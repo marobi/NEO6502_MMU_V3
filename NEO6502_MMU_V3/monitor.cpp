@@ -60,10 +60,13 @@ bool parseCmd(const String Cmd) {
   char lCmd;
   uint8_t c = 0;
 
+  cmdIndex = 0;
   while (Mon[c].cmd != NULL) {
     if (Mon[c].cmd == Cmd[0]) {
       // got it
       cmdCmd = Mon[c].cmd;
+
+      cmdIndex = 1;
 
       return true;
     }
@@ -92,7 +95,7 @@ void monitor() {
       Serial.printf(" OK\n");
       switch (cmdCmd) {
       case 'x':
-        return;
+        return;  // leave monitor
         break;
       };
     }
