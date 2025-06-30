@@ -37,6 +37,9 @@
     <ClCompile Include="monitor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="disasm6502.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="__vm\.NEO6502_MMU_V3.vsarduino.h">
@@ -61,6 +64,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="monitor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="disasm6502.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vdu.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

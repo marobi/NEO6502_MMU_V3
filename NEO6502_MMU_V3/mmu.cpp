@@ -8,6 +8,7 @@
 
 #define MMU_VALIDATE  1
 
+uint8_t gCurrentContext = 0x00;
 uint8_t gDefaultMMU[16] = { 0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x8F }; // straight 64k space with IO page on: F000 - FFFF
 
 volatile uint32_t gMMUIOCount = 0L;
@@ -63,7 +64,7 @@ bool getMMUIO() {
 /// 
 /// valid after init of MMU
 /// </summary>
-static void intMMUIO() {
+static void intrMMUIO() {
 //  setDebug(mLOW);
 
   gMMUIOCount++;
@@ -93,9 +94,6 @@ void setupMMU()
   gpio_pull_up(pMMUIO);            // Enable pull-up resistor
 }
 
-//
-static uint8_t gContext = 0x00;
-
 /// <summary>
 /// 
 /// </summary>
@@ -124,8 +122,18 @@ void writeMMUIndex(const uint8_t vIndex) {
   else
     Serial.printf("*E: writeMMUIndex: wrong control mode\n");
 }
+
+
 /// <summary>
-/// latch context register 00..255
+/// 
+/// </summary>
+/// <returns></returns>
+uint8_t readMMUContext() {
+  return gCurrentContext;
+}
+
+/// <summary>
+/// latch context register 00..127
 /// </summary>
 /// <param name="vContext"></param>
 //inline __attribute__((always_inline))
@@ -140,7 +148,7 @@ void writeMMUContext(const uint8_t vContext) {
 
   resetDataBus(); // databus to read
 
-  gContext = vContext;
+  gCurrentContext = vContext;
 }
 
 /// <summary>
@@ -151,7 +159,7 @@ void writeMMUContext(const uint8_t vContext) {
 /// <returns></returns>
 uint8_t readMMUPage(const uint8_t vContext, const uint8_t vIndex) {
   if (getControlMode() == mRPI) {
-    writeMMUContext(vContext);    // set context 00.255
+    writeMMUContext(vContext);    // set context 00.127
     writeMMUIndex(vIndex);        // set address 00.15
 
     setCPUARegOE(mLOW);         // enable address output 4 index
@@ -192,7 +200,7 @@ uint8_t readMMUPage(const uint8_t vContext, const uint8_t vIndex) {
 /// <param name="vPage"></param>
 /// <returns></returns>
 bool writeMMUPage(const uint8_t vContext, const uint8_t vIndex, const uint8_t vPage) {
-  writeMMUContext(vContext);    // set context 00.255
+  writeMMUContext(vContext);    // set context 00.127
   writeMMUIndex(vIndex);        // set address 00.15
 
   writeDataBus(vPage);        // data on NeoDBus
@@ -218,7 +226,6 @@ bool writeMMUPage(const uint8_t vContext, const uint8_t vIndex, const uint8_t vP
 
   resetDataBus();             //
 
-#if MMU_VALIDATE
 //  Serial.printf("*D: writeMMUPage: %02X %02X => %02X\n", vContext, vIndex, vPage);
 
   // validate
@@ -228,9 +235,6 @@ bool writeMMUPage(const uint8_t vContext, const uint8_t vIndex, const uint8_t vP
     Serial.printf("*E: writeMMUPage: @%02X %02X %02X (%02X)\n", vContext, vIndex & 0x0F, vPage, lData);
 
   return (lData == vPage);
-#else
-  return (true);
-#endif
 }
 
 /// <summary>
@@ -256,11 +260,9 @@ bool defMMUContext(const uint8_t vContext, const uint8_t *vMMU) {
     uint16_t lErrCount = 0;
 
     for (uint8_t lPage = 0; lPage < MUM_CONTEXT_PAGES; lPage++) {
-      if (!writeMMUPage(vContext, lPage, vMMU[lPage])) {
+      if (! writeMMUPage(vContext, lPage, vMMU[lPage])) {
         lErrCount++;
       }
-//      else
-//        Serial.printf("*D: defMMUContext: %02X %02X: %02X\n", vContext, lPage, readMMUPage(vContext, lPage));
     }
 
 //    dumpMMUContext(vContext);
@@ -279,7 +281,7 @@ void disableMMUInterrupt() {
 /// enable mmuIO interrupt
 /// </summary>
 void enableMMUInterrrupt() {
-  attachInterrupt(pMMUIO, intMMUIO, FALLING); // interrupt on IO page
+  attachInterrupt(pMMUIO, intrMMUIO, FALLING); // interrupt on IO page
 }
 
 /// <summary>
@@ -299,7 +301,7 @@ bool initMMU() {
     }
 
     // default context
-    writeMMUContext(0x00);
+    writeMMUContext(DEFAULT_CONTEXT);
 
     if (lErrCount == 0) {
       enableMMUInterrrupt(); // interrupt on IO page

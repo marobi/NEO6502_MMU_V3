@@ -4,7 +4,6 @@
  Author:	Rien Matthijsse
 */
 
-#include "monitor.h"
 #include <Arduino.h>
 #include "config.h"
 #include "control.h"
@@ -14,6 +13,7 @@
 #include "p6502.h"
 #include "ram.h"
 #include "monitor.h"
+#include "disasm6502.h"
 
 // base = 0xfff0
 static const uint8_t gBin[16] = {
@@ -29,8 +29,8 @@ static const uint8_t gBin[16] = {
 /// test
 /// </summary>
 void test() {
-  testMMU();
-//   testBUS();
+//  testMMU();
+   testBUS();
 }
 
 /// <summary>
@@ -69,13 +69,13 @@ void setup() {
   Serial.printf("*I: 6502 frequency: %d MHz\n", DEFAULT_6502_CLOCK / MHZ);
   Serial.println();
 
-  Serial.printf("Test program:\n");
+  Serial.printf("Test program @\n");
   if (loadBinary(0xFFF0, 16, &gBin[0]))      // load some sample binary
     dumpMemory(0xFFF0, 0XFFFF);              // show it
   else
     Serial.printf("*E: Binary not loaded\n");
 
-  enterMonitor();
+  initMonitor();
 
   //// test
   //dumpMemory(0x0FF0, 0X0FFF);
@@ -104,6 +104,7 @@ void setup() {
 /// loop for ever
 /// </summary>
 void loop() {
+  monitor();
   // test
   test();
 }

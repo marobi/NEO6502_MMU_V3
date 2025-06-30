@@ -292,16 +292,16 @@ void testBUS() {
   setDebug(mLOW);
 #endif
 
-  initMMU();
-  ldata = read6502Memory(0XFF00);
-  Serial.printf("*D: IRD: %04X %02X (%d)\n", gAddress, ldata, getMMUIOCount());
-  ldata = read6502Memory(0XFF01);
-  Serial.printf("*D: IRD: %04X %02X (%d)\n", gAddress, ldata, getMMUIOCount());
+  //initMMU();
+  //ldata = read6502Memory(0XFF00);
+  //Serial.printf("*D: IRD: %04X %02X (%d)\n", gAddress, ldata, getMMUIOCount());
+  //ldata = read6502Memory(0XFF01);
+  //Serial.printf("*D: IRD: %04X %02X (%d)\n", gAddress, ldata, getMMUIOCount());
 
-  defMMUContext(0x00, gDummy);
+  //defMMUContext(0x00, gDummy);
 
-  ldata = read6502Memory(0XFF00);
-  Serial.printf("*D: ORD: %04X %02X (%d)\n\n", gAddress, ldata, getMMUIOCount());
+  //ldata = read6502Memory(0XFF00);
+  //Serial.printf("*D: ORD: %04X %02X (%d)\n\n", gAddress, ldata, getMMUIOCount());
 
   
 #ifdef DEBUG

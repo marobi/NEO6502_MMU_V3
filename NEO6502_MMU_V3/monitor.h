@@ -5,8 +5,8 @@
 
 #define MON_VERSION "v1.00"
 
-void enterMonitor();
+void initMonitor();
 
-void exitMonitor();
+void monitor();
 
 #endif

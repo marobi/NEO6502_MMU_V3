@@ -5,11 +5,15 @@
 
 #include "pins.h"
 
-#define NUM_CONTEXTS (1)
-#define MUM_CONTEXT_PAGES  (16)
+//#define PAGE_SIZE        (4096)      // 4k
+#define NUM_CONTEXTS       (128)       // 128 x 4k = 512k
+#define MUM_CONTEXT_PAGES  (16)        // 16 x 4k = 64k
+#define DEFAULT_CONTEXT    (0)
 
 
 uint32_t getMMUIOCount();
+
+uint8_t readMMUContext();
 
 void writeMMUContext(const uint8_t);
 
