@@ -1,19 +1,22 @@
 // 
 // 
 // 
-#include <Arduino.h>
 #include "hardware/pwm.h"
+#include <Arduino.h>
 
 #include "config.h"
+#include "control.h"
+#include "neobus.h"
 #include "p6502.h"
 #include "pins.h"
-#include "control.h"
 
 // desired frequency in Hz
-uint32_t gClockFrequency = DEFAULT_6502_CLOCK;  // 1 MHz default
+static uint32_t gClockFrequency = DEFAULT_6502_CLOCK;  // 1 MHz default
 
-uint8_t gBusState;   // will be init in setup6502
-uint8_t gCPUState;   // will be init in setup6502
+static uint8_t gBusState;   // will be init in setup6502
+static uint8_t gCPUState;   // will be init in setup6502
+static uint8_t gDir6502RW = mINPUT;
+static uint8_t gClockState;
 
 /// <summary>
 /// control 6502 RESET
@@ -42,41 +45,22 @@ void set6502RDY(const uint8_t vHL) {
   gpio_put(p6502RDY, vHL);
 }
 
-//
-uint8_t gDir6502RW = mINPUT;
+/// <summary>
+/// 
+/// </summary>
+/// <param name="vHL"></param>
+inline __attribute__((always_inline))
+void set6502PHI2(const uint8_t vHL) {
+  gpio_put(p6502PHI2, vHL);
+}
 
 /// <summary>
-/// set the direction of 6502 RW bus pin
+/// 
 /// </summary>
-/// <param name="vDir"></param>
-void dir6502RW(const uint8_t vDir) {
-    switch (vDir) {
-    case mINPUT:                            // always allowed
-      if (gDir6502RW != mINPUT) {
-        gpio_init(p6502RW);                 // Always init pins first
-        gpio_set_dir(p6502RW, GPIO_IN);     // Set as input
-        gpio_pull_up(p6502RW);              // Enable pull-up resistor
-        gDir6502RW = mINPUT;
-      }
-      break;
-    
-    case mOUTPUT:
-//      if (gBusState == eDISABLED) {          // only allowed when bus is disabled
-        if (gDir6502RW != mOUTPUT) {
-          gpio_init(p6502RW);                // Always init pins first
-          gpio_set_dir(p6502RW, GPIO_OUT);   // Set as output
-          set6502Reset(mHIGH);               // read
-          gDir6502RW = mOUTPUT;
-        }
-//      }
-//      else
-//        Serial.printf("*E: dir6502RW: bus NOT disabled");
-      break;
-    
-    default:
-      Serial.printf("*E: dir6502RW: invalid direction\n");
-      break;
-    }
+/// <param name="vHL"></param>
+inline __attribute__((always_inline))
+void set6502IRQ(const uint8_t vHL) {
+  gpio_put(p6502IRQ, vHL);
 }
 
 /// <summary>
@@ -86,8 +70,50 @@ void dir6502RW(const uint8_t vDir) {
 void set6502RW(const uint8_t vHL) {
   if (gDir6502RW == mOUTPUT)
     gpio_put(p6502RW, vHL);
+//  else
+//    Serial.printf("*E: set6502RW: RW pin NOT output\n");
+}
+
+/// <summary>
+/// 
+/// </summary>
+/// <returns></returns>
+uint8_t get6502RW() {
+  if (gDir6502RW == mINPUT)
+    return gpio_get(p6502RW);
   else
-    Serial.printf("*E: set6502RW: RW pin NOT output\n");
+    Serial.println("*E: get6502RW: not input");
+
+  return true;
+}
+
+/// <summary>
+/// set the direction of 6502 RW bus pin
+/// </summary>
+/// <param name="vDir"></param>
+void dir6502RW(const uint8_t vDir) {
+    switch (vDir) {
+    case mINPUT:                            // always allowed
+      if (gDir6502RW != mINPUT) {
+        gpio_pull_up(p6502RW);              // Enable pull-up resistor
+        gpio_set_dir(p6502RW, GPIO_IN);     // Set as input
+        gDir6502RW = mINPUT;
+      }
+      break;
+    
+    case mOUTPUT:
+        if (gDir6502RW != mOUTPUT) {
+          gDir6502RW = mOUTPUT;
+          set6502RW(mHIGH);                  // read
+          gpio_set_dir(p6502RW, GPIO_OUT);   // Set as output
+          set6502RW(mHIGH);                  // for sure
+        }
+      break;
+    
+    default:
+      Serial.printf("*E: dir6502RW: invalid direction\n");
+      break;
+    }
 }
 
 /// <summary>
@@ -96,6 +122,8 @@ void set6502RW(const uint8_t vHL) {
 /// <param name="freq"></param>
 void set6502Clock(const uint32_t target_freq) {
   const uint32_t pwm_clk = 125000000L;
+
+  gpio_set_function(p6502PHI2, GPIO_FUNC_PWM); // PWM output
 
   uint slice_num = pwm_gpio_to_slice_num(p6502PHI2);
   uint channel = pwm_gpio_to_channel(p6502PHI2);
@@ -115,6 +143,64 @@ void set6502Clock(const uint32_t target_freq) {
   pwm_set_wrap(slice_num, wrap);
   pwm_set_chan_level(slice_num, channel, wrap / 2);  // 50% duty cycle
   pwm_set_enabled(slice_num, true);
+
+  gClockState = ePWM;
+}
+
+/// <summary>
+/// 
+/// </summary>
+void reset6502Clock() {
+  uint slice_num = pwm_gpio_to_slice_num(p6502PHI2);
+  pwm_set_enabled(slice_num, false);
+  delayMicroseconds(1);
+  gpio_set_function(p6502PHI2, GPIO_FUNC_SIO); // GPIO output
+  gpio_init(p6502PHI2);               // GPIO
+  gpio_set_dir(p6502PHI2, GPIO_OUT);
+
+  set6502PHI2(mLOW);
+
+  gClockState = eSS;
+}
+
+/// <summary>
+/// 
+/// </summary>
+inline __attribute__((always_inline))
+void _ss6502Clock() {
+  set6502PHI2(mLOW);
+
+  delayMicroseconds(5);
+
+  set6502PHI2(mHIGH);
+
+  delayMicroseconds(5);
+
+  set6502PHI2(mLOW);
+}
+
+/// <summary>
+/// 
+/// </summary>
+/// <param name="vSteps"></param>
+/// <param name="vDisplay"></param>
+void singleStep6502(const uint8_t vSteps, const bool vDisplay) {
+  if (gClockState == eSS) {
+    if (vSteps == 0) {
+      if (vDisplay) {
+        Serial.printf("%02d:\t%04X: %02X %1d\n", 0, readCPUAddress(), read6502Data(), get6502RW());
+      }
+      return;
+    }
+    for (uint8_t s; s < vSteps; s++) {
+      _ss6502Clock();
+      if (vDisplay) {
+        Serial.printf("s%02d:\t%04X: %02X %1d\n", s, readCPUAddress(), read6502Data(), get6502RW());
+      }
+    }
+  }
+  else
+    Serial.println("*E: ss6502: clock is running");
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -126,17 +212,19 @@ void set6502Clock(const uint32_t target_freq) {
 bool set6502State(const uint8_t cpuState, const uint8_t busState) {
   switch (cpuState) {
   case eRESET:
-    set6502Reset(mLOW);      // reset
+    set6502Reset(mLOW);                    // reset
 
     switch (busState) {
     case eDISABLED:
       setControlMode(mRPI);                // RPI can take control
+      set6502RDY(mLOW);
       set6502BE(mLOW);
       dir6502RW(mOUTPUT);                  // force RW-pin as output
       break;
     
     case eENABLED:
       setControlMode(mCPU);                // RPI cannot take control
+      set6502RDY(mLOW);
       dir6502RW(mINPUT);                   // force RW-pin as input
       set6502BE(mHIGH);
       break;
@@ -151,9 +239,10 @@ bool set6502State(const uint8_t cpuState, const uint8_t busState) {
   case eRUN:
     setControlMode(mCPU);                // RPI can not take control
     dir6502RW(mINPUT);                   // force RW-pin as input
-    set6502BE(mHIGH);
-    set6502RDY(mHIGH);
-    set6502Reset(mHIGH);
+    set6502IRQ(mHIGH);                   // no IRQ
+    set6502BE(mHIGH);                    // BUS enabled
+    set6502RDY(mHIGH);                   // RDY released
+    set6502Reset(mHIGH);                 // RESET released
     break;
 
   case eHALTED:
@@ -192,6 +281,12 @@ bool set6502State(const uint8_t cpuState, const uint8_t busState) {
 }
 
 //
+static const char lTxtRWState[2][8] = {
+  "OUTPUT",
+  "INPUT"
+};
+
+//
 static const char lTxtCPUState[3][8] = {
   "RESET",
   "RUN",
@@ -214,7 +309,12 @@ static const char lTxtControlState[2][4] = {
 /// show states of 6502
 /// </summary>
 void state6502() {
-  Serial.printf("*I: CPU: %s\tBus: %s\tControl: %s\n", lTxtCPUState[gCPUState], lTxtBusState[gBusState], lTxtControlState[getControlMode()]);
+  Serial.printf("*I: CPU: %s\tBus: %s\tControl: %s\tRW: %s\t", lTxtCPUState[gCPUState], lTxtBusState[gBusState], lTxtControlState[getControlMode()], lTxtRWState[gDir6502RW]);
+
+  if (gClockState == ePWM)
+    Serial.println("CLK: GEN");
+  else
+    Serial.println("CLK: SS");
 }
 
 /// <summary>
@@ -250,6 +350,12 @@ void setup6502() {
   gDir6502RW = mOUTPUT;
   set6502RW(mREAD);                   // read
 
+  gpio_init(p6502IRQ);                // Always init
+  set6502IRQ(mHIGH);                   // no IRQ
+  gpio_set_dir(p6502IRQ, GPIO_OUT);   // Set as output
+  set6502IRQ(mHIGH);                   // no IRQ
+
   gpio_init(p6502PHI2);               // Always init
   gpio_set_function(p6502PHI2, GPIO_FUNC_PWM); // PWM output
+  gClockState = ePWM;
 }

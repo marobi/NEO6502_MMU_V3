@@ -42,9 +42,8 @@ void resetVDU() {
 /// 
 /// </summary>
 void initVDU() {
-  if (! display.begin()) {
+  if (!display.begin()) {
     Serial.println("*E: VDU: not enough RAM available");
-//    for (;;);
   }
   else
     resetVDU();
@@ -76,7 +75,8 @@ void initVDU() {
     display.write('\n');
   }
   display.write('\n');
-  display.write('\n');
+
+  Serial.println("*I: VDU init OK");
 }
 
 /// <summary>

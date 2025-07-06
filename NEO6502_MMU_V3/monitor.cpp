@@ -4,19 +4,24 @@
 // 
 #include <arduino.h>
 #include <SimpleCLI.h>
+
+#include "config.h"
+#include "bios.h"
 #include "monitor.h"
 #include "p6502.h"
 #include "mmu.h"
 #include "ram.h"
-#include "bus.h"
+#include "neobus.h"
 #include "disasm6502.h"
 
 
 // Create CLI Object
 static SimpleCLI gCli;
+// Commands
+static Command gCmd;
 
 /// <summary>
-/// 
+/// converts text string hex > integer
 /// </summary>
 /// <param name="s"></param>
 /// <returns></returns>
@@ -45,51 +50,109 @@ int x2i(const char* s)
 }
 
 /// <summary>
-/// 
+/// RESET
 /// </summary>
 /// <param name="c"></param>
 void cmdResetCallback(cmd* c) {
   Command cmd(c); // Create wrapper object
 
   // Get argument
-  if (cmd.getArgument("d").isSet()) 
+  String lBus = cmd.getArgument("bus").getValue();
+  switch (lBus[0]) {
+  case 'd':
+    set6502State(eRESET, eDISABLED);
     Serial.println("Reset disabled");
-  else
-    if (cmd.getArgument("e").isSet())
-      Serial.println("Reset enabled");
-    else
-      Serial.println("Reset");
+    break;
+
+  case 'e':
+    set6502State(eRESET, eENABLED);
+    Serial.println("Reset enabled");
+    break;
+
+  default:
+    Serial.println("*E: Reset: invalid parameter");
+    break;
+  }
 }
 
 /// <summary>
-/// 
+/// CLOCK on or off
+/// </summary>
+/// <param name="c"></param>
+void cmdClockCallback(cmd* c) {
+  Command cmd(c); // Create wrapper object
+
+  // Get argument
+  String lBus = cmd.getArgument("state").getValue();
+  switch (lBus[1]) {
+  case 'n':
+    // clock on
+    set6502Clock(DEFAULT_6502_CLOCK);
+    Serial.println("Clock ON");
+    break;
+  case 'f':
+    // clock off
+    reset6502Clock();
+    Serial.println("Clock OFF");
+    break;
+  default:
+    Serial.println("*E: Clock: invalid parameter");
+    break;
+  }
+}
+
+/// <summary>
+/// GO after halt or reset
 /// </summary>
 /// <param name="c"></param>
 void cmdGoCallback(cmd* c) {
   Command cmd(c); // Create wrapper object
 
+  set6502State(eRUN, eENABLED);
   Serial.println("Go");
 }
 
 /// <summary>
-/// 
+/// SINGLE STEP CPU
+/// </summary>
+/// <param name="c"></param>
+void cmdSSCallback(cmd* c) {
+  Command cmd(c);
+
+  String arg1 = cmd.getArgument("steps").getValue();
+  uint8_t lStep = atoi(arg1.c_str()) & 0xFF;
+
+  singleStep6502(lStep, true);
+}
+
+/// <summary>
+/// STOP
 /// </summary>
 /// <param name="c"></param>
 void cmdStopCallback(cmd* c) {
   Command cmd(c); // Create wrapper object
 
   // Get argument
-  if (cmd.getArgument("d").isSet())
+  String lBus = cmd.getArgument("bus").getValue();
+  switch (lBus[0]) {
+  case 'd':
+    set6502State(eHALTED, eDISABLED);
     Serial.println("Stop disabled");
-  else
-    if (cmd.getArgument("e").isSet())
-      Serial.println("Stop enabled");
-    else
-      Serial.println("Stop");
+    break;
+
+  case 'e':
+    set6502State(eHALTED, eENABLED);
+    Serial.println("Stop enabled");
+    break;
+
+  default:
+    Serial.println("*E: Stop: invalid parameter");
+    break;
+  }
 }
 
 /// <summary>
-/// 
+/// DUMP memory
 /// </summary>
 /// <param name="c"></param>
 void cmdDumpCallback(cmd* c) {
@@ -106,7 +169,7 @@ void cmdDumpCallback(cmd* c) {
 }
 
 /// <summary>
-/// 
+/// DISASM memory
 /// </summary>
 /// <param name="c"></param>
 void cmdDisAsmCallback(cmd* c) {
@@ -128,7 +191,7 @@ void cmdDisAsmCallback(cmd* c) {
 }
 
 /// <summary>
-/// 
+/// MEMORY alter
 /// </summary>
 /// <param name="c"></param>
 void cmdMemCallback(cmd* c) {
@@ -147,7 +210,7 @@ void cmdMemCallback(cmd* c) {
     for (uint8_t i = 1; i < lCountArgs; i++) {
       lData = x2i(cmd.getArgument(i).getValue().c_str()) & 0xFF;
 
-      write6502Memory(lAddress++, lData);
+      snoop_write6502Memory(lAddress++, 1, &lData);
     }
 
     // just nice
@@ -157,7 +220,7 @@ void cmdMemCallback(cmd* c) {
 }
 
 /// <summary>
-/// 
+/// STATUS
 /// </summary>
 /// <param name="c"></param>
 void cmdStatusCallback(cmd* c) {
@@ -167,7 +230,7 @@ void cmdStatusCallback(cmd* c) {
 }
 
 /// <summary>
-/// 
+/// IRQ
 /// </summary>
 /// <param name="c"></param>
 void cmdIRQCallback(cmd* c) {
@@ -213,19 +276,21 @@ void cmdPageCallback(cmd* c) {
 /// </summary>
 /// <param name="c"></param>
 void cmdHelpCallback(cmd* c) {
-  Serial.print("\n\r\RPI ICM:\n\r\
- r/eset <d|e>          reset <disabled | enabled>\n\r\
- g/o                   go from reset\n\r\
- s/top <d|e>           stop <disabled | enabled> \n\r\
- i/rq                  generate IRQ\n\r\
- d/ump <from> <to>     dump memory\n\r\
- dis <from> <to>       disasm memory\n\r\
- m/em <address> <data> modify memory address(es)\n\r\
- st/at                 status of cpus/bus\n\r\
- mmu  <context>        set mmu context\n\r\
- page <index> <page>   set mmu page\n\r\
- h/elp                 help\n\r\
-\n\r");
+  Serial.print("RPI ICM help:\n\
+ cl/ock <on|off>       turn clock on|off\n\
+ r/eset <d|e>          reset <disabled | enabled>\n\
+ s/top <d|e>           stop <disabled | enabled> \n\
+ g/o                   go\n\
+ ss <steps>            single step (steps)\n\
+ i/rq                  generate IRQ\n\
+ d/ump <from> <to>     dump memory\n\
+ dis <from> <to>       disasm memory\n\
+ m/em <address> <data> modify memory address(es)\n\
+ st/at                 status of cpus/bus\n\
+ mmu  <context>        set mmu context\n\
+ page <index> <page>   set mmu page\n\
+ help                  help\n\
+\n");
 }
 
 /// <summary>
@@ -245,33 +310,34 @@ void errorCallback(cmd_error* e) {
   }
 }
 
-// Commands
-static Command gCmd;
-
 /// <summary>
 /// init the monitor commands
 /// </summary>
 void initMonitor() {
-  Serial.printf("RPI-6502 I.C.M. %s\n> ", MON_VERSION);
+  Serial.printf("RPI I.C.M. (%s) %s\n> ", BIOS_CPU, MON_VERSION);
 
   // Create the commands with callback function
+  gCmd = gCli.addCmd("cl/ock", cmdClockCallback);
+  gCmd.addPositionalArgument("state", "off");
+
   gCmd = gCli.addCmd("r/eset", cmdResetCallback);
-  gCmd.addFlagArgument("d");
-  gCmd.addFlagArgument("e");
+  gCmd.addPositionalArgument("bus", "d");
 
   gCmd = gCli.addCmd("g/o", cmdGoCallback);
 
+  gCmd = gCli.addCmd("ss", cmdSSCallback);
+  gCmd.addPositionalArgument("steps", "1");
+
   gCmd = gCli.addCmd("s/top", cmdStopCallback);
-  gCmd.addFlagArgument("d");
-  gCmd.addFlagArgument("e");
+  gCmd.addPositionalArgument("bus", "d");
 
   gCmd = gCli.addCmd("d/ump", cmdDumpCallback);
   gCmd.addPositionalArgument("from");
-  gCmd.addPositionalArgument("to");
+  gCmd.addPositionalArgument("to", "0");
 
   gCmd = gCli.addCmd("dis", cmdDisAsmCallback);
   gCmd.addPositionalArgument("from");
-  gCmd.addPositionalArgument("to");
+  gCmd.addPositionalArgument("to", "0");
 
   gCmd = gCli.addBoundlessCommand("m/em", cmdMemCallback);
 
@@ -280,7 +346,7 @@ void initMonitor() {
   gCmd = gCli.addCmd("i/rq", cmdIRQCallback);
 
   gCmd = gCli.addCmd("mmu", cmdMMUCallback);
-  gCmd.addPositionalArgument("context");
+  gCmd.addPositionalArgument("context", "0");
 
   gCmd = gCli.addCmd("page", cmdPageCallback);
   gCmd.addPositionalArgument("index");

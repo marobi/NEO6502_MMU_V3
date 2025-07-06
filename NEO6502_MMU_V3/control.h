@@ -18,11 +18,11 @@ void setControlMode(const uint8_t);
 
 void setmRW(const uint8_t);
 
-uint8_t readDataBus();
+uint8_t readNEOBus();
 
-void writeDataBus(const uint8_t);
+void writeNEOBus(const uint8_t);
 
-void resetDataBus();
+void resetNEOBus();
 
 void setupControl();
 

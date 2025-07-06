@@ -5,33 +5,22 @@
 */
 
 #include <Arduino.h>
+#include <LittleFS.h>
+
 #include "config.h"
 #include "control.h"
 #include "mmu.h"
-#include "bus.h"
+#include "neobus.h"
 #include "vdu.h"
 #include "p6502.h"
 #include "ram.h"
 #include "monitor.h"
-#include "disasm6502.h"
+#include "bios.h"
+#include "cmd_proc.h"
 
-// base = 0xfff0
-static const uint8_t gBin[16] = {
- 0x4c, 0xf0, 0xff,
- 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
- 0x00, 0x00,  // irq
- 0xf0, 0xff,  // reset 
- 0x00, 0x00   // nmi
-};
-
-
-/// <summary>
-/// test
-/// </summary>
-void test() {
-//  testMMU();
-   testBUS();
-}
+#include "rom.h"
+#include "rom_test.h"
+#include "rom_bios.h"
 
 /// <summary>
 /// setup
@@ -43,7 +32,7 @@ void setup() {
   setupMMU();
 
   Serial.begin(115200);
-  delay(2500);
+  delay(1500);
 
   // turn PHI2 on
   init6502();
@@ -59,21 +48,30 @@ void setup() {
     delay(5000);
   }
 
+  if (! LittleFS.begin()) {
+    Serial.println("*E: LittleFS mount failed");
+  }
+  else
+    Serial.println("*I: LittleFS mount OK");
+
   initVDU();      // get display running
+
+  initCmdProcessor();
 
   Serial.printf("*I: setup done\n");
 
+  Serial.printf("*I: BIOS: %s %s\n", BIOS_DATE, BIOS_TIME);
   // report clock freqs.
   uint32_t freq = clock_get_hz(clk_sys);
   Serial.printf("*I: Core frequency: %d MHz\n", freq / MHZ);
   Serial.printf("*I: 6502 frequency: %d MHz\n", DEFAULT_6502_CLOCK / MHZ);
-  Serial.println();
 
   Serial.printf("Test program @\n");
-  if (loadBinary(0xFFF0, 16, &gBin[0]))      // load some sample binary
-    dumpMemory(0xFFF0, 0XFFFF);              // show it
-  else
-    Serial.printf("*E: Binary not loaded\n");
+  loadROM(test_bin);
+
+  // load bios
+  Serial.printf("BIOS program @\n");
+  loadROM(bios_bin);
 
   initMonitor();
 
@@ -105,6 +103,6 @@ void setup() {
 /// </summary>
 void loop() {
   monitor();
-  // test
-  test();
+  delay(50);
+//  testBUS();
 }

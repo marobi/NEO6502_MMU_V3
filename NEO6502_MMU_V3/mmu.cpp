@@ -4,9 +4,7 @@
 
 #include "control.h"
 #include "mmu.h"
-#include "bus.h"
-
-#define MMU_VALIDATE  1
+#include "neobus.h"
 
 uint8_t gCurrentContext = 0x00;
 uint8_t gDefaultMMU[16] = { 0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x8F }; // straight 64k space with IO page on: F000 - FFFF
@@ -138,15 +136,16 @@ uint8_t readMMUContext() {
 /// <param name="vContext"></param>
 //inline __attribute__((always_inline))
 void writeMMUContext(const uint8_t vContext) {
-  writeDataBus(vContext); // write context
+  writeNEOBus(vContext); // write context
 
   setMMUARegHLatch(mLOW); // arm latching
 
   DELAY_FACTOR_SHORT();
+  DELAY_FACTOR_SHORT();
 
   setMMUARegHLatch(mHIGH); // latch
 
-  resetDataBus(); // databus to read
+  resetNEOBus(); // databus to read
 
   gCurrentContext = vContext;
 }
@@ -162,24 +161,19 @@ uint8_t readMMUPage(const uint8_t vContext, const uint8_t vIndex) {
     writeMMUContext(vContext);    // set context 00.127
     writeMMUIndex(vIndex);        // set address 00.15
 
-    setCPUARegOE(mLOW);         // enable address output 4 index
+    setCPUARegOE(mLOW);           // enable address output 4 index
 
-    setpRW(mREAD);              // read action (to be sure)
+    setpRW(mREAD);                // read action (to be sure)
 
-    setMMUDRegOE(mLOW);         // enable DBuffer
+    setMMUDRegOE(mLOW);           // enable DBuffer
 
-    DELAY_FACTOR_SHORT();
-    DELAY_FACTOR_SHORT();
-    DELAY_FACTOR_SHORT();
-    DELAY_FACTOR_SHORT();
+    uint8_t lPage = readNEOBus();
 
-    uint8_t lPage = readDataBus();
+    setMMUDRegOE(mHIGH);          // disable DBuffer
 
-    setMMUDRegOE(mHIGH);        // disable DBuffer
+    setCPUARegOE(mHIGH);          // disable output address
 
-    setCPUARegOE(mHIGH);        // disable output address
-
-    resetDataBus();             //
+//    resetNEOBus();                // to be sure
 
 //    Serial.printf("*D: readMMUPage %02X %02X : %02X\n", vContext, vIndex, lPage);
 
@@ -200,16 +194,16 @@ uint8_t readMMUPage(const uint8_t vContext, const uint8_t vIndex) {
 /// <param name="vPage"></param>
 /// <returns></returns>
 bool writeMMUPage(const uint8_t vContext, const uint8_t vIndex, const uint8_t vPage) {
-  writeMMUContext(vContext);    // set context 00.127
-  writeMMUIndex(vIndex);        // set address 00.15
+  writeMMUContext(vContext);   // set context 00.127
+  writeMMUIndex(vIndex);       // set address 00.15
 
-  writeDataBus(vPage);        // data on NeoDBus
+  setCPUARegOE(mLOW);          // enable output address
 
-  setCPUARegOE(mLOW);         // enable output address
-
-  setMMUDRegOE(mLOW);         // enable DBuffer
-
-  setpRW(mWRITE);             // write action
+  writeNEOBus(vPage);          // data on NeoDBus
+   
+  setMMUDRegOE(mLOW);          // enable DBuffer
+   
+  setpRW(mWRITE);              // write action
 
   DELAY_FACTOR_SHORT();
   DELAY_FACTOR_SHORT();
@@ -224,9 +218,7 @@ bool writeMMUPage(const uint8_t vContext, const uint8_t vIndex, const uint8_t vP
 
   setCPUARegOE(mHIGH)   ;     // disable output address
 
-  resetDataBus();             //
-
-//  Serial.printf("*D: writeMMUPage: %02X %02X => %02X\n", vContext, vIndex, vPage);
+  resetNEOBus();
 
   // validate
   uint8_t lData = readMMUPage(vContext, vIndex);
@@ -312,7 +304,7 @@ bool initMMU() {
     return (lErrCount == 0);
 }
 
-#include "bus.h"
+#include "neobus.h"
 
 /// <summary>
 /// 

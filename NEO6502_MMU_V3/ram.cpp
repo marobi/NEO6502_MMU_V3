@@ -1,13 +1,12 @@
 // 
 // 
 // 
-
 #include "Arduino.h"
 #include "config.h"
 #include "ram.h"
 #include "control.h"
 #include "mmu.h"
-#include "bus.h"
+#include "neobus.h"
 
 /// <summary>
 /// dump 16 bytes of memory
@@ -15,14 +14,16 @@
 /// <param name="vAddress"></param>
 inline __attribute__((always_inline))
 void dump16(const uint16_t vAddress) {
+  uint8_t dat;
+
   Serial.printf("%04X:", vAddress);
   for (uint8_t m = 0; m < 8; m++) {
-    uint8_t dat = read6502Memory(vAddress + m);
+    snoop_read6502Memory(vAddress + m, 1, &dat);
     Serial.printf(" %02X", dat);
   }
   Serial.printf(" ");
   for (uint8_t m = 8; m < 16; m++) {
-    uint8_t dat = read6502Memory(vAddress + m);
+    snoop_read6502Memory(vAddress + m, 1, &dat);
     Serial.printf(" %02X", dat);
   }
 
@@ -55,9 +56,11 @@ bool loadBinary(const uint16_t vAddress, const uint16_t vSize, const uint8_t* vB
     return false;
   }
 
-  for (uint16_t m = 0; m < vSize; m++) {
-    write6502Memory(vAddress + m, vBinary[m]);
-  }
+  //for (uint16_t m = 0; m < vSize; m++) {
+  //  write6502Memory(vAddress + m, vBinary[m]);
+  //}
+
+  snoop_write6502Memory(vAddress, vSize, vBinary);
 
   return true;
 }

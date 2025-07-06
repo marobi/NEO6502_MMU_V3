@@ -15,6 +15,11 @@ enum busState {
   eENABLED
 };
 
+enum clockState {
+  ePWM = 0,
+  eSS
+};
+
 /*
                     DISABLED  ENABLED
     eRESET             X        X
@@ -32,6 +37,10 @@ enum busState {
 void set6502RW(const uint8_t);
 
 void set6502Clock(const uint32_t);
+
+void reset6502Clock();
+
+void singleStep6502(const uint8_t vSteps, const bool vDisplay);
 
 bool set6502State(const uint8_t, const uint8_t);
 

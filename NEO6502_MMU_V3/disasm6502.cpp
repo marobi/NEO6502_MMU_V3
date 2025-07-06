@@ -3,7 +3,7 @@
 */
 #include <arduino.h>
 #include "disasm6502.h"
-#include "bus.h"
+#include "neobus.h"
 
 // Padding for 1,2 & 3 byte instructions
 static const char* padding[3] = { "       ","    "," " };
@@ -61,9 +61,11 @@ uint16_t disasm6502(const uint16_t vAddress) {
   const char* post;
 
   address = vAddress;
-  buffer[0] = read6502Memory(vAddress);
-  buffer[1] = read6502Memory(vAddress + 1);
-  buffer[2] = read6502Memory(vAddress + 2);
+  //buffer[0] = read6502Memory(vAddress);
+  //buffer[1] = read6502Memory(vAddress + 1);
+  //buffer[2] = read6502Memory(vAddress + 2);
+
+  snoop_read6502Memory(vAddress, 3, buffer);
 
   for (uint8_t i = 0; i < 3; ++i) {                                 //Start proccessing loop.
     previousbyte = currentbyte;

@@ -53,21 +53,15 @@ void setmRW(const uint8_t vRW) {
 /// </summary>
 /// <param name="lDirection"></param>
 inline __attribute__((always_inline))
-void  setDataBusDir(const uint8_t lDirection) {
+void  setNEOBusDir(const uint8_t lDirection) {
   if (lDirection != gBusDir) {
     switch (lDirection) {
     case mWRITE:  
       gpio_set_dir_masked64(DATA_BUS_MASK, DATA_BUS_MASK);
-//      for (uint8_t i = (40u); i <= (47u); i++) {
-//        gpio_set_dir(i, GPIO_OUT);   // Set as output
-//      }
       break;
 
     case mREAD:   
       gpio_set_dir_masked64(DATA_BUS_MASK, (uint64_t)0ULL);
-//      for (uint8_t i = (40u); i <= (47u); i++) {
-//        gpio_set_dir(i, GPIO_IN);   // Set as input
-//      }
       break;
     }
 
@@ -79,8 +73,8 @@ void  setDataBusDir(const uint8_t lDirection) {
 /// read a byte from NEObus
 /// </summary>
 /// <returns></returns>
-uint8_t readDataBus() {
-  setDataBusDir(mREAD);     // input
+uint8_t readNEOBus() {
+  setNEOBusDir(mREAD);     // input
 
   DELAY_FACTOR_SHORT();
   DELAY_FACTOR_SHORT();
@@ -96,11 +90,12 @@ uint8_t readDataBus() {
 /// write a byte to the NEObus
 /// </summary>
 /// <param name="vData"></param>
-void writeDataBus(const uint8_t vData) {
-  setDataBusDir(mWRITE);
+void writeNEOBus(const uint8_t vData) {
+  setNEOBusDir(mWRITE);
 
   gpio_put_masked64(DATA_BUS_MASK, ((uint64_t)vData << 40u));
 
+  DELAY_FACTOR_SHORT();
   DELAY_FACTOR_SHORT();
   DELAY_FACTOR_SHORT();
   DELAY_FACTOR_SHORT();
@@ -109,10 +104,10 @@ void writeDataBus(const uint8_t vData) {
 /// <summary>
 /// reset NOEObus
 /// </summary>
-void resetDataBus() {
+void resetNEOBus() {
   DELAY_FACTOR_SHORT();
 
-  setDataBusDir(mREAD);
+  setNEOBusDir(mREAD);
 }
 
 /// <summary>
@@ -121,18 +116,18 @@ void resetDataBus() {
 void setupControl() {
   // NEO databus init
   for (uint8_t  i = (40u); i <= (47u); i++) {
-    gpio_init(i);               // Always init pins first
-    gpio_set_dir(i, GPIO_IN);   // Set as input
-    gpio_pull_up(i);            // Enable pull-up resistor
+    gpio_init(i);                  // Always init pins first
+    gpio_set_dir(i, GPIO_IN);      // Set as input
+    gpio_pull_up(i);               // Enable pull-up resistor
   }
 
-  setDataBusDir(mREAD);         // INPUT
+  setNEOBusDir(mREAD);            // INPUT
 
-  gpio_init(mRW);               // Always init pins first
-  gpio_set_dir(mRW, GPIO_OUT);   // Set as output
+  gpio_init(mRW);                  // Always init pins first
+  gpio_set_dir(mRW, GPIO_OUT);     // Set as output
   setmRW(mHIGH);
 
   gpio_init(pDebug);               // Always init pins first
-  gpio_set_dir(pDebug, GPIO_OUT);   // Set as output
+  gpio_set_dir(pDebug, GPIO_OUT);  // Set as output
   setDebug(mHIGH);
 }

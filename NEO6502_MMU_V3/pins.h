@@ -16,9 +16,6 @@ constexpr auto mHIGH = 1;
 constexpr auto mOUTPUT = 0;
 constexpr auto mINPUT = 1;
 
-// control
-#define pDebug           (38u)
-
 #define pRW              (04u)
 #define mRW              (05u)
 
@@ -29,6 +26,14 @@ constexpr auto mINPUT = 1;
 #define pMMUARegHLatch   (22u)
 #define pMMUDRegOE       (23u)
 
+// control 6502
+#define p6502PHI2        (26u) // PHI2
+#define p6502RESET       (27u) // RESB
+#define p6502RW          (28u) // R/W
+#define p6502BE          (29u) // Bus Enable
+#define p6502RDY         (30u) // Ready
+#define p6502IRQ         (31u) // IRQ
+
 // RAM control pins
 #define pCPUARegLLatch   (32u)
 #define pCPUARegHLatch   (33u)
@@ -37,10 +42,5 @@ constexpr auto mINPUT = 1;
 #define pCPUABufHOE      (36u)
 #define pCPUDBufOE       (37u)
 
-// control 6502
-#define p6502PHI2        (26u) // PHI2
-#define p6502RESET       (27u) // RESB
-#define p6502RW          (28u) // R/W
-#define p6502BE          (29u) // Bus Enable
-#define p6502RDY         (30u) // Ready
-#define p6502IRQ         (31u) // IRQ
+// control
+#define pDebug           (38u)

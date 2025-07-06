@@ -16,7 +16,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="NEO6502_MMU_V3.ino" />
-    <ClCompile Include="bus.cpp">
+    <ClCompile Include="neobus.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="control.cpp">
@@ -40,12 +40,21 @@
     <ClCompile Include="disasm6502.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="bios.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="cmd_proc.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="rom.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="__vm\.NEO6502_MMU_V3.vsarduino.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="bus.h">
+    <ClInclude Include="neobus.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="control.h">
@@ -70,6 +79,21 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="vdu.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="bios.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cmd_proc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="rom.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="rom_bios.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="rom_test.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
