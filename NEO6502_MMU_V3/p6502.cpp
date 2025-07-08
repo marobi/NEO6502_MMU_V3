@@ -167,16 +167,24 @@ void reset6502Clock() {
 /// 
 /// </summary>
 inline __attribute__((always_inline))
-void _ss6502Clock() {
-  set6502PHI2(mLOW);
+void _ss6502ClockIn() {
+  set6502PHI2(mLOW);        // to be sure
 
-  delayMicroseconds(5);
+  delayMicroseconds(2);
 
   set6502PHI2(mHIGH);
 
-  delayMicroseconds(5);
+  delayMicroseconds(2);
+}
 
+/// <summary>
+/// 
+/// </summary>
+inline __attribute__((always_inline))
+void _ss6502ClockOut() {
   set6502PHI2(mLOW);
+
+  delayMicroseconds(2);
 }
 
 /// <summary>
@@ -193,10 +201,11 @@ void singleStep6502(const uint8_t vSteps, const bool vDisplay) {
       return;
     }
     for (uint8_t s; s < vSteps; s++) {
-      _ss6502Clock();
+      _ss6502ClockIn();
       if (vDisplay) {
         Serial.printf("s%02d:\t%04X: %02X %1d\n", s, readCPUAddress(), read6502Data(), get6502RW());
       }
+      _ss6502ClockOut();
     }
   }
   else
@@ -248,6 +257,7 @@ bool set6502State(const uint8_t cpuState, const uint8_t busState) {
   case eHALTED:
     gCPUState = cpuState;
     set6502RDY(mLOW);                      // halted
+    delayMicroseconds(2);                  // ???
 
     switch (busState) {
     case eDISABLED:
