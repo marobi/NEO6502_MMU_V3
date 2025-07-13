@@ -16,37 +16,40 @@ enum busState {
 };
 
 enum clockState {
-  ePWM = 0,
-  eSS
+  eOFF = 0,
+  eON,
 };
 
-/*
-                    DISABLED  ENABLED
-    eRESET             X        X
-    eRUN                        X
-    eHALTED            X        X
+enum sysState {
+//                    CTRL   STATE   PHI2   BUS   DIR
+  sBOOT = 0,       // RPI    RESET   OFF    DIS   IN
+  sRESET,          // CPU    RESET   ON     ENA   IN
+  sHALTED,         // CPU    HALTED  OFF    ENA   IN
+  sRUNNING,        // CPU    RUN     ON     ENA   IN
+  sREAD,           // RPI    HALTED  OFF    ENA   IN
+  sRPI             // RPI    HALTED  OFF    DIS   OUT
+};
 
-                          RESET RDY BE   RW
-    eRESET    DISABLED      0    0   0   rpi
-              ENABLED       0    1   1   cpu
-    eRUN      ENABLED       1    1   1   cpu
-    eHALTED   DISABLED      1    0   0   rpi
-              ENABLED       1    0   1   cpu
-*/
+#define eKEEP   99
 
 void set6502RW(const uint8_t);
 
+uint8_t get6502RW();
+
+uint8_t getClockState();
+
 void set6502Clock(const uint32_t);
 
-void reset6502Clock();
+bool reset6502Clock(const bool);
 
-void singleStep6502(const uint8_t vSteps, const bool vDisplay);
+void singleStep6502(const uint8_t, const bool);
 
-bool set6502State(const uint8_t, const uint8_t);
+uint8_t get6502State();
+
+bool set6502State(const uint8_t);
 
 void state6502();
 
 void init6502();
 
 void setup6502();
-

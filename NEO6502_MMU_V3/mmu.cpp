@@ -63,11 +63,7 @@ bool getMMUIO() {
 /// valid after init of MMU
 /// </summary>
 static void intrMMUIO() {
-//  setDebug(mLOW);
-
   gMMUIOCount++;
-
-//  setDebug(mHIGH);
 }
 
 /// <summary>
@@ -304,6 +300,7 @@ bool initMMU() {
     return (lErrCount == 0);
 }
 
+#if 0
 #include "neobus.h"
 
 /// <summary>
@@ -325,3 +322,4 @@ void testMMU() {
     Serial.printf("*E: mem error @%04X %02X : %02X\n", lad, ld, t);
   }
 }
+#endif

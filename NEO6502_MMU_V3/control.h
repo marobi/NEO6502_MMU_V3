@@ -7,9 +7,6 @@
 
 #define DELAY_FACTOR_SHORT() asm volatile("nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n");
 
-// neo bus
-constexpr auto DATA_BUS_MASK = (0xFF0000000000LL); // pin 40..47
-
 uint8_t getControlMode();
 
 void setDebug(const uint8_t);

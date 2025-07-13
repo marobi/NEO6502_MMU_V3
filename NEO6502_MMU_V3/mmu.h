@@ -31,7 +31,9 @@ void dumpMMUContext(const uint8_t);
 
 bool initMMU();
 
+#if 0
 void testMMU();
+#endif
 
 #endif
 

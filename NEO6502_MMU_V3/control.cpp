@@ -9,6 +9,10 @@
 #include "mmu.h"
 #include "p6502.h"
 
+// neo bus
+constexpr auto DATA_BUS_MASK = (0xFF0000000000LL); // pin 40..47
+
+
 // maintains control
 static uint8_t gControlMode = mRPI;
 
@@ -45,7 +49,6 @@ void setControlMode(const uint8_t vMode) {
 /// <param name="vRW"></param>
 void setmRW(const uint8_t vRW) {
   gpio_put(mRW, vRW);
-  set6502RW(vRW);
 }
 
 /// <summary>

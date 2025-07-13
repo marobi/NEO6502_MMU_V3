@@ -4,10 +4,12 @@
 // 
 #include <arduino.h>
 #include <SimpleCLI.h>
+#include "cmd.h"
 
 #include "config.h"
 #include "bios.h"
 #include "monitor.h"
+#include "control.h"
 #include "p6502.h"
 #include "mmu.h"
 #include "ram.h"
@@ -19,6 +21,8 @@
 static SimpleCLI gCli;
 // Commands
 static Command gCmd;
+
+static uint8_t gInterface = 0x00;
 
 /// <summary>
 /// converts text string hex > integer
@@ -56,49 +60,8 @@ int x2i(const char* s)
 void cmdResetCallback(cmd* c) {
   Command cmd(c); // Create wrapper object
 
-  // Get argument
-  String lBus = cmd.getArgument("bus").getValue();
-  switch (lBus[0]) {
-  case 'd':
-    set6502State(eRESET, eDISABLED);
-    Serial.println("Reset disabled");
-    break;
-
-  case 'e':
-    set6502State(eRESET, eENABLED);
-    Serial.println("Reset enabled");
-    break;
-
-  default:
-    Serial.println("*E: Reset: invalid parameter");
-    break;
-  }
-}
-
-/// <summary>
-/// CLOCK on or off
-/// </summary>
-/// <param name="c"></param>
-void cmdClockCallback(cmd* c) {
-  Command cmd(c); // Create wrapper object
-
-  // Get argument
-  String lBus = cmd.getArgument("state").getValue();
-  switch (lBus[1]) {
-  case 'n':
-    // clock on
-    set6502Clock(DEFAULT_6502_CLOCK);
-    Serial.println("Clock ON");
-    break;
-  case 'f':
-    // clock off
-    reset6502Clock();
-    Serial.println("Clock OFF");
-    break;
-  default:
-    Serial.println("*E: Clock: invalid parameter");
-    break;
-  }
+  set6502State(sRESET);
+  Serial.println("Reset");
 }
 
 /// <summary>
@@ -108,8 +71,8 @@ void cmdClockCallback(cmd* c) {
 void cmdGoCallback(cmd* c) {
   Command cmd(c); // Create wrapper object
 
-  set6502State(eRUN, eENABLED);
-  Serial.println("Go");
+  set6502State(sRUNNING);
+  Serial.println("Running");
 }
 
 /// <summary>
@@ -132,23 +95,8 @@ void cmdSSCallback(cmd* c) {
 void cmdStopCallback(cmd* c) {
   Command cmd(c); // Create wrapper object
 
-  // Get argument
-  String lBus = cmd.getArgument("bus").getValue();
-  switch (lBus[0]) {
-  case 'd':
-    set6502State(eHALTED, eDISABLED);
-    Serial.println("Stop disabled");
-    break;
-
-  case 'e':
-    set6502State(eHALTED, eENABLED);
-    Serial.println("Stop enabled");
-    break;
-
-  default:
-    Serial.println("*E: Stop: invalid parameter");
-    break;
-  }
+  set6502State(sHALTED);
+  Serial.println("Halted");
 }
 
 /// <summary>
@@ -163,6 +111,7 @@ void cmdDumpCallback(cmd* c) {
   uint16_t lFrom = x2i(arg1.c_str()) & 0XFFFF;
   uint16_t lTo = max(x2i(arg2.c_str()) & 0XFFFF, lFrom + 15);
   if (lTo <= lFrom) lTo = 0xFFFF;
+
   Serial.printf("Dump %04X - %04X\n", lFrom, lTo);
 
   dumpMemory(lFrom, lTo);
@@ -249,8 +198,11 @@ void cmdMMUCallback(cmd* c) {
 
   Serial.printf("MMU: %02X\n", lContext);
 
+  uint8_t lState = get6502State();
+  set6502State(sRPI);
   writeMMUContext(lContext);  // set the context
   dumpMMUContext(lContext);   // dump context
+  set6502State(lState);
 }
 
 /// <summary>
@@ -265,10 +217,24 @@ void cmdPageCallback(cmd* c) {
   uint8_t lContext = readMMUContext();
   uint8_t lIndex = x2i(arg1.c_str()) & 0xFF;
   uint8_t lPage = x2i(arg2.c_str()) & 0xFF;
+
+  uint8_t lState = get6502State();
+  set6502State(sRPI);
   uint8_t lPrevPage = readMMUPage(lContext, lIndex);
   writeMMUPage(lContext, lIndex, lPage);
+  set6502State(lState);
 
   Serial.printf("MMU page: %02X:%02X %02X => %02X\n", lContext, lIndex, lPrevPage, lPage);
+}
+
+/// <summary>
+/// 
+/// </summary>
+/// <param name="c"></param>
+void cmdCommandCallback(cmd* c) {
+  Command cmd(c);
+
+  gInterface++;
 }
 
 /// <summary>
@@ -277,9 +243,9 @@ void cmdPageCallback(cmd* c) {
 /// <param name="c"></param>
 void cmdHelpCallback(cmd* c) {
   Serial.print("RPI ICM help:\n\
- cl/ock <on|off>       turn clock on|off\n\
- r/eset <d|e>          reset <disabled | enabled>\n\
- s/top <d|e>           stop <disabled | enabled> \n\
+ c/md                  toggle command\n\
+ r/eset                reset\n\
+ s/top                 stop\n\
  g/o                   go\n\
  ss <steps>            single step (steps)\n\
  i/rq                  generate IRQ\n\
@@ -317,11 +283,9 @@ void initMonitor() {
   Serial.printf("RPI I.C.M. (%s) %s\n> ", BIOS_CPU, MON_VERSION);
 
   // Create the commands with callback function
-  gCmd = gCli.addCmd("cl/ock", cmdClockCallback);
-  gCmd.addPositionalArgument("state", "off");
+  gCmd = gCli.addCmd("c/md", cmdCommandCallback);
 
   gCmd = gCli.addCmd("r/eset", cmdResetCallback);
-  gCmd.addPositionalArgument("bus", "d");
 
   gCmd = gCli.addCmd("g/o", cmdGoCallback);
 
@@ -329,7 +293,6 @@ void initMonitor() {
   gCmd.addPositionalArgument("steps", "1");
 
   gCmd = gCli.addCmd("s/top", cmdStopCallback);
-  gCmd.addPositionalArgument("bus", "d");
 
   gCmd = gCli.addCmd("d/ump", cmdDumpCallback);
   gCmd.addPositionalArgument("from");
@@ -387,12 +350,28 @@ void monitor() {
       break;
     case '\n':                                 // CR
     case '\r':                                 // LF
-      // Parse the user input into the CLI
-      gCli.parse(gInputBuffer);
+      if (gInterface == 0x00) {
+        // Parse the user input into the CLI
+        gCli.parse(gInputBuffer);
+      }
+      else {
+        for (uint8_t k = 0; k < gInputIndex; k++) {
+          while (write6502Char(gInputBuffer[k]));    // ulgh
+        }
+      }
 
-      Serial.print("> ");                     // new prompt
+      if (gInterface == 0x00)
+        Serial.print("> ");                     // new prompt
+      else
+        Serial.print("$ ");                     // new prompt
+
       gInputIndex = 0;                        // new buffer
       gInputBuffer[0] = '\0';
+      break;
+
+    case 27:
+    case 0x03:
+      gInterface = 0x00;                      // return to ICM
       break;
 
     default:                                  // enter in buffer

@@ -75,6 +75,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="bios.cpp" />
+    <ClCompile Include="cmd.cpp" />
     <ClCompile Include="neobus.cpp" />
     <ClCompile Include="cmd_proc.cpp" />
     <ClCompile Include="control.cpp" />
@@ -92,6 +93,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="bios.h" />
+    <ClInclude Include="cmd.h" />
+    <ClInclude Include="config.h" />
     <ClInclude Include="neobus.h" />
     <ClInclude Include="cmd_proc.h" />
     <ClInclude Include="control.h" />

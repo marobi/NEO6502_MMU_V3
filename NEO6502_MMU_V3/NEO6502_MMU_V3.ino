@@ -17,6 +17,7 @@
 #include "monitor.h"
 #include "bios.h"
 #include "cmd_proc.h"
+#include "cmd.h"
 
 #include "rom.h"
 #include "rom_test.h"
@@ -66,16 +67,20 @@ void setup() {
   Serial.printf("*I: Core frequency: %d MHz\n", freq / MHZ);
   Serial.printf("*I: 6502 frequency: %d MHz\n", DEFAULT_6502_CLOCK / MHZ);
 
-  Serial.printf("Test program @\n");
+  Serial.printf("\nTest program @\n");
   loadROM(test_bin);
 
   // load bios
   Serial.printf("BIOS program @\n");
   loadROM(bios_bin);
 
+  Serial.println();
+
+  set6502State(sRESET);
+
   initMonitor();
 
-  //// test
+  // test
   //dumpMemory(0x0FF0, 0X0FFF);
 
   //Serial.println();
@@ -98,11 +103,22 @@ void setup() {
   //// end test
 }
 
+static uint8_t tmp;
 /// <summary>
 /// loop for ever
 /// </summary>
 void loop() {
+  uint8_t lChar;
+
   monitor();
-  delay(50);
+
+//  if (read6502Char(&lChar))
+//    Serial.print(lChar);
+
+  snoop_write6502Memory(0XFC10, 1, &tmp);
+
+  tmp++;
+
+  delay(5);
 //  testBUS();
 }

@@ -56,11 +56,11 @@ bool loadBinary(const uint16_t vAddress, const uint16_t vSize, const uint8_t* vB
     return false;
   }
 
-  //for (uint16_t m = 0; m < vSize; m++) {
-  //  write6502Memory(vAddress + m, vBinary[m]);
-  //}
+  for (uint16_t m = 0; m < vSize; m++) {
+    write6502Memory(vAddress + m, vBinary[m]);
+  }
 
-  snoop_write6502Memory(vAddress, vSize, vBinary);
+  //snoop_write6502Memory(vAddress, vSize, vBinary);
 
   return true;
 }

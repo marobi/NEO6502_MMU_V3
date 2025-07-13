@@ -51,8 +51,8 @@ static const uint8_t opcode_props[256][3] = {
 uint16_t disasm6502(const uint16_t vAddress) {
   uint16_t address;
   uint8_t buffer[4];
-  int currentbyte;
-  int previousbyte;
+  int currentbyte = 0;
+  int previousbyte = 0;
   uint8_t paramcount = 0;
   uint8_t addrmode;
   const char* opcode;
@@ -61,9 +61,6 @@ uint16_t disasm6502(const uint16_t vAddress) {
   const char* post;
 
   address = vAddress;
-  //buffer[0] = read6502Memory(vAddress);
-  //buffer[1] = read6502Memory(vAddress + 1);
-  //buffer[2] = read6502Memory(vAddress + 2);
 
   snoop_read6502Memory(vAddress, 3, buffer);
 
@@ -75,7 +72,6 @@ uint16_t disasm6502(const uint16_t vAddress) {
       paramcount = opcode_props[currentbyte][0];              //Get instruction length
       opcode = instruction[opcode_props[currentbyte][1]];     //Get opcode name
       addrmode = opcode_props[currentbyte][2];                //Get info required to display addressing mode
-//      Serial.printf("*D: %02X %d %s %d\n", currentbyte, paramcount, opcode, addrmode);
       pre = modes[addrmode][0];                               //Look up pre-operand formatting text
       post = modes[addrmode][1];                              //Look up post-operand formatting text
       pad = padding[(paramcount - 1)];                        //Calculate correct padding for output alignment
