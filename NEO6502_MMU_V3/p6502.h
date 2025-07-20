@@ -40,7 +40,7 @@ uint8_t getClockState();
 
 void set6502Clock(const uint32_t);
 
-bool reset6502Clock(const bool);
+bool halt6502clock(const bool);
 
 void singleStep6502(const uint8_t, const bool);
 
@@ -48,7 +48,7 @@ uint8_t get6502State();
 
 bool set6502State(const uint8_t);
 
-void state6502();
+void show6502State();
 
 void init6502();
 

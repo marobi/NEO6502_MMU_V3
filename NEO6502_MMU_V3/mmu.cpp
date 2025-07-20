@@ -232,7 +232,7 @@ bool writeMMUPage(const uint8_t vContext, const uint8_t vIndex, const uint8_t vP
 void dumpMMUContext(const uint8_t vContext) {
   Serial.printf("C %02X:", vContext);
 
-  for (uint8_t lPage = 0; lPage < MUM_CONTEXT_PAGES; lPage++) {
+  for (uint8_t lPage = 0; lPage < NUM_CONTEXT_PAGES; lPage++) {
     Serial.printf(" %02X", readMMUPage(vContext, lPage));
   }
   Serial.printf("\n");
@@ -247,7 +247,7 @@ void dumpMMUContext(const uint8_t vContext) {
 bool defMMUContext(const uint8_t vContext, const uint8_t *vMMU) {
     uint16_t lErrCount = 0;
 
-    for (uint8_t lPage = 0; lPage < MUM_CONTEXT_PAGES; lPage++) {
+    for (uint8_t lPage = 0; lPage < NUM_CONTEXT_PAGES; lPage++) {
       if (! writeMMUPage(vContext, lPage, vMMU[lPage])) {
         lErrCount++;
       }

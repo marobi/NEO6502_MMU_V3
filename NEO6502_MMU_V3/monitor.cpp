@@ -174,7 +174,7 @@ void cmdMemCallback(cmd* c) {
 /// <param name="c"></param>
 void cmdStatusCallback(cmd* c) {
   Serial.printf("Status\n");
-  state6502();
+  show6502State();
   Serial.printf("*I: MMU: %02X\n", readMMUContext());
 }
 
@@ -348,16 +348,19 @@ void monitor() {
       else
         Serial.print(" ");                     // buffer is empty
       break;
+
+    case 27:
+    case 0x03:
+      gInterface = 0x00;                      // return to ICM
+      gInputIndex = 0x00;
+      Serial.print("> ");                     // new prompt
+      break;
+
     case '\n':                                 // CR
     case '\r':                                 // LF
       if (gInterface == 0x00) {
         // Parse the user input into the CLI
         gCli.parse(gInputBuffer);
-      }
-      else {
-        for (uint8_t k = 0; k < gInputIndex; k++) {
-          while (write6502Char(gInputBuffer[k]));    // ulgh
-        }
       }
 
       if (gInterface == 0x00)
@@ -369,14 +372,14 @@ void monitor() {
       gInputBuffer[0] = '\0';
       break;
 
-    case 27:
-    case 0x03:
-      gInterface = 0x00;                      // return to ICM
-      break;
-
     default:                                  // enter in buffer
-      gInputBuffer[gInputIndex++] = c;
-      gInputBuffer[gInputIndex] = '\0';
+      if (gInterface == 0x00) {
+        gInputBuffer[gInputIndex++] = c;
+        gInputBuffer[gInputIndex] = '\0';
+      }
+      else {
+        while (! write6502Char(c));
+      }
       break;
     }
   }

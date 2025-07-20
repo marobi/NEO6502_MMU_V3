@@ -130,8 +130,8 @@ void writeCPUAddressH(const uint8_t vAddress) {
   DELAY_FACTOR_SHORT();
   DELAY_FACTOR_SHORT();
   DELAY_FACTOR_SHORT();
-//  DELAY_FACTOR_SHORT();
-//  DELAY_FACTOR_SHORT();
+  DELAY_FACTOR_SHORT();
+  DELAY_FACTOR_SHORT();
 
   setCPUARegHLatch(mHIGH); // latch in AREG
   resetNEOBus();          // reset NEObus
@@ -151,11 +151,11 @@ void writeCPUAddressL(const uint8_t vAddress) {
   DELAY_FACTOR_SHORT();
   DELAY_FACTOR_SHORT();
   DELAY_FACTOR_SHORT();
-//  DELAY_FACTOR_SHORT();
-//  DELAY_FACTOR_SHORT();
+  DELAY_FACTOR_SHORT();
+  DELAY_FACTOR_SHORT();
 
   setCPUARegLLatch(mHIGH); // latch in AREG
-  resetNEOBus();         // reset NEObus
+  resetNEOBus();           // reset NEObus
 }
 
 /// <summary>
@@ -165,8 +165,8 @@ void writeCPUAddressL(const uint8_t vAddress) {
 inline __attribute__((always_inline))
 void writeCPUAddress(const uint16_t vAddress) {
   if (getControlMode() == mRPI) {         // only in MMU mode
-    writeCPUAddressL(vAddress);           // latch AddressL
     writeCPUAddressH(vAddress >> 8);      // latch AddressH
+    writeCPUAddressL(vAddress);           // latch AddressL
 
     uint16_t laddress = readCPUAddress(); // validate
     if (laddress != vAddress) {
@@ -188,6 +188,8 @@ uint8_t read6502Data() {
   setCPUDBufOE(mLOW);   // read from databus
 
   DELAY_FACTOR_SHORT(); // settle
+  DELAY_FACTOR_SHORT();
+  DELAY_FACTOR_SHORT();
   DELAY_FACTOR_SHORT();
   DELAY_FACTOR_SHORT();
   DELAY_FACTOR_SHORT();
@@ -246,6 +248,8 @@ void write6502Memory(const uint16_t vAddress, const uint8_t vData) {
     DELAY_FACTOR_SHORT();
     DELAY_FACTOR_SHORT();
     DELAY_FACTOR_SHORT();
+    DELAY_FACTOR_SHORT();
+    DELAY_FACTOR_SHORT();
 
     set6502RW(mREAD);
     setmRW(mREAD);              // end write cycle
@@ -275,13 +279,6 @@ void write6502Memory(const uint16_t vAddress, const uint8_t vData) {
 /// <param name="vBytes"></param>
 /// <param name="vBuffer"></param>
 void snoop_read6502Memory(const uint16_t vAddress, const uint16_t vBytes, uint8_t *vBuffer) {
-//  bool lCPUHasControl = false;
-
-//  if (getControlMode() == mCPU) {
-//    lCPUHasControl = true;
-//    // halt, disable CPU
-//    set6502State(sREAD);
-//  }
   uint8_t lState = get6502State();
   set6502State(sRPI);
 
@@ -290,11 +287,6 @@ void snoop_read6502Memory(const uint16_t vAddress, const uint16_t vBytes, uint8_
   for (uint16_t m = 0; m < vBytes; m++) {
     lBuf[m] = read6502Memory(lAd++);
   }
-
-//  if (lCPUHasControl) {
-//    // enable, running
-//    set6502State(sRUNNING);
-//  }
 
   set6502State(lState);  // return to prev state
 }
@@ -306,13 +298,6 @@ void snoop_read6502Memory(const uint16_t vAddress, const uint16_t vBytes, uint8_
 /// <param name="vBytes"></param>
 /// <param name="vBuffer"></param>
 void snoop_write6502Memory(const uint16_t vAddress, uint16_t vBytes, const uint8_t* vBuffer) {
-//  bool lCPUHasControl = false;
-
-//  if (getControlMode() == mCPU) {
-//    lCPUHasControl = true;
-//    set6502State(sREAD);    // not anymore
-//  }
-
   uint8_t lState = get6502State();
   set6502State(sRPI);
 
@@ -321,10 +306,6 @@ void snoop_write6502Memory(const uint16_t vAddress, uint16_t vBytes, const uint8
     write6502Memory(lAd++, vBuffer[m]);
   }
 
-//  if (lCPUHasControl) {
-//    // enable, running
-//    set6502State(sRUNNING);
-//  }
   set6502State(lState);  // return to prev state
 }
 

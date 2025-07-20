@@ -5,7 +5,7 @@
 #include "cmd.h"
 #include "neobus.h"
 
-#define CMD_SLOT_BASE   (0xFC00)
+#define CMD_SLOT_BASE   (0x0FF0)
 
 #define CMD_INCHAR      (0u)
 #define CMD_OUTCHAR     (1u)
@@ -45,8 +45,8 @@ bool read6502Char(uint8_t *vChar) {
   else {
     *vChar = lChar;
     writeCmdSlot(CMD_OUTCHAR, 0x00);  // ACK
-    return true;
   }
+  return true;
 }
 
 /// <summary>
@@ -65,4 +65,3 @@ bool write6502Char(const uint8_t vChar) {
     return true;
   }
 }
-

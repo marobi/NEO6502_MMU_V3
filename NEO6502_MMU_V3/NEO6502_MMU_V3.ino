@@ -64,8 +64,8 @@ void setup() {
   Serial.printf("*I: BIOS: %s %s\n", BIOS_DATE, BIOS_TIME);
   // report clock freqs.
   uint32_t freq = clock_get_hz(clk_sys);
-  Serial.printf("*I: Core frequency: %d MHz\n", freq / MHZ);
-  Serial.printf("*I: 6502 frequency: %d MHz\n", DEFAULT_6502_CLOCK / MHZ);
+  Serial.printf("*I: Core frequency: %0d MHz\n", freq / MHZ);
+  Serial.printf("*I: 6502 frequency: %0.1f MHz\n", (float)DEFAULT_6502_CLOCK / MHZ);
 
   Serial.printf("\nTest program @\n");
   loadROM(test_bin);
@@ -103,22 +103,18 @@ void setup() {
   //// end test
 }
 
-static uint8_t tmp;
 /// <summary>
 /// loop for ever
 /// </summary>
 void loop() {
-  uint8_t lChar;
+  static uint8_t lChar;
+
+  if (read6502Char(&lChar)) {
+    Serial.printf("%c", lChar);
+  }
 
   monitor();
 
-//  if (read6502Char(&lChar))
-//    Serial.print(lChar);
-
-  snoop_write6502Memory(0XFC10, 1, &tmp);
-
-  tmp++;
-
-  delay(5);
+  delay(1);
 //  testBUS();
 }

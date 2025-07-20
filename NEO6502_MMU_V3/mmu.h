@@ -7,7 +7,8 @@
 
 //#define PAGE_SIZE        (4096)      // 4k
 #define NUM_CONTEXTS       (128)       // 128 x 4k = 512k
-#define MUM_CONTEXT_PAGES  (16)        // 16 x 4k = 64k
+#define NUM_TOTAL_PAGES    (128)       // 128 4k pages available
+#define NUM_CONTEXT_PAGES  (16)        // 16 x 4k = 64k
 #define DEFAULT_CONTEXT    (0)
 
 

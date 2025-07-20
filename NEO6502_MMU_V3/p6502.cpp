@@ -10,7 +10,9 @@
 #include "p6502.h"
 #include "pins.h"
 
-//
+/// <summary>
+/// system states
+/// </summary>
 static const char lTxtSystemState[6][7] = {
   "BOOT ",
   "RESET",
@@ -20,24 +22,33 @@ static const char lTxtSystemState[6][7] = {
   "RPI  "
 };
 
+/// <summary>
+/// clockstates
+/// </summary>
 static const char lTxtClockState[3][5] = {
   "OFF",
   "ON "
 };
 
-//
+/// <summary>
+/// RW pi states
+/// </summary>
 static const char lTxtRWState[2][7] = {
   "OUT",
   "IN "
 };
 
-//
+/// <summary>
+/// cpu bus states
+/// </summary>
 static const char lTxtBusState[2][9] = {
   "DIS",
   "ENA",
 };
 
-//
+/// <summary>
+/// bus control processor states
+/// </summary>
 static const char lTxtControlState[2][4] = {
   "RPI",
   "CPU"
@@ -52,7 +63,7 @@ static uint8_t gDir6502RW = 99;
 static uint8_t gClockState;     // will be init in setup6502
 
 /// <summary>
-/// control 6502 RESET
+/// control 6502 RESET pin
 /// </summary>
 /// <param name="vHL"></param>
 inline __attribute__((always_inline))
@@ -61,7 +72,7 @@ void set6502Reset(const uint8_t vHL) {
 }
 
 /// <summary>
-/// control 6502 BE
+/// control 6502 BE pin
 /// </summary>
 /// <param name="vHL"></param>
 inline __attribute__((always_inline))
@@ -72,7 +83,7 @@ void set6502BE(const uint8_t vHL) {
 }
 
 /// <summary>
-/// 
+/// control 6502 RDY pin
 /// </summary>
 /// <param name="vHL"></param>
 inline __attribute__((always_inline))
@@ -83,7 +94,7 @@ void set6502RDY(const uint8_t vHL) {
 }
 
 /// <summary>
-/// 
+/// control 6502 2PHI2 pin
 /// </summary>
 /// <param name="vHL"></param>
 inline __attribute__((always_inline))
@@ -92,7 +103,7 @@ void set6502PHI2(const uint8_t vHL) {
 }
 
 /// <summary>
-/// 
+/// control 6502 IRQ pin
 /// </summary>
 /// <param name="vHL"></param>
 inline __attribute__((always_inline))
@@ -125,7 +136,7 @@ uint8_t get6502RW() {
 }
 
 /// <summary>
-/// 
+/// get PHI2 state
 /// </summary>
 /// <returns></returns>
 uint8_t getClockState() {
@@ -187,6 +198,7 @@ void set6502Clock(const uint32_t target_freq) {
   pwm_set_clkdiv_int_frac(slice_num, divider16 / 16, divider16 & 0xF);
   pwm_set_wrap(slice_num, wrap);
   pwm_set_chan_level(slice_num, channel, wrap / 2);  // 50% duty cycle
+//  pwm_set_chan_level(slice_num, channel, wrap * 60 / 100);  // duty cycle
   pwm_set_enabled(slice_num, true);
 
   gClockState = eON;
@@ -228,19 +240,19 @@ void _ss6502ClockOut() {
   DELAY_FACTOR_SHORT();
 }
 
-// <summary>
-/// stop the clock in low state optional in a read cycle
+/// <summary>
+/// stop the clock in low state; optional in a read cycle
 /// </summary>
 /// <param name="vToRead"></param>
 /// <returns></returns>
-bool reset6502Clock(const bool vToRead) {
+bool halt6502clock(const bool vToRead) {
   if (gClockState == eOFF) return true;
 
   uint8_t lTry = 0;
 
   uint slice_num = pwm_gpio_to_slice_num(p6502PHI2);
 
-  pwm_set_enabled(slice_num, false);
+  pwm_set_enabled(slice_num, false);  // stop PWM
 
   DELAY_FACTOR_SHORT();
 
@@ -248,18 +260,18 @@ bool reset6502Clock(const bool vToRead) {
   gpio_init(p6502PHI2);
   gpio_set_dir(p6502PHI2, GPIO_OUT);
 
-  set6502PHI2(mLOW);
+  set6502PHI2(mLOW);  // force low
 
   gClockState = eOFF;
 
-  if (vToRead) {
-    while ((get6502RW() == mWRITE) && (lTry++ < 4)) {   // continue till in read cycle
-      _ss6502ClockIn();
+  if (vToRead) {                                        // should we step through til read cycle?
+    while ((get6502RW() == mWRITE) && (lTry++ < 8)) {   // continue till in read cycle
+      _ss6502ClockIn();                                 // step
       _ss6502ClockOut();
     }
 
-    if (lTry >= 4) {
-      Serial.println("*E: reset6502Clock: STOPPED but in unknown clock state");
+    if (lTry >= 8) {
+      Serial.println("*E: halt6502clock: STOPPED but in unknown clock state");
       return false;
     }
   }
@@ -297,7 +309,7 @@ void singleStep6502(const uint8_t vSteps, const bool vDisplay) {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// <summary>
-/// get neo6502_mmu state
+/// get neo6502_mmu system state
 /// </summary>
 /// <returns></returns>
 uint8_t get6502State() {
@@ -317,7 +329,7 @@ bool set6502State(const uint8_t vSysState) {
   switch (vSysState) {
   case sBOOT:  // system in boot mode
     set6502Reset(mLOW);
-    reset6502Clock(false);
+    halt6502clock(false);
     set6502RDY(mLOW);
     set6502BE(mLOW);
     dir6502RW(mOUTPUT);
@@ -335,7 +347,7 @@ bool set6502State(const uint8_t vSysState) {
 
   case sHALTED: // cpu stopped
     set6502Reset(mHIGH);
-    reset6502Clock(true);
+    halt6502clock(true);
     set6502RDY(mLOW);
     set6502BE(mHIGH);
     dir6502RW(mINPUT);
@@ -353,7 +365,7 @@ bool set6502State(const uint8_t vSysState) {
 
   case sREAD:  // SS mode
     set6502Reset(mHIGH);
-    reset6502Clock(true);
+    halt6502clock(true);
     set6502RDY(mHIGH);
     set6502BE(mHIGH);
     dir6502RW(mINPUT);
@@ -362,7 +374,7 @@ bool set6502State(const uint8_t vSysState) {
 
   case sRPI: // rpi control mode, cpu halted
     set6502Reset(mHIGH);
-    reset6502Clock(true);
+    halt6502clock(true);
     set6502RDY(mLOW);
     set6502BE(mLOW);
     dir6502RW(mOUTPUT);
@@ -382,7 +394,7 @@ bool set6502State(const uint8_t vSysState) {
 /// <summary>
 /// show substates of 6502
 /// </summary>
-void state6502() {
+void show6502State() {
   Serial.printf("*I: SYS: %s\tBUS: %s\tCTL: %s\tRW: %s\tCLK: %s\n",
     lTxtSystemState[gSysState],
     lTxtBusState[gBusState],
@@ -399,7 +411,7 @@ void init6502() {
 
   set6502State(sBOOT);
 
-  state6502();
+  show6502State();
 }
 
 /// <summary>
