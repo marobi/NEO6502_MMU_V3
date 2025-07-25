@@ -109,8 +109,9 @@ void setup() {
 void loop() {
   static uint8_t lChar;
 
-  if (read6502Char(&lChar)) {
+  while (read6502Char(&lChar)) {
     Serial.printf("%c", lChar);
+    delayMicroseconds(100);
   }
 
   monitor();
