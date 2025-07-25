@@ -20,7 +20,7 @@
 #include "cmd.h"
 
 #include "rom.h"
-#include "rom_test.h"
+#include "rom_monitor.h"
 #include "rom_bios.h"
 
 /// <summary>
@@ -67,12 +67,12 @@ void setup() {
   Serial.printf("*I: Core frequency: %0d MHz\n", freq / MHZ);
   Serial.printf("*I: 6502 frequency: %0.1f MHz\n", (float)DEFAULT_6502_CLOCK / MHZ);
 
-  Serial.printf("\nTest program @\n");
-  loadROM(test_bin);
-
   // load bios
-  Serial.printf("BIOS program @\n");
+  Serial.println("BIOS program @");
   loadROM(bios_bin);
+
+  Serial.println("Monitor program @");
+  loadROM(wozmon_bin);
 
   Serial.println();
 
@@ -115,6 +115,6 @@ void loop() {
 
   monitor();
 
-  delay(1);
+  delay(5);
 //  testBUS();
 }

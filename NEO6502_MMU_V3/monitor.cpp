@@ -364,9 +364,9 @@ void monitor() {
       }
 
       if (gInterface == 0x00)
-        Serial.print("> ");                     // new prompt
+        Serial.print("> ");                   // new prompt
       else
-        Serial.print("$ ");                     // new prompt
+        while (!write6502Char(c));            // CR
 
       gInputIndex = 0;                        // new buffer
       gInputBuffer[0] = '\0';
