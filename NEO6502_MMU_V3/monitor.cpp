@@ -331,56 +331,63 @@ void monitor() {
   static uint8_t gInputIndex = 0;
   static char gInputBuffer[40] = "\0";
   int c;
+  uint8_t cnt;
 
   // Check if user typed something on keyboard
   if (Serial.available()) {
     c = Serial.read();
-    switch (c) {
-    case -1:                                   // no char
-      break;
-    case '\b':                                 // backspace
-    case 127:                                  // delete
-      if (gInputIndex >= 1) {
-        gInputIndex--;                         // delete last char
-        gInputBuffer[gInputIndex] = '\0';      // from buffer
-        Serial.print(" \b");
+    if (gInterface != 0) {
+      switch (c) {
+      case 0x03:                                // ^C
+        gInterface = 0x00;                      // return to ICM
+        gInputIndex = 0;
+        gInputBuffer[0] = '\0';
+        Serial.print("> ");                     // new prompt for CLI
+        break;
+
+      default:
+        cnt = 8;
+        while ((!write6502Char(c)) && (cnt > 0)) {
+          cnt--;
+          delay(50L);
+        }
+        if (cnt == 0) {
+          Serial.println("*E: write6502: not listener\n");
+        }
+        break;
       }
-      else
-        Serial.print(" ");                     // buffer is empty
-      break;
+    }
+    else {
+      switch (c) {
+      case -1:                                   // no char
+        break;
+      
+      case '\b':                                 // backspace
+      case 127:                                  // delete
+        if (gInputIndex >= 1) {
+          gInputIndex--;                         // delete last char
+          gInputBuffer[gInputIndex] = '\0';      // from buffer
+          Serial.print(" \b");
+        }
+        else
+          Serial.print(" ");                     // buffer is empty
+        break;
 
-    case 27:
-    case 0x03:
-      gInterface = 0x00;                      // return to ICM
-      gInputIndex = 0x00;
-      Serial.print("> ");                     // new prompt
-      break;
-
-    case '\n':                                 // CR
-    case '\r':                                 // LF
-      if (gInterface == 0x00) {
-        // Parse the user input into the CLI
+      case '\n':                                 // CR
+      case '\r':                                 // LF
+        // Parse the user input into the CLI & execute
         gCli.parse(gInputBuffer);
-      }
+        if (gInterface == 0)
+          Serial.print("> ");                   // new prompt
+        gInputIndex = 0;                        // new buffer
+        gInputBuffer[0] = '\0';
+        break;
 
-      if (gInterface == 0x00)
-        Serial.print("> ");                   // new prompt
-      else
-        while (!write6502Char(c));            // CR
-
-      gInputIndex = 0;                        // new buffer
-      gInputBuffer[0] = '\0';
-      break;
-
-    default:                                  // enter in buffer
-      if (gInterface == 0x00) {
-        gInputBuffer[gInputIndex++] = c;
-        gInputBuffer[gInputIndex] = '\0';
+      default:                                  // enter in buffer
+          gInputBuffer[gInputIndex++] = c;
+          gInputBuffer[gInputIndex] = '\0';
+        break;
       }
-      else {
-        while (! write6502Char(c));
-      }
-      break;
     }
   }
 }

@@ -1,6 +1,7 @@
 // 
 // 
 // 
+#include <arduino.h>
 #include "hardware/gpio.h"
 #include "hardware/structs/sio.h"
 
@@ -124,7 +125,7 @@ void setupControl() {
     gpio_pull_up(i);               // Enable pull-up resistor
   }
 
-  setNEOBusDir(mREAD);            // INPUT
+  setNEOBusDir(mREAD);             // INPUT
 
   gpio_init(mRW);                  // Always init pins first
   gpio_set_dir(mRW, GPIO_OUT);     // Set as output

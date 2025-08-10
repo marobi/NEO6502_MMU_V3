@@ -1,6 +1,7 @@
 // 
 // 
 // 
+#include <arduino.h>
 #include "control.h"
 #include "neobus.h"
 #include "mmu.h"
@@ -168,10 +169,10 @@ void writeCPUAddress(const uint16_t vAddress) {
     writeCPUAddressH(vAddress >> 8);      // latch AddressH
     writeCPUAddressL(vAddress);           // latch AddressL
 
-    uint16_t laddress = readCPUAddress(); // validate
-    if (laddress != vAddress) {
-      Serial.printf("*E writeCPUAddress: 0x%04X (0x%04X)\n", vAddress, laddress);
-    }
+//    uint16_t laddress = readCPUAddress(); // validate
+//    if (laddress != vAddress) {
+//      Serial.printf("*E writeCPUAddress: 0x%04X (0x%04X)\n", vAddress, laddress);
+//    }
   }
   else
     Serial.printf("*E: setCPUAddress: wrong mode\n");
@@ -260,13 +261,13 @@ void write6502Memory(const uint16_t vAddress, const uint8_t vData) {
 
 //    resetNEOBus();            // disable neodbus
 
-    uint8_t ldata = read6502Memory(vAddress);  // validate
+//    uint8_t ldata = read6502Memory(vAddress);  // validate
 
-//    setCPUARegOE(mHIGH);      // disable address output
+    setCPUARegOE(mHIGH);      // disable address output
 
-    if (ldata != vData) {
-      Serial.printf("*E: write6502Memory: 0x%04X: 0x%02X (0x%02X)\n", vAddress, vData, ldata);
-    }
+//    if (ldata != vData) {
+//      Serial.printf("*E: write6502Memory: 0x%04X: 0x%02X (0x%02X)\n", vAddress, vData, ldata);
+//    }
   }
   else
     Serial.println("*E: write6502Memory: wrong mode");

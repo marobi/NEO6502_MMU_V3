@@ -4,7 +4,7 @@
  Author:	Rien Matthijsse
 */
 
-#include <Arduino.h>
+#include <arduino.h>
 #include <LittleFS.h>
 
 #include "config.h"
@@ -22,6 +22,7 @@
 #include "rom.h"
 #include "rom_monitor.h"
 #include "rom_bios.h"
+#include "rom_test.h"
 
 /// <summary>
 /// setup
@@ -57,6 +58,7 @@ void setup() {
 
   initVDU();      // get display running
 
+  initCmdSlots();
   initCmdProcessor();
 
   Serial.printf("*I: setup done\n");
@@ -73,6 +75,11 @@ void setup() {
 
   Serial.println("Monitor program @");
   loadROM(wozmon_bin);
+
+#if 0
+  Serial.println("Test program @");
+  loadROM(test_bin);
+#endif
 
   Serial.println();
 
@@ -107,15 +114,17 @@ void setup() {
 /// loop for ever
 /// </summary>
 void loop() {
+  uint8_t cnt;
   static uint8_t lChar;
 
-  while (read6502Char(&lChar)) {
+  cnt = 10;
+  while (read6502Char(&lChar) && (cnt > 0)) {
     Serial.printf("%c", lChar);
-    delayMicroseconds(100);
+    delayMicroseconds(8);
+    cnt--;
   }
 
   monitor();
 
   delay(5);
-//  testBUS();
 }

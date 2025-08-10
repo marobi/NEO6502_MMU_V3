@@ -13,6 +13,15 @@
 /// <summary>
 /// 
 /// </summary>
+void initCmdSlots() {
+  uint8_t ldata = 0x00;
+  snoop_write6502Memory(CMD_SLOT_BASE + CMD_INCHAR, 1, &ldata);
+  snoop_write6502Memory(CMD_SLOT_BASE + CMD_OUTCHAR, 1, &ldata);
+}
+
+/// <summary>
+/// 
+/// </summary>
 /// <param name="vSlot"></param>
 /// <param name="vData"></param>
 inline __attribute__((always_inline))
@@ -27,7 +36,8 @@ void readCmdSlot(const uint8_t vSlot, uint8_t* vData) {
 /// <param name="vData"></param>
 inline __attribute__((always_inline))
 void writeCmdSlot(const uint8_t vSlot, uint8_t vData) {
-  snoop_write6502Memory(CMD_SLOT_BASE + vSlot, 1, &vData);
+  uint8_t lData = vData;
+  snoop_write6502Memory(CMD_SLOT_BASE + vSlot, 1, &lData);
 }
 
 /// <summary>
