@@ -31,9 +31,6 @@
     <ClCompile Include="ram.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="vdu.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="monitor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -50,6 +47,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="cmd.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="vdu.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="vdu_graphics.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="vdu_interface.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -81,9 +87,6 @@
     <ClInclude Include="disasm6502.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="vdu.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="bios.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -106,6 +109,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="rom_monitor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vdu.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vdu_graphics.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="vdu_interface.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -1,0 +1,12 @@
+ N  N          66  555   00   22
+ N  N         6    5    0  0 2  2
+ NN N         6    5    0  0    2
+ N NN EEE  O  666  555  0  0   2   M   M M   M U   U
+ N  N E   O O 6  6    5 0  0  2    MM MM MM MM U   U
+ N  N EE  O O 6  6    5 0  0 2     M M M M M M U   U
+ N  N E   O O 6  6 5  5 0  0 2     M   M M   M U  UU
+ N  N EEE  O   66   55   00  2222  M   M M   M  UU U
+
+Happy?
+:-)
+

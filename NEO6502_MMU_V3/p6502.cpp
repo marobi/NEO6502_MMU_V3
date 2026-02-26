@@ -346,7 +346,7 @@ bool set6502State(const uint8_t vSysState) {
     break;
 
   case sHALTED: // cpu stopped
-    set6502Reset(mHIGH);
+//    set6502Reset(mHIGH);
     halt6502clock(true);
     set6502RDY(mLOW);
     set6502BE(mHIGH);
@@ -355,11 +355,11 @@ bool set6502State(const uint8_t vSysState) {
     break;
 
   case sRUNNING: // cpu running free
-    set6502Reset(mHIGH);
-    set6502BE(mHIGH);
     dir6502RW(mINPUT);
+    set6502BE(mHIGH);
     init6502Clock();
     set6502RDY(mHIGH);
+    set6502Reset(mHIGH);
     setControlMode(mCPU);
     break;
 
@@ -373,7 +373,7 @@ bool set6502State(const uint8_t vSysState) {
     break;
 
   case sRPI: // rpi control mode, cpu halted
-    set6502Reset(mHIGH);
+  //  set6502Reset(mHIGH);
     halt6502clock(true);
     set6502RDY(mLOW);
     set6502BE(mLOW);
