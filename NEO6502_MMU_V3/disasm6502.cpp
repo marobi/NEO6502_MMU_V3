@@ -1,5 +1,5 @@
 /*
-  basis of code taken from : http://forum.6502.org/viewtopic.php?t=3644
+  basics of code taken from : http://forum.6502.org/viewtopic.php?t=3644
 */
 #include <arduino.h>
 #include "disasm6502.h"

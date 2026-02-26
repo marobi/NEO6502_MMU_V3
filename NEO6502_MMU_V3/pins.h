@@ -1,26 +1,26 @@
 #pragma once
 
 // control mode
-constexpr auto mCPU = 1;
-constexpr auto mRPI = 0;
+constexpr auto mCPU     = 1;
+constexpr auto mRPI     = 0;
 
 // Bus direction
-constexpr auto mREAD = 1;
-constexpr auto mWRITE = 0;
+constexpr auto mWRITE   = false;
+constexpr auto mREAD    = true;
 
 // Pin setting
-constexpr auto mLOW = 0;
-constexpr auto mHIGH = 1;
+constexpr auto mLOW     = false;
+constexpr auto mHIGH    = true;
 
 // pin direction
-constexpr auto mOUTPUT = 0;
-constexpr auto mINPUT = 1;
+constexpr auto mINPUT   = false;
+constexpr auto mOUTPUT  = true;
 
-#define pRW              (04u)
-#define mRW              (05u)
+#define pRW              (4u)
+#define mRW              (5u)
 
 // control MMU I/O page 
-#define pMMUIO           (07u)
+#define pMMUIO           (7u)
 
 // MMU control pins
 #define pMMUARegHLatch   (22u)

@@ -1,11 +1,10 @@
 // cpu.h
 
-#ifndef _BUS_h
-#define _BUS_h
+#pragma once
 
 #include "pins.h"
 
-void setCPUARegOE(const uint8_t vHL);
+void setCPUARegOE(const bool vHL);
 
 void setupCPU();
 
@@ -23,8 +22,6 @@ void snoop_read6502Memory(const uint16_t, const uint16_t, uint8_t*);
 
 void snoop_write6502Memory(const uint16_t, uint16_t, const uint8_t*);
 
-#if 0
+#if 1
 void testBUS();
-#endif
-
 #endif

@@ -1,4 +1,4 @@
-// 
+﻿// 
 // 
 // 
 #include <arduino.h>
@@ -7,7 +7,7 @@
 #include "neobus.h"
 
 uint8_t gCurrentContext = 0x00;
-uint8_t gDefaultMMU[16] = { 0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x0F }; // straight 64k space with IO page on: F000 - FFFF
+uint8_t gDefaultMMU[16] = { 0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x8E,0x0F }; // straight 64k space with IO page on: F000 - FFFF
 
 volatile uint32_t gMMUIOCount = 0L;
 
@@ -24,26 +24,45 @@ uint32_t getMMUIOCount() {
 /// </summary>
 /// <param name="vRW"></param>
 //inline __attribute__((always_inline))
-void setpRW(const uint8_t vRW) {
-  gpio_put(pRW, vRW);
+constexpr uint32_t PRW_BIT = (1u << pRW);   // 4 → bit 4
+
+inline __attribute__((always_inline))
+void setpRW(const bool high)
+{
+  if (high)
+    sio_hw->gpio_set = PRW_BIT;
+  else
+    sio_hw->gpio_clr = PRW_BIT;
 }
 
 /// <summary>
 /// control pMMUARegHLatch
 /// </summary>
 /// <param name="vHL"></param>
+constexpr uint32_t MMU_H_BIT = (1u << pMMUARegHLatch);
+
 inline __attribute__((always_inline))
-void setMMUARegHLatch(const uint8_t vHL) {
-    gpio_put(pMMUARegHLatch, vHL);
+void setMMUARegHLatch(const bool vHL)
+{
+  if (vHL)
+    sio_hw->gpio_set = MMU_H_BIT;
+  else
+    sio_hw->gpio_clr = MMU_H_BIT;
 }
 
 /// <summary>
 /// cotrol pMMUDRegOE
 /// </summary>
 /// <param name="vHL"></param>
+constexpr uint32_t MMU_D_OE_BIT = (1u << pMMUDRegOE);
+
 inline __attribute__((always_inline))
-void setMMUDRegOE(const uint8_t vHL) {
-    gpio_put(pMMUDRegOE, vHL);
+void setMMUDRegOE(const bool vHL)
+{
+  if (vHL)
+    sio_hw->gpio_set = MMU_D_OE_BIT;
+  else
+    sio_hw->gpio_clr = MMU_D_OE_BIT;
 }
 
 //-----------------------------------------------------------------------------------------------
@@ -53,7 +72,7 @@ void setMMUDRegOE(const uint8_t vHL) {
 /// </summary>
 /// <returns></returns>
 bool getMMUIO() {
-    return (!gpio_get(pMMUIO));
+  return (!gpio_get(pMMUIO));
 }
 
 
@@ -108,13 +127,11 @@ uint8_t readMMUIndex() {
 /// latch address register A12..15
 /// </summary>
 /// <param name="vIndex"></param>
-//inline __attribute__((always_inline))
+inline __attribute__((always_inline))
 void writeMMUIndex(const uint8_t vIndex) {
-  if (getControlMode() == mRPI) {
-    writeCPUAddressH(vIndex << 4);
-  }
-  else
-    Serial.printf("*E: writeMMUIndex: wrong control mode\n");
+//  Serial.printf("*D: writeMMUIndex: %02X\n", vIndex);
+
+  writeCPUAddressH((vIndex & 0x0F) << 4);
 }
 
 
@@ -132,10 +149,14 @@ uint8_t readMMUContext() {
 /// <param name="vContext"></param>
 //inline __attribute__((always_inline))
 void writeMMUContext(const uint8_t vContext) {
+//  Serial.printf("*D: writeMMUContext: %02X\n", vContext);
+
   writeNEOBus(vContext); // write context
 
   setMMUARegHLatch(mLOW); // arm latching
 
+  DELAY_FACTOR_SHORT();
+  DELAY_FACTOR_SHORT();
   DELAY_FACTOR_SHORT();
   DELAY_FACTOR_SHORT();
 
@@ -153,37 +174,32 @@ void writeMMUContext(const uint8_t vContext) {
 /// <param name="vIndex"></param>
 /// <returns></returns>
 uint8_t readMMUPage(const uint8_t vContext, const uint8_t vIndex) {
-  if (getControlMode() == mRPI) {
-    writeMMUContext(vContext);    // set context 00.127
-    writeMMUIndex(vIndex);        // set address 00.15
 
-    setCPUARegOE(mLOW);           // enable address output 4 index
+  writeMMUContext(vContext);   // set context 00.127
+  writeMMUIndex(vIndex);       // set address 00.15
 
-    setpRW(mREAD);                // read action (to be sure)
+  setCPUARegOE(mLOW);          // enable output address
 
-    setMMUDRegOE(mLOW);           // enable DBuffer
+  setpRW(mREAD);                // read action (to be sure)
 
-    uint8_t lPage = readNEOBus();
+  setMMUDRegOE(mLOW);           // enable MMU DBuffer
 
-    setMMUDRegOE(mHIGH);          // disable DBuffer
+  DELAY_FACTOR_SHORT();
 
-    setCPUARegOE(mHIGH);          // disable output address
+  uint8_t lPage = readNEOBus();
 
-//    resetNEOBus();                // to be sure
+  setMMUDRegOE(mHIGH);          // disable DBuffer
 
-//    Serial.printf("*D: readMMUPage %02X %02X : %02X\n", vContext, vIndex, lPage);
+  setCPUARegOE(mHIGH);          // disable output address
 
-    return lPage;
-
-  }
-  else
-    Serial.printf("*E: readMMUPage: wrong mode\n");
-
-  return 0;
+  //resetNEOBus();                // to be sure
+  
+  //Serial.printf("*D: readMMUPage %02X %02X : %02X\n", vContext, vIndex, lPage);
+  return lPage;
 }
 
 /// <summary>
-/// write MMU
+/// write MMU Page Index (00..15) of Context (00..127) with Page value (00..FF)
 /// </summary>
 /// <param name="vContext"></param>
 /// <param name="vIndex"></param>
@@ -196,14 +212,11 @@ bool writeMMUPage(const uint8_t vContext, const uint8_t vIndex, const uint8_t vP
   setCPUARegOE(mLOW);          // enable output address
 
   writeNEOBus(vPage);          // data on NeoDBus
-   
+
   setMMUDRegOE(mLOW);          // enable DBuffer
-   
+
   setpRW(mWRITE);              // write action
 
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
   DELAY_FACTOR_SHORT();
 
   setpRW(mREAD);              // read (commit write)
@@ -212,7 +225,7 @@ bool writeMMUPage(const uint8_t vContext, const uint8_t vIndex, const uint8_t vP
 
   setMMUDRegOE(mHIGH);        // disable DBuffer
 
-  setCPUARegOE(mHIGH)   ;     // disable output address
+  setCPUARegOE(mHIGH);     // disable output address
 
   resetNEOBus();
 
@@ -220,7 +233,7 @@ bool writeMMUPage(const uint8_t vContext, const uint8_t vIndex, const uint8_t vP
   uint8_t lData = readMMUPage(vContext, vIndex);
 
   if (lData != vPage)
-    Serial.printf("*E: writeMMUPage: @%02X %02X %02X (%02X)\n", vContext, vIndex & 0x0F, vPage, lData);
+    Serial.printf("*E: writeMMUPage: @%02X %02X (%02X <> %02X)\n", vContext, vIndex & 0x0F, vPage, lData);
 
   return (lData == vPage);
 }
@@ -244,18 +257,18 @@ void dumpMMUContext(const uint8_t vContext) {
 /// <param name="vContext"></param>
 /// <param name="vMMU"></param>
 /// <returns>bool</returns>
-bool defMMUContext(const uint8_t vContext, const uint8_t *vMMU) {
-    uint16_t lErrCount = 0;
+bool defMMUContext(const uint8_t vContext, const uint8_t* vMMU) {
+  uint16_t lErrCount = 0;
 
-    for (uint8_t lPage = 0; lPage < NUM_CONTEXT_PAGES; lPage++) {
-      if (! writeMMUPage(vContext, lPage, vMMU[lPage])) {
-        lErrCount++;
-      }
+  for (uint8_t lPage = 0; lPage < NUM_CONTEXT_PAGES; lPage++) {
+    if (!writeMMUPage(vContext, lPage, vMMU[lPage])) {
+      lErrCount++;
     }
+  }
 
-//    dumpMMUContext(vContext);
+  //    dumpMMUContext(vContext);
 
-    return (lErrCount == 0);
+  return (lErrCount == 0);
 }
 
 /// <summary>
@@ -277,49 +290,39 @@ void enableMMUInterrrupt() {
 /// </summary>
 /// <returns>bool</returns>
 bool initMMU() {
-    uint16_t lContext;
-    uint16_t lErrCount = 0L;
+  uint16_t lContext;
+  uint16_t lErrCount = 0L;
 
-    disableMMUInterrupt();
+  disableMMUInterrupt();
 
-    // for all contexts
-    for (lContext = 0; lContext < NUM_CONTEXTS; lContext++) {
-        if (! defMMUContext((uint8_t)lContext, gDefaultMMU))
-            lErrCount++;
-    }
+  // for all contexts set the pages
+  for (lContext = 0; lContext < NUM_CONTEXTS; lContext++) {
+    if (!defMMUContext((uint8_t)lContext, gDefaultMMU))
+      lErrCount++;
+  }
 
-    // default context
-    writeMMUContext(DEFAULT_CONTEXT);
+  // default context
+  writeMMUContext(DEFAULT_CONTEXT);
 
-    if (lErrCount == 0) {
-      enableMMUInterrrupt(); // interrupt on IO page
-    }
-    else
-      Serial.printf("*E: initMMU failure\n");
+  if (lErrCount == 0) {
+    enableMMUInterrrupt(); // interrupt on IO page
+  }
+  else
+    Serial.printf("*E: initMMU failure\n");
 
-    return (lErrCount == 0);
+  return (lErrCount == 0);
 }
 
-#if 0
-#include "neobus.h"
-
+#if 1
 /// <summary>
 /// 
 /// </summary>
 void testMMU() {
-  uint16_t lad = random(0x0000, 0xFFFF);
-  uint8_t ld = random(0, 0xFF);
+  Serial.printf("*D: Testing MMU\n");
 
-  setDebug(mLOW);
-
-  write6502Memory(lad, ld);
-  
-  uint8_t t = read6502Memory(lad);
-
-  setDebug(mHIGH);
-
-  if (ld != t) {
-    Serial.printf("*E: mem error @%04X %02X : %02X\n", lad, ld, t);
+  while (true) {
+    writeMMUPage(random(NUM_CONTEXTS), random(NUM_CONTEXT_PAGES), random(256));
   }
 }
+
 #endif

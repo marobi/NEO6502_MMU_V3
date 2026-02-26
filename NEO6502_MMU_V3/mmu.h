@@ -1,7 +1,5 @@
 // mmu.h
-
-#ifndef _MMU_h
-#define _MMU_h
+#pragma once
 
 #include "pins.h"
 
@@ -32,9 +30,8 @@ void dumpMMUContext(const uint8_t);
 
 bool initMMU();
 
-#if 0
+#if 1
 void testMMU();
 #endif
 
-#endif
 

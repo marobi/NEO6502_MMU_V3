@@ -29,12 +29,12 @@
 /// </summary>
 void setup() {
   setupControl(); // As early as possible
-  setup6502();
-  setupCPU();
   setupMMU();
+  setupCPU();
+  setup6502();
 
   Serial.begin(115200);
-  delay(1500);
+  delay(2500);
 
   // turn PHI2 on
   init6502();
@@ -50,13 +50,15 @@ void setup() {
     delay(5000);
   }
 
+//  testMMU();
+
   if (! LittleFS.begin()) {
     Serial.println("*E: LittleFS mount failed");
   }
   else
     Serial.println("*I: LittleFS mount OK");
 
-  initVDU();      // get display running
+    initVDU();      // get display running
 
   initCmdSlots();
   initCmdProcessor();
@@ -73,7 +75,7 @@ void setup() {
   Serial.println("BIOS program @");
   loadROM(bios_bin);
 
-  Serial.println("Monitor program @");
+  Serial.println("Monitor WOZMON @");
   loadROM(wozmon_bin);
 
 #if 0
@@ -86,43 +88,13 @@ void setup() {
   set6502State(sRESET);
 
   initMonitor();
-
-  // test
-  //dumpMemory(0x0FF0, 0X0FFF);
-
-  //Serial.println();
-
-  //// replaced a page
-  //writeMMUPage(0x00, 0x0F, 0x9F);
-  //dumpMMUContext(0x00);
-  //dumpMemory(0xFFF0, 0XFFFF);              // show it
-
-  //Serial.println();
-
-  //// dup pages
-  //writeMMUPage(0x00, 0x0F, 0x8F);
-  //writeMMUPage(0x00, 0x00, 0x8F);
-  //dumpMMUContext(0x00);
-
-  //// show it
-  //dumpMemory(0xFFF0, 0xFFFF);
-  //dumpMemory(0x0FF0, 0x0FFF);
-  //// end test
 }
 
 /// <summary>
 /// loop for ever
 /// </summary>
 void loop() {
-  uint8_t cnt;
-  static uint8_t lChar;
-
-  cnt = 10;
-  while (read6502Char(&lChar) && (cnt > 0)) {
-    Serial.printf("%c", lChar);
-    delayMicroseconds(8);
-    cnt--;
-  }
+//  testBUS();
 
   monitor();
 

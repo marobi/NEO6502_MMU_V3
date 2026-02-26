@@ -1,19 +1,34 @@
 // control.h
 
-#ifndef _CONTROL_h
-#define _CONTROL_h
+#pragma once
+#include <Arduino.h>
 
-#include <arduino.h>
-
-#define DELAY_FACTOR_SHORT() asm volatile("nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n");
+#define DELAY_FACTOR_SHORT() \
+    asm volatile(            \
+        "nop\n\t"            \
+        "nop\n\t"            \
+        "nop\n\t"            \
+        "nop\n\t"            \
+        "nop\n\t"            \
+        "nop\n\t"            \
+        "nop\n\t"            \
+        "nop\n\t"            \
+        "nop\n\t"            \
+        "nop\n\t"            \
+        "nop\n\t"            \
+        "nop\n\t"            \
+        "nop\n\t"            \
+        "nop\n\t"            \
+        "nop\n\t"            \
+        ::: "memory")
 
 uint8_t getControlMode();
 
-void setDebug(const uint8_t);
+void setDebug(const bool);
 
 void setControlMode(const uint8_t);
 
-void setmRW(const uint8_t);
+void setmRW(const bool);
 
 uint8_t readNEOBus();
 
@@ -23,4 +38,3 @@ void resetNEOBus();
 
 void setupControl();
 
-#endif

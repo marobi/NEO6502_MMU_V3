@@ -373,8 +373,10 @@ void monitor() {
           Serial.print(" ");                     // buffer is empty
         break;
 
-      case '\n':                                 // CR
       case '\r':                                 // LF
+        break;
+
+      case '\n':                                 // CR
         // Parse the user input into the CLI & execute
         gCli.parse(gInputBuffer);
         if (gInterface == 0)

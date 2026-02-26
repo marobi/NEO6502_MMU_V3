@@ -18,13 +18,13 @@ constexpr auto DATA_BUS_MASK = (0xFF0000000000LL); // pin 40..47
 static uint8_t gControlMode = mRPI;
 
 // maintains databus direction
-static uint8_t gBusDir = 2;  // invalid :-)
+static bool gBusDir = mINPUT;  // invalid :-)
 
 /// <summary>
 /// 
 /// </summary>
 /// <param name="vRW"></param>
-void setDebug(const uint8_t vRW) {
+void setDebug(const bool vRW) {
   gpio_put(pDebug, vRW);
 }
 
@@ -48,7 +48,7 @@ void setControlMode(const uint8_t vMode) {
 /// 
 /// </summary>
 /// <param name="vRW"></param>
-void setmRW(const uint8_t vRW) {
+void setmRW(const bool vRW) {
   gpio_put(mRW, vRW);
 }
 
@@ -57,7 +57,7 @@ void setmRW(const uint8_t vRW) {
 /// </summary>
 /// <param name="lDirection"></param>
 inline __attribute__((always_inline))
-void  setNEOBusDir(const uint8_t lDirection) {
+void  setNEOBusDir(const bool lDirection) {
   if (lDirection != gBusDir) {
     switch (lDirection) {
     case mWRITE:  
@@ -81,13 +81,11 @@ uint8_t readNEOBus() {
   setNEOBusDir(mREAD);     // input
 
   DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
 
-  uint32_t lData = ((uint32_t)sio_hw->gpio_hi_in) >> 8u;
+  uint32_t lData = ((uint32_t)sio_hw->gpio_hi_in);
+//  Serial.printf("*D: readNEOBus: 0x%08lX\n", lData);
 
-  return lData & 0xFF;
+  return (lData >> 8u) & 0xFF;
 }
 
 /// <summary>
@@ -97,11 +95,11 @@ uint8_t readNEOBus() {
 void writeNEOBus(const uint8_t vData) {
   setNEOBusDir(mWRITE);
 
-  gpio_put_masked64(DATA_BUS_MASK, ((uint64_t)vData << 40u));
+  uint64_t lData = (uint64_t)vData;
+  lData = lData << 40u; // align to pin 40..47
+//  Serial.printf("*D: writeNEOBus2: 0x%02X =>0x%08llX\n", vData, lData);
+  gpio_put_masked64(DATA_BUS_MASK, lData);
 
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
   DELAY_FACTOR_SHORT();
 }
 
@@ -109,8 +107,6 @@ void writeNEOBus(const uint8_t vData) {
 /// reset NOEObus
 /// </summary>
 void resetNEOBus() {
-  DELAY_FACTOR_SHORT();
-
   setNEOBusDir(mREAD);
 }
 

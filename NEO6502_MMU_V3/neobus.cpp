@@ -1,7 +1,6 @@
 // 
 // 
 // 
-#include <arduino.h>
 #include "control.h"
 #include "neobus.h"
 #include "mmu.h"
@@ -12,7 +11,7 @@
 /// </summary>
 /// <param name="vHL"></param>
 inline __attribute__((always_inline))
-void setCPUARegLLatch(const uint8_t vHL) {
+static void setCPUARegLLatch(const bool vHL) {
   gpio_put(pCPUARegLLatch, vHL);
 }
 
@@ -21,7 +20,7 @@ void setCPUARegLLatch(const uint8_t vHL) {
 /// </summary>
 /// <param name="vHL"></param>
 inline __attribute__((always_inline))
-void setCPUARegHLatch(const uint8_t vHL) {
+static void setCPUARegHLatch(const bool vHL) {
   gpio_put(pCPUARegHLatch, vHL);
 }
 
@@ -30,7 +29,7 @@ void setCPUARegHLatch(const uint8_t vHL) {
 /// </summary>
 /// <param name="vHL"></param>
 //inline __attribute__((always_inline))
-void setCPUARegOE(const uint8_t vHL) {
+void setCPUARegOE(const bool vHL) {
   gpio_put(pCPUARegOE, vHL);
 }
 
@@ -39,7 +38,7 @@ void setCPUARegOE(const uint8_t vHL) {
 /// </summary>
 /// <param name="vHL"></param>
 inline __attribute__((always_inline))
-void setCPUDBufOE(const uint8_t vHL) {
+static void setCPUDBufOE(const bool vHL) {
   gpio_put(pCPUDBufOE, vHL);
 }
 
@@ -48,7 +47,7 @@ void setCPUDBufOE(const uint8_t vHL) {
 /// </summary>
 /// <param name="vHL"></param>
 inline __attribute__((always_inline))
-void setCPUABufLOE(const uint8_t vHL) {
+static void setCPUABufLOE(const bool vHL) {
   gpio_put(pCPUABufLOE, vHL);
 }
 
@@ -57,7 +56,7 @@ void setCPUABufLOE(const uint8_t vHL) {
 /// </summary>
 /// <param name="vHL"></param>
 inline __attribute__((always_inline))
-void setCPUABufHOE(const uint8_t vHL) {
+static void setCPUABufHOE(const bool vHL) {
   gpio_put(pCPUABufHOE, vHL);
 }
 
@@ -102,7 +101,8 @@ uint16_t readCPUAddress() {
 
   setCPUABufHOE(mLOW);        // enable high byte
 
-  uint16_t laddress = ((uint16_t)readNEOBus() << 8); // read it
+  uint16_t laddress = readNEOBus(); // read it
+  laddress = laddress << 8u;        // align to high byte
 
   setCPUABufHOE(mHIGH);   // disable hight byte
   setCPUABufLOE(mLOW);    // enable low byte
@@ -129,12 +129,9 @@ void writeCPUAddressH(const uint8_t vAddress) {
 
   DELAY_FACTOR_SHORT();     // settle
   DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
 
   setCPUARegHLatch(mHIGH); // latch in AREG
+
   resetNEOBus();          // reset NEObus
 }
 
@@ -143,19 +140,15 @@ void writeCPUAddressH(const uint8_t vAddress) {
 /// </summary>
 /// <param name="vAddress"></param>
 inline __attribute__((always_inline))
-void writeCPUAddressL(const uint8_t vAddress) {
-  // set HighAddress A8..15
+static void writeCPUAddressL(const uint8_t vAddress) {
+  // set LowAddress A0..7
   writeNEOBus(vAddress);   // write hight byte of address on NEObus
   setCPUARegLLatch(mLOW);   // arm latch
 
   DELAY_FACTOR_SHORT();     // settle
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
 
   setCPUARegLLatch(mHIGH); // latch in AREG
+
   resetNEOBus();           // reset NEObus
 }
 
@@ -164,18 +157,21 @@ void writeCPUAddressL(const uint8_t vAddress) {
 /// </summary>
 /// <param name="vAddress"></param>
 inline __attribute__((always_inline))
-void writeCPUAddress(const uint16_t vAddress) {
+static void writeCPUAddress(const uint16_t vAddress) {
   if (getControlMode() == mRPI) {         // only in MMU mode
     writeCPUAddressH(vAddress >> 8);      // latch AddressH
-    writeCPUAddressL(vAddress);           // latch AddressL
+    writeCPUAddressL(vAddress & 0xFF);    // latch AddressL
 
-//    uint16_t laddress = readCPUAddress(); // validate
-//    if (laddress != vAddress) {
-//      Serial.printf("*E writeCPUAddress: 0x%04X (0x%04X)\n", vAddress, laddress);
-//    }
+#if 1
+    uint16_t laddress = readCPUAddress(); // validate
+    if (laddress != vAddress) {
+      Serial.printf("*E writeCPUAddress: 0x%04X (0x%04X)\n", vAddress, laddress);
+    }
+#endif
   }
   else
     Serial.printf("*E: setCPUAddress: wrong mode\n");
+
 }
 
 /// <summary>
@@ -189,11 +185,6 @@ uint8_t read6502Data() {
   setCPUDBufOE(mLOW);   // read from databus
 
   DELAY_FACTOR_SHORT(); // settle
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
 
   uint8_t ldata = readNEOBus();  // read data
 
@@ -240,34 +231,25 @@ void write6502Memory(const uint16_t vAddress, const uint8_t vData) {
 
     writeNEOBus(vData);         // write data to Neodbus
 
-    setCPUDBufOE(mLOW);         // enable databus
-
     setmRW(mWRITE);             // write cycle
     set6502RW(mWRITE);
+    setCPUDBufOE(mLOW);         // enable databus
 
-    DELAY_FACTOR_SHORT();
-    DELAY_FACTOR_SHORT();
-    DELAY_FACTOR_SHORT();
-    DELAY_FACTOR_SHORT();
-    DELAY_FACTOR_SHORT();
     DELAY_FACTOR_SHORT();
 
     set6502RW(mREAD);
     setmRW(mREAD);              // end write cycle
-
-    DELAY_FACTOR_SHORT();
-
     setCPUDBufOE(mHIGH);        // disable databus
 
-//    resetNEOBus();            // disable neodbus
+    //    resetNEOBus();            // disable neodbus
 
-//    uint8_t ldata = read6502Memory(vAddress);  // validate
+    uint8_t ldata = read6502Memory(vAddress);  // validate
 
-    setCPUARegOE(mHIGH);      // disable address output
+    setCPUARegOE(mHIGH);        // disable address output
 
-//    if (ldata != vData) {
-//      Serial.printf("*E: write6502Memory: 0x%04X: 0x%02X (0x%02X)\n", vAddress, vData, ldata);
-//    }
+    if (ldata != vData) {
+      Serial.printf("*E: write6502Memory: 0x%04X: 0x%02X (0x%02X)\n", vAddress, vData, ldata);
+    }
   }
   else
     Serial.println("*E: write6502Memory: wrong mode");
@@ -279,12 +261,12 @@ void write6502Memory(const uint16_t vAddress, const uint8_t vData) {
 /// <param name="vAddress"></param>
 /// <param name="vBytes"></param>
 /// <param name="vBuffer"></param>
-void snoop_read6502Memory(const uint16_t vAddress, const uint16_t vBytes, uint8_t *vBuffer) {
+void snoop_read6502Memory(const uint16_t vAddress, const uint16_t vBytes, uint8_t* vBuffer) {
   uint8_t lState = get6502State();
   set6502State(sRPI);
 
   uint16_t lAd = vAddress;
-  uint8_t* lBuf = (uint8_t *)vBuffer;
+  uint8_t* lBuf = (uint8_t*)vBuffer;
   for (uint16_t m = 0; m < vBytes; m++) {
     lBuf[m] = read6502Memory(lAd++);
   }
@@ -310,10 +292,7 @@ void snoop_write6502Memory(const uint16_t vAddress, uint16_t vBytes, const uint8
   set6502State(lState);  // return to prev state
 }
 
-#if 0
-//
-static uint16_t gAddress = 0x0F00;
-
+#if 1
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /// <summary>
 /// 
@@ -322,14 +301,20 @@ void testBUS() {
   uint8_t vData, lData;
 
   uint16_t lAddress = random(0x0200, 0XEFFF);
-  
+
   vData = random(0xFF);
 
   setDebug(mLOW);
 
-  snoop_write6502Memory(lAddress, 1, &vData);
+  write6502Memory(lAddress, vData);
 
-  snoop_read6502Memory(lAddress, 1, &lData);
+  setDebug(mHIGH);
+
+  setDebug(mLOW);
+
+  read6502Memory(random(0x0200, 0XEFFF));
+  read6502Memory(random(0x0200, 0XEFFF));
+  lData = read6502Memory(lAddress);
 
   setDebug(mHIGH);
 
