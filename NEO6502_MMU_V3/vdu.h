@@ -13,15 +13,11 @@ Lesser General Public License for more details.
 
 #pragma once
 
-#define IDX_CURSOR       254   // palette index for cursor color
-#define WIDTH            320   // TBD display.width()
-#define HEIGHT           240   // TBD display.height()
-#define FONT_CHAR_WIDTH  5  
-#define FONT_CHAR_HEIGHT 7
-#define FONT_CELL_WIDTH  (FONT_CHAR_WIDTH + 1)
-#define FONT_CELL_HEIGHT (FONT_CHAR_HEIGHT + 1)
-#define ROWS             (HEIGHT / FONT_CELL_HEIGHT)
-#define COLS             (WIDTH / FONT_CELL_WIDTH)
+#define DEFAULT_COLOR   15      // WHITE
+#define DEFAULT_BG_COLOR 4      // DARK BLUE
+#define DEFAULT_MODE     0      // VDU display mode (0-7)
+
+#define CURSOR_BLINK_INTERVAL_MS 600    // MS
 
 // the 16 standard colors of the 256 in the palette
 #define BLACK    0
@@ -40,6 +36,17 @@ Lesser General Public License for more details.
 #define FUCHSIA 13
 #define AQUA    14
 #define WHITE   15
+
+////////////////////////////////////////////////////////////////////////
+#define IDX_CURSOR       254   // palette index for cursor color
+#define WIDTH            320   // TBD display.width()
+#define HEIGHT           240   // TBD display.height()
+#define FONT_CHAR_WIDTH  5  
+#define FONT_CHAR_HEIGHT 7
+#define FONT_CELL_WIDTH  (FONT_CHAR_WIDTH + 1)
+#define FONT_CELL_HEIGHT (FONT_CHAR_HEIGHT + 1)
+#define ROWS             (HEIGHT / FONT_CELL_HEIGHT)
+#define COLS             (WIDTH / FONT_CELL_WIDTH)
 
 /// <summary>
 /// cursor styles

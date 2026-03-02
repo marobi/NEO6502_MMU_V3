@@ -1,7 +1,4 @@
-// 
-// 
-// 
-#include <arduino.h>
+#include <Arduino.h>
 #include "hardware/gpio.h"
 #include "hardware/structs/sio.h"
 
@@ -13,23 +10,14 @@
 // neo bus
 constexpr auto DATA_BUS_MASK = (0xFF0000000000LL); // pin 40..47
 
-
 // maintains control
 static uint8_t gControlMode = mRPI;
 
 // maintains databus direction
-static bool gBusDir = mINPUT;  // invalid :-)
+static uint8_t gBusDir = 99;  // invalid :-)
 
 /// <summary>
-/// 
-/// </summary>
-/// <param name="vRW"></param>
-void setDebug(const bool vRW) {
-  gpio_put(pDebug, vRW);
-}
-
-/// <summary>
-/// 
+/// get mode of control
 /// </summary>
 /// <returns></returns>
 uint8_t getControlMode() {
@@ -45,15 +33,7 @@ void setControlMode(const uint8_t vMode) {
 }
 
 /// <summary>
-/// 
-/// </summary>
-/// <param name="vRW"></param>
-void setmRW(const bool vRW) {
-  gpio_put(mRW, vRW);
-}
-
-/// <summary>
-/// set GPIO as input/output
+/// set NEObus direction to input or output
 /// </summary>
 /// <param name="lDirection"></param>
 inline __attribute__((always_inline))
@@ -104,14 +84,14 @@ void writeNEOBus(const uint8_t vData) {
 }
 
 /// <summary>
-/// reset NOEObus
+/// reset NEObus
 /// </summary>
 void resetNEOBus() {
   setNEOBusDir(mREAD);
 }
 
 /// <summary>
-/// 
+/// setup control pins: mRW for read/write, pDebug for debug output, and pin 40..47 for NEObus data bus
 /// </summary>
 void setupControl() {
   // NEO databus init
@@ -125,9 +105,9 @@ void setupControl() {
 
   gpio_init(mRW);                  // Always init pins first
   gpio_set_dir(mRW, GPIO_OUT);     // Set as output
-  setmRW(mHIGH);
+  MRWPin::high();                  // default to read mode
 
   gpio_init(pDebug);               // Always init pins first
   gpio_set_dir(pDebug, GPIO_OUT);  // Set as output
-  setDebug(mHIGH);
+  DebugPin::high();
 }

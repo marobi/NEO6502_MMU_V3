@@ -1,3 +1,6 @@
 #pragma once
 
-bool loadROM(const uint8_t* vRom);
+extern bool loadROMCartridge(const uint8_t*);
+
+extern uint8_t* readBinaryFile(const char *vFile);
+

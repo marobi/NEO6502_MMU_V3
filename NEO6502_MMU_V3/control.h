@@ -3,6 +3,10 @@
 #pragma once
 #include <Arduino.h>
 
+// control mode
+#define mRPI  0
+#define mCPU  1
+
 #define DELAY_FACTOR_SHORT() \
     asm volatile(            \
         "nop\n\t"            \
@@ -24,11 +28,7 @@
 
 uint8_t getControlMode();
 
-void setDebug(const bool);
-
 void setControlMode(const uint8_t);
-
-void setmRW(const bool);
 
 uint8_t readNEOBus();
 
@@ -37,4 +37,3 @@ void writeNEOBus(const uint8_t);
 void resetNEOBus();
 
 void setupControl();
-

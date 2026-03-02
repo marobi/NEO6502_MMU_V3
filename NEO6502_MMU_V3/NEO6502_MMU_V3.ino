@@ -4,7 +4,7 @@
  Author:	Rien Matthijsse
 */
 
-#include <arduino.h>
+#include <Arduino.h>
 #include <LittleFS.h>
 
 #include "config.h"
@@ -13,21 +13,23 @@
 #include "neobus.h"
 #include "p6502.h"
 #include "ram.h"
-#include "monitor.h"
 #include "bios.h"
-#include "cmd_proc.h"
 #include "cmd.h"
 #include "vdu.h"
 #include "vdu_graphics.h"
 #include "vdu_interface.h"
 
 #include "rom.h"
-#include "rom_monitor.h"
-#include "rom_bios.h"
-#include "rom_test.h"
+
+#include "memory_config.h"
+
+#include "sys_config.h"
+#include "boot.h"
+
+#include "monitor.h"
 
 /// <summary>
-/// 
+/// print the contents of a file from LittleFS to the serial console for debugging purposes.
 /// </summary>
 /// <param name="vFile"></param>
 void printFile(const char* vFile) {
@@ -49,7 +51,7 @@ void printFile(const char* vFile) {
 }
 
 /// <summary>
-/// 
+/// intro display on VDU to show that the system is up and running, and to test some basic VDU graphics capabilities.
 /// </summary>
 void introDisplay() {
   setTColor(69);  // text color light blue
@@ -91,7 +93,9 @@ void introDisplay() {
 }
 
 /// <summary>
-/// setup
+/// setup the system, including initializing the 6502 CPU, MMU, VDU, and other components. 
+/// Also mounts the LittleFS filesystem and displays an intro screen on the VDU. 
+/// Finally, it boots the system with a menu to select the configuration to boot with.
 /// </summary>
 void setup() {
   setupControl(); // As early as possible
@@ -129,42 +133,61 @@ void setup() {
   introDisplay();
 
   initCmdSlots();
-  initCmdProcessor();
 
   printFile("intro.txt");
 
-  Serial.printf("*I: setup done\n");
+  Serial.println("*I: setup done");
 
   Serial.printf("*I: BIOS: %s %s\n", BIOS_DATE, BIOS_TIME);
+  
   // report clock freqs.
   uint32_t freq = clock_get_hz(clk_sys);
   Serial.printf("*I: Core frequency: %0d MHz\n", freq / MHZ);
   Serial.printf("*I: 6502 frequency: %0.1f MHz\n", (float)DEFAULT_6502_CLOCK / MHZ);
 
-  // load bios
-  Serial.println("BIOS program @");
-  loadROM(bios_bin);
+  initializeMemoryConfig();
+  configureMMUFromActiveModel();
 
-  Serial.println("Monitor WOZMON @");
-  loadROM(wozmon_bin);
+  dumpMMUPhysicalUsage();       // dump physical page usage for debug
+  dumpMMUPageMapsCompact();
 
-  Serial.println("Test program @");
-  loadROM(test_bin);
+  initializeSystemConfig();     // init system configuration from /system.ini
 
-  Serial.println();
+  bootSystemWithMenu();         // boot system with menu to select configuration.
+
+  writeMMUContext(DEFAULT_CONTEXT); // set default MMU context for booting
 
   set6502State(sRESET);
 
-  initMonitor();
+  initMonitor();                // init monitor after boot
 }
 
 /// <summary>
-/// loop for ever
+/// loop function runs repeatedly after setup 
+/// processing any serial input for the VDU
+/// and is responsible for running the VDU task, 
+/// and running the monitor.
 /// </summary>
 void loop() {
-//  testBUS();
+#if 0
+  // process serial input for 6502
+  if (Serial.available() > 0) {
+    if (outCharAvailable6502()) {
+      uint8_t c = Serial.read(); // read char from serial
+      outChar6502(c);            // write char to 6502, should succeed
+ //     vduPutc(c);                // local echo to VDU for testing, remove if not needed
+    }
+  }
+#endif
 
-  monitor();
+  uint8_t c = inChar6502();
+  if (c != 0x00) {
+    vduPutc(c);                  // echo char from 6502 to VDU
+  }
+
+  taskVDU();                     // run VDU task to process VDU commands and update display
+
+  monitor();                     // run monitor to update state
 
   delay(5);
 }

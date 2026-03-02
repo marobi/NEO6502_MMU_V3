@@ -4,10 +4,9 @@
 
 #include "pins.h"
 
-void setCPUARegOE(const bool vHL);
-
 void setupCPU();
 
+uint16_t readCPUBusAddress();
 uint16_t readCPUAddress();
 
 void writeCPUAddressH(const uint8_t);

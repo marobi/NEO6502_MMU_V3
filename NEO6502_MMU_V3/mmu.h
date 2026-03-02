@@ -1,4 +1,3 @@
-// mmu.h
 #pragma once
 
 #include "pins.h"
@@ -9,6 +8,8 @@
 #define NUM_CONTEXT_PAGES  (16)        // 16 x 4k = 64k
 #define DEFAULT_CONTEXT    (0)
 
+extern volatile uint32_t gMMUIOCount;
+extern volatile bool gMMUIOTrigger;
 
 uint32_t getMMUIOCount();
 
@@ -30,7 +31,11 @@ void dumpMMUContext(const uint8_t);
 
 bool initMMU();
 
-#if 1
+void disableMMUInterrupt();
+
+void enableMMUInterrupt();
+
+#if 0
 void testMMU();
 #endif
 

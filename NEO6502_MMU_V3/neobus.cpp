@@ -7,87 +7,48 @@
 #include "p6502.h"
 
 /// <summary>
-/// control cpuARegLLatch
-/// </summary>
-/// <param name="vHL"></param>
-inline __attribute__((always_inline))
-static void setCPUARegLLatch(const bool vHL) {
-  gpio_put(pCPUARegLLatch, vHL);
-}
-
-/// <summary>
-/// control cpuARegHLatch
-/// </summary>
-/// <param name="vHL"></param>
-inline __attribute__((always_inline))
-static void setCPUARegHLatch(const bool vHL) {
-  gpio_put(pCPUARegHLatch, vHL);
-}
-
-/// <summary>
-/// control cpuARegOE
-/// </summary>
-/// <param name="vHL"></param>
-//inline __attribute__((always_inline))
-void setCPUARegOE(const bool vHL) {
-  gpio_put(pCPUARegOE, vHL);
-}
-
-/// <summary>
-/// control pCPUDBufOE
-/// </summary>
-/// <param name="vHL"></param>
-inline __attribute__((always_inline))
-static void setCPUDBufOE(const bool vHL) {
-  gpio_put(pCPUDBufOE, vHL);
-}
-
-/// <summary>
-/// 
-/// </summary>
-/// <param name="vHL"></param>
-inline __attribute__((always_inline))
-static void setCPUABufLOE(const bool vHL) {
-  gpio_put(pCPUABufLOE, vHL);
-}
-
-/// <summary>
-/// 
-/// </summary>
-/// <param name="vHL"></param>
-inline __attribute__((always_inline))
-static void setCPUABufHOE(const bool vHL) {
-  gpio_put(pCPUABufHOE, vHL);
-}
-
-
-/// <summary>
 /// setup CPU interface
 /// </summary>
 void setupCPU() {
   gpio_init(pCPUARegLLatch);                // Always init pins first
   gpio_set_dir(pCPUARegLLatch, GPIO_OUT);   // Set as output
-  setCPUARegLLatch(mHIGH);  // no latch
+  CPUARegLLatchPin::high();                 // no latch
 
   gpio_init(pCPUARegHLatch);                // Always init pins first
   gpio_set_dir(pCPUARegHLatch, GPIO_OUT);   // Set as output
-  setCPUARegHLatch(mHIGH);  // no latch
+  CPUARegHLatchPin::high();                 // no latch
 
   gpio_init(pCPUABufLOE);                   // Always init pins first
   gpio_set_dir(pCPUABufLOE, GPIO_OUT);      // Set as output
-  setCPUABufLOE(mHIGH);// no OE
+  CPUABufLOEPin::high();                    // no OE
 
   gpio_init(pCPUABufHOE);                   // Always init pins first
   gpio_set_dir(pCPUABufHOE, GPIO_OUT);      // Set as output
-  setCPUABufHOE(mHIGH);  // no OE
+  CPUABufHOEPin::high();                    // no OE
 
   gpio_init(pCPUARegOE);                    // Always init pins first
   gpio_set_dir(pCPUARegOE, GPIO_OUT);       // Set as output
-  setCPUARegOE(mHIGH);  // no OE
+  CPUARegOEPin::high();                     // no OE
 
   gpio_init(pCPUDBufOE);                    // Always init pins first
   gpio_set_dir(pCPUDBufOE, GPIO_OUT);       // Set as output
-  setCPUDBufOE(mHIGH);  // no OE
+  CPUDBufOEPin::high();                     // no OE
+}
+
+uint16_t readCPUBusAddress() {
+  CPUABufHOEPin::low();                     // enable high byte
+
+  uint16_t laddress = readNEOBus();         // read it
+  laddress = laddress << 8u;                // align to high byte
+
+  CPUABufHOEPin::high();                    // disable hight byte
+  CPUABufLOEPin::low();                     // enable low byte
+
+  laddress |= readNEOBus();                 // read it
+
+  CPUABufLOEPin::high();                    // disable low byte
+
+  return laddress;
 }
 
 /// <summary>
@@ -96,23 +57,23 @@ void setupCPU() {
 /// <returns></returns>
 uint16_t readCPUAddress() {
   if (getControlMode() == mRPI) {
-    setCPUARegOE(mLOW);       // output AREG address
+    CPUARegOEPin::low();                    // output AREG address
   }
 
-  setCPUABufHOE(mLOW);        // enable high byte
+  CPUABufHOEPin::low();     // enable high byte
 
   uint16_t laddress = readNEOBus(); // read it
   laddress = laddress << 8u;        // align to high byte
 
-  setCPUABufHOE(mHIGH);   // disable hight byte
-  setCPUABufLOE(mLOW);    // enable low byte
+  CPUABufHOEPin::high();    // disable hight byte
+  CPUABufLOEPin::low();     // enable low byte
 
   laddress |= readNEOBus();  // read it
 
-  setCPUABufLOE(mHIGH);   // disable low byte
+  CPUABufLOEPin::high();   // disable low byte
 
   if (getControlMode() == mRPI) {
-    setCPUARegOE(mHIGH);  // disable AREG output
+    CPUARegOEPin::high();    // disable AREG output
   }
 
   return laddress;
@@ -125,14 +86,14 @@ uint16_t readCPUAddress() {
 void writeCPUAddressH(const uint8_t vAddress) {
   // set HighAddress A8..15
   writeNEOBus(vAddress);   // write hight byte of address on NEObus
-  setCPUARegHLatch(mLOW);   // arm latch
+  CPUARegHLatchPin::low();  // arm latch
 
   DELAY_FACTOR_SHORT();     // settle
   DELAY_FACTOR_SHORT();
 
-  setCPUARegHLatch(mHIGH); // latch in AREG
+  CPUARegHLatchPin::high(); // latch in AREG
 
-  resetNEOBus();          // reset NEObus
+  resetNEOBus();            // reset NEObus
 }
 
 /// <summary>
@@ -143,11 +104,11 @@ inline __attribute__((always_inline))
 static void writeCPUAddressL(const uint8_t vAddress) {
   // set LowAddress A0..7
   writeNEOBus(vAddress);   // write hight byte of address on NEObus
-  setCPUARegLLatch(mLOW);   // arm latch
+  CPUARegLLatchPin::low(); // arm latch
 
   DELAY_FACTOR_SHORT();     // settle
 
-  setCPUARegLLatch(mHIGH); // latch in AREG
+  CPUARegLLatchPin::high(); // latch in AREG
 
   resetNEOBus();           // reset NEObus
 }
@@ -162,7 +123,7 @@ static void writeCPUAddress(const uint16_t vAddress) {
     writeCPUAddressH(vAddress >> 8);      // latch AddressH
     writeCPUAddressL(vAddress & 0xFF);    // latch AddressL
 
-#if 1
+#if USE_VALIDATION
     uint16_t laddress = readCPUAddress(); // validate
     if (laddress != vAddress) {
       Serial.printf("*E writeCPUAddress: 0x%04X (0x%04X)\n", vAddress, laddress);
@@ -181,14 +142,14 @@ static void writeCPUAddress(const uint16_t vAddress) {
 //inline __attribute__((always_inline))
 uint8_t read6502Data() {
   // read databus
-  setmRW(mREAD);        // to be sure
-  setCPUDBufOE(mLOW);   // read from databus
+  MRWPin::high(); // to be sure
+  CPUDBufOEPin::low();  // read from databus
 
   DELAY_FACTOR_SHORT(); // settle
 
   uint8_t ldata = readNEOBus();  // read data
 
-  setCPUDBufOE(mHIGH);  // disable data output
+  CPUDBufOEPin::high();         // disable data output
 
   return ldata;
 }
@@ -200,15 +161,15 @@ uint8_t read6502Data() {
 /// <returns></returns>
 uint8_t read6502Memory(const uint16_t vAddress) {
   if (getControlMode() == mRPI) {
-    set6502RW(mREAD);
+    set6502RW(mREAD);       // set RW to read
 
-    writeCPUAddress(vAddress);
+    writeCPUAddress(vAddress); // latch address
 
-    setCPUARegOE(mLOW);  // output adress on cpu bus
+    CPUARegOEPin::low();    // output address on cpu bus
 
-    uint8_t ldata = read6502Data();
+    uint8_t ldata = read6502Data(); // read data from bus
 
-    setCPUARegOE(mHIGH); // disable address output
+    CPUARegOEPin::high();   // disable address output
 
     return ldata;
   }
@@ -225,31 +186,38 @@ uint8_t read6502Memory(const uint16_t vAddress) {
 /// <param name="vData"></param>
 void write6502Memory(const uint16_t vAddress, const uint8_t vData) {
   if (getControlMode() == mRPI) {
+    disableMMUInterrupt();
+
     writeCPUAddress(vAddress);  // latch address
 
-    setCPUARegOE(mLOW);         // output on address bus
+      CPUARegOEPin::low();      // output on address bus
 
     writeNEOBus(vData);         // write data to Neodbus
 
-    setmRW(mWRITE);             // write cycle
-    set6502RW(mWRITE);
-    setCPUDBufOE(mLOW);         // enable databus
+    MRWPin::low();              // write cycle
+    set6502RW(mWRITE);          // set RW to write
+    CPUDBufOEPin::low();        // enable databus
 
     DELAY_FACTOR_SHORT();
 
-    set6502RW(mREAD);
-    setmRW(mREAD);              // end write cycle
-    setCPUDBufOE(mHIGH);        // disable databus
+    set6502RW(mREAD);           // set RW to read for next cycle
+    MRWPin::high();             // end write cycle
+    CPUDBufOEPin::high();       // disable databus
 
-    //    resetNEOBus();            // disable neodbus
-
+#if USE_VALIDATION
     uint8_t ldata = read6502Memory(vAddress);  // validate
 
-    setCPUARegOE(mHIGH);        // disable address output
+    CPUARegOEPin::high();      // disable address output
 
     if (ldata != vData) {
       Serial.printf("*E: write6502Memory: 0x%04X: 0x%02X (0x%02X)\n", vAddress, vData, ldata);
     }
+#else
+    CPUARegOEPin::high();      // disable address output
+
+#endif
+
+    enableMMUInterrupt();
   }
   else
     Serial.println("*E: write6502Memory: wrong mode");
@@ -292,7 +260,7 @@ void snoop_write6502Memory(const uint16_t vAddress, uint16_t vBytes, const uint8
   set6502State(lState);  // return to prev state
 }
 
-#if 1
+#if 0
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /// <summary>
 /// 

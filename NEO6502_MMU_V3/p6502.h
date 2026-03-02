@@ -1,6 +1,10 @@
-// p6502.h
-
 #pragma once
+
+#define mREAD  1
+#define mWRITE 0
+
+#define mINPUT  1
+#define mOUTPUT 0
 
 // state of 6502 cpu
 enum cpuState {

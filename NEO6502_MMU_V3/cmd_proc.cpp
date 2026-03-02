@@ -4,11 +4,17 @@
 #include <arduino.h>
 #include "cmd_proc.h"
 
+/// <summary>
+/// 
+/// </summary>
 typedef struct {
   char     Name[16];
   bool   (*Callback)();
 } tCmdCmd;
 
+/// <summary>
+/// 
+/// </summary>
 typedef  struct {
   uint8_t  Id;
   char     Name[16];
@@ -125,11 +131,6 @@ void dumpCmdProcessor() {
 /// 
 /// </summary>
 void initCmdProcessor() {
-
-  setCmdGroup(0, "BIOS", 2);
-  setCmdCmd(0, 0, "INCHAR", cbDummy);
-  setCmdCmd(0, 1, "OUTCHAR", cbDummy);
-
   setCmdGroup(1, "VDU", 4);
   setCmdCmd(1, 0, "CLS", cbDummy);
   setCmdCmd(1, 1, "CURSOR", cbDummy);

@@ -1,15 +1,18 @@
 ﻿// 
 // 
 // 
-#include <arduino.h>
+#include <Arduino.h>
+#include "config.h"
+#include "pins.h"
 #include "control.h"
 #include "mmu.h"
 #include "neobus.h"
 
 uint8_t gCurrentContext = 0x00;
-uint8_t gDefaultMMU[16] = { 0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x8E,0x0F }; // straight 64k space with IO page on: F000 - FFFF
+uint8_t gDefaultMMU[16] = { 0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x8F }; // straight 64k space with IO page on: F000 - FFFF
 
 volatile uint32_t gMMUIOCount = 0L;
+volatile bool     gMMUIOTrigger = false;
 
 /// <summary>
 /// 
@@ -17,52 +20,6 @@ volatile uint32_t gMMUIOCount = 0L;
 /// <returns></returns>
 uint32_t getMMUIOCount() {
   return gMMUIOCount;
-}
-
-//// <summary>
-/// control RW (NEObus)
-/// </summary>
-/// <param name="vRW"></param>
-//inline __attribute__((always_inline))
-constexpr uint32_t PRW_BIT = (1u << pRW);   // 4 → bit 4
-
-inline __attribute__((always_inline))
-void setpRW(const bool high)
-{
-  if (high)
-    sio_hw->gpio_set = PRW_BIT;
-  else
-    sio_hw->gpio_clr = PRW_BIT;
-}
-
-/// <summary>
-/// control pMMUARegHLatch
-/// </summary>
-/// <param name="vHL"></param>
-constexpr uint32_t MMU_H_BIT = (1u << pMMUARegHLatch);
-
-inline __attribute__((always_inline))
-void setMMUARegHLatch(const bool vHL)
-{
-  if (vHL)
-    sio_hw->gpio_set = MMU_H_BIT;
-  else
-    sio_hw->gpio_clr = MMU_H_BIT;
-}
-
-/// <summary>
-/// cotrol pMMUDRegOE
-/// </summary>
-/// <param name="vHL"></param>
-constexpr uint32_t MMU_D_OE_BIT = (1u << pMMUDRegOE);
-
-inline __attribute__((always_inline))
-void setMMUDRegOE(const bool vHL)
-{
-  if (vHL)
-    sio_hw->gpio_set = MMU_D_OE_BIT;
-  else
-    sio_hw->gpio_clr = MMU_D_OE_BIT;
 }
 
 //-----------------------------------------------------------------------------------------------
@@ -77,12 +34,13 @@ bool getMMUIO() {
 
 
 /// <summary>
-/// basic interrupt routine on IO pin FALLING
-/// 
-/// valid after init of MMU
+/// intrMMUIO: interrupt handler for MMU IO pin, triggered on falling edge (active low)
 /// </summary>
 static void intrMMUIO() {
+  gpio_acknowledge_irq(pMMUIO, GPIO_IRQ_EDGE_FALL);
+
   gMMUIOCount++;
+  gMMUIOTrigger = true;
 }
 
 /// <summary>
@@ -92,15 +50,15 @@ void setupMMU()
 {
   gpio_init(pRW);               // Always init pins first
   gpio_set_dir(pRW, GPIO_OUT);   // Set as output
-  setpRW(mHIGH);
+  PRWPin::high();                // default to read mode
 
   gpio_init(pMMUARegHLatch);               // Always init pins first
   gpio_set_dir(pMMUARegHLatch, GPIO_OUT);   // Set as output
-  setMMUARegHLatch(mHIGH);          // no latch
+  MMUARegHLatchPin::high();     // no latch
 
   gpio_init(pMMUDRegOE);               // Always init pins first
   gpio_set_dir(pMMUDRegOE, GPIO_OUT);   // Set as output
-  setMMUDRegOE(mHIGH);              // no output
+  MMUDRegOEPin::high();            // no output
 
   gpio_init(pMMUIO);               // Always init pins first
   gpio_set_dir(pMMUIO, GPIO_IN);   // Set as output
@@ -153,14 +111,14 @@ void writeMMUContext(const uint8_t vContext) {
 
   writeNEOBus(vContext); // write context
 
-  setMMUARegHLatch(mLOW); // arm latching
+  MMUARegHLatchPin::low(); // arm latching
 
   DELAY_FACTOR_SHORT();
   DELAY_FACTOR_SHORT();
   DELAY_FACTOR_SHORT();
   DELAY_FACTOR_SHORT();
 
-  setMMUARegHLatch(mHIGH); // latch
+  MMUARegHLatchPin::high(); // latch
 
   resetNEOBus(); // databus to read
 
@@ -178,21 +136,19 @@ uint8_t readMMUPage(const uint8_t vContext, const uint8_t vIndex) {
   writeMMUContext(vContext);   // set context 00.127
   writeMMUIndex(vIndex);       // set address 00.15
 
-  setCPUARegOE(mLOW);          // enable output address
+  CPUARegOEPin::low();         // enable output address
 
-  setpRW(mREAD);                // read action (to be sure)
+  PRWPin::high();              // read action (to be sure)
 
-  setMMUDRegOE(mLOW);           // enable MMU DBuffer
+  MMUDRegOEPin::low();         // enable MMU DBuffer
 
   DELAY_FACTOR_SHORT();
 
   uint8_t lPage = readNEOBus();
 
-  setMMUDRegOE(mHIGH);          // disable DBuffer
+  MMUDRegOEPin::high();       // disable DBuffer
 
-  setCPUARegOE(mHIGH);          // disable output address
-
-  //resetNEOBus();                // to be sure
+  CPUARegOEPin::high();       // disable output address
   
   //Serial.printf("*D: readMMUPage %02X %02X : %02X\n", vContext, vIndex, lPage);
   return lPage;
@@ -209,26 +165,27 @@ bool writeMMUPage(const uint8_t vContext, const uint8_t vIndex, const uint8_t vP
   writeMMUContext(vContext);   // set context 00.127
   writeMMUIndex(vIndex);       // set address 00.15
 
-  setCPUARegOE(mLOW);          // enable output address
+  CPUARegOEPin::low();         // enable output address
 
   writeNEOBus(vPage);          // data on NeoDBus
 
-  setMMUDRegOE(mLOW);          // enable DBuffer
+  MMUDRegOEPin::low();         // enable DBuffer
 
-  setpRW(mWRITE);              // write action
-
-  DELAY_FACTOR_SHORT();
-
-  setpRW(mREAD);              // read (commit write)
+  PRWPin::low();               // write action
 
   DELAY_FACTOR_SHORT();
 
-  setMMUDRegOE(mHIGH);        // disable DBuffer
+  PRWPin::high();             // read (commit write)
 
-  setCPUARegOE(mHIGH);     // disable output address
+  DELAY_FACTOR_SHORT();
+
+  MMUDRegOEPin::high();       // disable DBuffer
+
+  CPUARegOEPin::high();       // disable output address
 
   resetNEOBus();
 
+#if USE_VALIDATION
   // validate
   uint8_t lData = readMMUPage(vContext, vIndex);
 
@@ -236,6 +193,9 @@ bool writeMMUPage(const uint8_t vContext, const uint8_t vIndex, const uint8_t vP
     Serial.printf("*E: writeMMUPage: @%02X %02X (%02X <> %02X)\n", vContext, vIndex & 0x0F, vPage, lData);
 
   return (lData == vPage);
+#else
+  return true;
+#endif
 }
 
 /// <summary>
@@ -266,25 +226,33 @@ bool defMMUContext(const uint8_t vContext, const uint8_t* vMMU) {
     }
   }
 
-  //    dumpMMUContext(vContext);
-
   return (lErrCount == 0);
 }
 
 /// <summary>
-/// diasble mmuIO interrupt
+/// initialise MMU interrupts
 /// </summary>
-void disableMMUInterrupt() {
-  detachInterrupt(pMMUIO);
+static void initMMUInterrupt() {
+  irq_set_exclusive_handler(IO_IRQ_BANK0, intrMMUIO);
 }
 
 /// <summary>
-/// enable mmuIO interrupt
+/// enable MMU interrupts on MMU_IO pin FALLING
 /// </summary>
-void enableMMUInterrrupt() {
-  attachInterrupt(pMMUIO, intrMMUIO, FALLING); // interrupt on IO page
+void enableMMUInterrupt() {
+  gpio_acknowledge_irq(pMMUIO, GPIO_IRQ_EDGE_FALL);
+  irq_set_enabled(IO_IRQ_BANK0, true);
+  gpio_set_irq_enabled(pMMUIO, GPIO_IRQ_EDGE_FALL, true);
 }
 
+/// <summary>
+/// disable MMU interrupts on MMU_IO pin FALLING
+/// </summary>
+void disableMMUInterrupt() {
+  gpio_set_irq_enabled(pMMUIO, GPIO_IRQ_EDGE_FALL, false);
+  gpio_acknowledge_irq(pMMUIO, GPIO_IRQ_EDGE_FALL);
+  irq_set_enabled(IO_IRQ_BANK0, false);
+}
 /// <summary>
 /// fill MMU with 256 contexts of straight 64k RAM space
 /// </summary>
@@ -293,6 +261,7 @@ bool initMMU() {
   uint16_t lContext;
   uint16_t lErrCount = 0L;
 
+  initMMUInterrupt();
   disableMMUInterrupt();
 
   // for all contexts set the pages
@@ -305,7 +274,7 @@ bool initMMU() {
   writeMMUContext(DEFAULT_CONTEXT);
 
   if (lErrCount == 0) {
-    enableMMUInterrrupt(); // interrupt on IO page
+    enableMMUInterrupt(); // interrupt on IO page
   }
   else
     Serial.printf("*E: initMMU failure\n");
@@ -313,7 +282,7 @@ bool initMMU() {
   return (lErrCount == 0);
 }
 
-#if 1
+#if 0
 /// <summary>
 /// 
 /// </summary>
@@ -324,5 +293,4 @@ void testMMU() {
     writeMMUPage(random(NUM_CONTEXTS), random(NUM_CONTEXT_PAGES), random(256));
   }
 }
-
 #endif

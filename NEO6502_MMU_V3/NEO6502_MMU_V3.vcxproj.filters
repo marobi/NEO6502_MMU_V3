@@ -40,9 +40,6 @@
     <ClCompile Include="bios.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="cmd_proc.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="rom.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -56,6 +53,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="vdu_interface.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sys_config.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="boot.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="memory_config.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -90,25 +96,13 @@
     <ClInclude Include="bios.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="cmd_proc.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="rom.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="rom_bios.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="rom_test.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="cmd.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="config.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="rom_monitor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="vdu.h">
@@ -118,6 +112,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="vdu_interface.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="sys_config.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="boot.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="memory_config.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

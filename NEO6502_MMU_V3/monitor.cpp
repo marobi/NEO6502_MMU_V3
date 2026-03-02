@@ -57,7 +57,7 @@ int x2i(const char* s)
 /// RESET
 /// </summary>
 /// <param name="c"></param>
-void cmdResetCallback(cmd* c) {
+static void cmdResetCallback(cmd* c) {
   Command cmd(c); // Create wrapper object
 
   set6502State(sRESET);
@@ -68,7 +68,7 @@ void cmdResetCallback(cmd* c) {
 /// GO after halt or reset
 /// </summary>
 /// <param name="c"></param>
-void cmdGoCallback(cmd* c) {
+static void cmdGoCallback(cmd* c) {
   Command cmd(c); // Create wrapper object
 
   set6502State(sRUNNING);
@@ -79,7 +79,7 @@ void cmdGoCallback(cmd* c) {
 /// SINGLE STEP CPU
 /// </summary>
 /// <param name="c"></param>
-void cmdSSCallback(cmd* c) {
+static void cmdSSCallback(cmd* c) {
   Command cmd(c);
 
   String arg1 = cmd.getArgument("steps").getValue();
@@ -92,7 +92,7 @@ void cmdSSCallback(cmd* c) {
 /// STOP
 /// </summary>
 /// <param name="c"></param>
-void cmdStopCallback(cmd* c) {
+static void cmdStopCallback(cmd* c) {
   Command cmd(c); // Create wrapper object
 
   set6502State(sHALTED);
@@ -103,7 +103,7 @@ void cmdStopCallback(cmd* c) {
 /// DUMP memory
 /// </summary>
 /// <param name="c"></param>
-void cmdDumpCallback(cmd* c) {
+static void cmdDumpCallback(cmd* c) {
   Command cmd(c);
 
   String arg1 = cmd.getArgument("from").getValue();
@@ -121,7 +121,7 @@ void cmdDumpCallback(cmd* c) {
 /// DISASM memory
 /// </summary>
 /// <param name="c"></param>
-void cmdDisAsmCallback(cmd* c) {
+static void cmdDisAsmCallback(cmd* c) {
   Command cmd(c);
 
   String arg1 = cmd.getArgument("from").getValue();
@@ -143,7 +143,7 @@ void cmdDisAsmCallback(cmd* c) {
 /// MEMORY alter
 /// </summary>
 /// <param name="c"></param>
-void cmdMemCallback(cmd* c) {
+static void cmdMemCallback(cmd* c) {
   uint16_t lStartAddress, lAddress;
   uint8_t lData;
   Command cmd(c);
@@ -172,7 +172,7 @@ void cmdMemCallback(cmd* c) {
 /// STATUS
 /// </summary>
 /// <param name="c"></param>
-void cmdStatusCallback(cmd* c) {
+static void cmdStatusCallback(cmd* c) {
   Serial.printf("Status\n");
   show6502State();
   Serial.printf("*I: MMU: %02X\n", readMMUContext());
@@ -182,7 +182,7 @@ void cmdStatusCallback(cmd* c) {
 /// IRQ
 /// </summary>
 /// <param name="c"></param>
-void cmdIRQCallback(cmd* c) {
+static void cmdIRQCallback(cmd* c) {
   Serial.printf("IRQ\n");
 }
 
@@ -190,7 +190,7 @@ void cmdIRQCallback(cmd* c) {
 /// MMU context change
 /// </summary>
 /// <param name="c"></param>
-void cmdMMUCallback(cmd* c) {
+static void cmdMMUCallback(cmd* c) {
   Command cmd(c);
   String arg1 = cmd.getArgument("context").getValue();
 
@@ -209,7 +209,7 @@ void cmdMMUCallback(cmd* c) {
 /// MMU context index page change
 /// </summary>
 /// <param name="c"></param>
-void cmdPageCallback(cmd* c) {
+static void cmdPageCallback(cmd* c) {
   Command cmd(c);
 
   String arg1 = cmd.getArgument("index").getValue();
@@ -231,7 +231,7 @@ void cmdPageCallback(cmd* c) {
 /// 
 /// </summary>
 /// <param name="c"></param>
-void cmdCommandCallback(cmd* c) {
+static void cmdCommandCallback(cmd* c) {
   Command cmd(c);
 
   gInterface++;
@@ -241,8 +241,8 @@ void cmdCommandCallback(cmd* c) {
 /// help overview of commands
 /// </summary>
 /// <param name="c"></param>
-void cmdHelpCallback(cmd* c) {
-  Serial.print("RPI ICM help:\n\
+static void cmdHelpCallback(cmd* c) {
+  Serial.print("\nRPI ICM help:\n\
  c/md                  toggle command\n\
  r/eset                reset\n\
  s/top                 stop\n\
@@ -263,7 +263,7 @@ void cmdHelpCallback(cmd* c) {
 /// CLI error handler
 /// </summary>
 /// <param name="e"></param>
-void errorCallback(cmd_error* e) {
+static void errorCallback(cmd_error* e) {
   CommandError cmdError(e); // Create wrapper object
 
   Serial.print("*E: ");
@@ -280,7 +280,7 @@ void errorCallback(cmd_error* e) {
 /// init the monitor commands
 /// </summary>
 void initMonitor() {
-  Serial.printf("RPI I.C.M. (%s) %s\n> ", BIOS_CPU, MON_VERSION);
+  Serial.printf("\nRPI I.C.M. (%s) %s\n> ", BIOS_CPU, MON_VERSION);
 
   // Create the commands with callback function
   gCmd = gCli.addCmd("c/md", cmdCommandCallback);
@@ -323,13 +323,25 @@ void initMonitor() {
 
 ////////////////////////////////////////////////////////////////////////////
 
+static uint8_t gInputIndex = 0;
+static char gInputBuffer[40] = "\0";
+
+/// <summary>
+/// return to ICM mode, resetting the input buffer and index, and printing a new prompt for the CLI
+/// </summary>
+static void returnToICM() {
+  gInterface = 0x00;                      // return to ICM
+  gInputIndex = 0;
+  gInputBuffer[0] = '\0';
+
+  Serial.print("> ");                     // new prompt for CLI
+}
+
 /// <summary>
 /// rpi monitor to control the HW
 /// </summary>
 /// <returns>void</returns>
 void monitor() {
-  static uint8_t gInputIndex = 0;
-  static char gInputBuffer[40] = "\0";
   int c;
   uint8_t cnt;
 
@@ -339,20 +351,19 @@ void monitor() {
     if (gInterface != 0) {
       switch (c) {
       case 0x03:                                // ^C
-        gInterface = 0x00;                      // return to ICM
-        gInputIndex = 0;
-        gInputBuffer[0] = '\0';
-        Serial.print("> ");                     // new prompt for CLI
+        returnToICM();
         break;
 
       default:
-        cnt = 8;
-        while ((!write6502Char(c)) && (cnt > 0)) {
+        cnt = 100;
+        while ((! outChar6502(c)) && (cnt > 0)) {
           cnt--;
           delay(50L);
         }
         if (cnt == 0) {
-          Serial.println("*E: write6502: not listener\n");
+          Serial.println("*E: outChar6502: not listener\n");
+
+          returnToICM();
         }
         break;
       }

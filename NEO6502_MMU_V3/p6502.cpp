@@ -63,61 +63,12 @@ static uint8_t gDir6502RW = 99;
 static uint8_t gClockState;     // will be init in setup6502
 
 /// <summary>
-/// control 6502 RESET pin
-/// </summary>
-/// <param name="vHL"></param>
-inline __attribute__((always_inline))
-void set6502Reset(const uint8_t vHL) {
-  gpio_put(p6502RESET, vHL);
-}
-
-/// <summary>
-/// control 6502 BE pin
-/// </summary>
-/// <param name="vHL"></param>
-inline __attribute__((always_inline))
-void set6502BE(const uint8_t vHL) {
-  gpio_put(p6502BE, vHL);
-
-  gBusState = vHL;
-}
-
-/// <summary>
-/// control 6502 RDY pin
-/// </summary>
-/// <param name="vHL"></param>
-inline __attribute__((always_inline))
-void set6502RDY(const uint8_t vHL) {
-  gpio_put(p6502RDY, vHL);
-
-  DELAY_FACTOR_SHORT();
-}
-
-/// <summary>
-/// control 6502 2PHI2 pin
-/// </summary>
-/// <param name="vHL"></param>
-inline __attribute__((always_inline))
-void set6502PHI2(const uint8_t vHL) {
-  gpio_put(p6502PHI2, vHL);
-}
-
-/// <summary>
-/// control 6502 IRQ pin
-/// </summary>
-/// <param name="vHL"></param>
-inline __attribute__((always_inline))
-void set6502IRQ(const uint8_t vHL) {
-  gpio_put(p6502IRQ, vHL);
-}
-
-/// <summary>
 /// set RW pin state
 /// </summary>
 /// <param name="vHL"></param>
 void set6502RW(const uint8_t vHL) {
   if (gDir6502RW == mOUTPUT)
-    gpio_put(p6502RW, vHL);
+    RWPin::set(vHL);
   else
     Serial.printf("*E: set6502RW: not output [%s]\n", lTxtSystemState[gSysState]);
 }
@@ -160,9 +111,9 @@ void dir6502RW(const uint8_t vDir) {
   case mOUTPUT:
     if (gDir6502RW != mOUTPUT) {
       gDir6502RW = mOUTPUT;
-      set6502RW(mHIGH);                  // read
+      set6502RW(mREAD);                  // Read
       gpio_set_dir(p6502RW, GPIO_OUT);   // Set as output
-      set6502RW(mHIGH);                  // for sure
+      set6502RW(mREAD);                  // for sure
     }
     break;
 
@@ -217,11 +168,12 @@ void init6502Clock() {
 /// </summary>
 inline __attribute__((always_inline))
 void _ss6502ClockIn() {
-  set6502PHI2(mLOW);        // to be sure
+  PHI2Pin::low();         // to be sure
 
   DELAY_FACTOR_SHORT();
+  DELAY_FACTOR_SHORT();
 
-  set6502PHI2(mHIGH);
+  PHI2Pin::high();
 
   DELAY_FACTOR_SHORT();
   DELAY_FACTOR_SHORT();
@@ -234,8 +186,10 @@ void _ss6502ClockIn() {
 /// </summary>
 inline __attribute__((always_inline))
 void _ss6502ClockOut() {
-  set6502PHI2(mLOW);
+  PHI2Pin::low();
 
+  DELAY_FACTOR_SHORT();
+  DELAY_FACTOR_SHORT();
   DELAY_FACTOR_SHORT();
   DELAY_FACTOR_SHORT();
 }
@@ -255,12 +209,13 @@ bool halt6502clock(const bool vToRead) {
   pwm_set_enabled(slice_num, false);  // stop PWM
 
   DELAY_FACTOR_SHORT();
+  DELAY_FACTOR_SHORT();
 
-  gpio_set_function(p6502PHI2, GPIO_FUNC_SIO); // GPIO output
+  gpio_set_function(p6502PHI2, GPIO_FUNC_SIO);          // GPIO output
   gpio_init(p6502PHI2);
   gpio_set_dir(p6502PHI2, GPIO_OUT);
 
-  set6502PHI2(mLOW);  // force low
+  PHI2Pin::low();                                       // force low
 
   gClockState = eOFF;
 
@@ -290,7 +245,7 @@ void singleStep6502(const uint8_t vSteps, const bool vDisplay) {
 
   if (vSteps == 0) {
     if (vDisplay) {
-      Serial.printf("%02d:\t%04X: %02X %1d\n", 0, readCPUAddress(), read6502Data(), get6502RW());
+      Serial.printf("%02d:\t%04X: %02X %1d\n", 0, readCPUBusAddress(), read6502Data(), get6502RW());
     }
     return;
   }
@@ -298,7 +253,7 @@ void singleStep6502(const uint8_t vSteps, const bool vDisplay) {
     _ss6502ClockIn();
 
     if (vDisplay) {
-      Serial.printf("s%02d:\t%04X: %02X %1d\n", s, readCPUAddress(), read6502Data(), get6502RW());
+      Serial.printf("s%02d:\t%04X: %02X %1d\n", s, readCPUBusAddress(), read6502Data(), get6502RW());
     }
     _ss6502ClockOut();
   }
@@ -328,19 +283,19 @@ bool set6502State(const uint8_t vSysState) {
 
   switch (vSysState) {
   case sBOOT:  // system in boot mode
-    set6502Reset(mLOW);
+    RESETPin::low();                    // reset
     halt6502clock(false);
-    set6502RDY(mLOW);
-    set6502BE(mLOW);
+    RDYPin::low();
+    BEPin::low();
     dir6502RW(mOUTPUT);
     setControlMode(mRPI);
     break;
 
   case sRESET:  // cpu helt reset
-    set6502Reset(mLOW);
+    RESETPin::low();
     init6502Clock();
-    set6502RDY(mLOW);
-    set6502BE(mHIGH);
+    RDYPin::low();
+    BEPin::high();
     dir6502RW(mINPUT);
     setControlMode(mCPU);
     break;
@@ -348,26 +303,26 @@ bool set6502State(const uint8_t vSysState) {
   case sHALTED: // cpu stopped
 //    set6502Reset(mHIGH);
     halt6502clock(true);
-    set6502RDY(mLOW);
-    set6502BE(mHIGH);
+    RDYPin::low();
+    BEPin::high();
     dir6502RW(mINPUT);
     setControlMode(mCPU);
     break;
 
   case sRUNNING: // cpu running free
     dir6502RW(mINPUT);
-    set6502BE(mHIGH);
+    BEPin::high();
     init6502Clock();
-    set6502RDY(mHIGH);
-    set6502Reset(mHIGH);
+    RDYPin::high();
+    RESETPin::high();
     setControlMode(mCPU);
     break;
 
   case sREAD:  // SS mode
-    set6502Reset(mHIGH);
+    RESETPin::high();
     halt6502clock(true);
-    set6502RDY(mHIGH);
-    set6502BE(mHIGH);
+    RDYPin::high();
+    BEPin::high();
     dir6502RW(mINPUT);
     setControlMode(mRPI);
     break;
@@ -375,8 +330,8 @@ bool set6502State(const uint8_t vSysState) {
   case sRPI: // rpi control mode, cpu halted
   //  set6502Reset(mHIGH);
     halt6502clock(true);
-    set6502RDY(mLOW);
-    set6502BE(mLOW);
+    RDYPin::low();
+    BEPin::low();
     dir6502RW(mOUTPUT);
     setControlMode(mRPI);
     break;
@@ -420,16 +375,16 @@ void init6502() {
 void setup6502() {
   gpio_init(p6502RESET);              // Always init
   gpio_set_dir(p6502RESET, GPIO_OUT); // Set as output
-  set6502Reset(mLOW);                 // reset
+  RESETPin::low();                    // reset
 
   gpio_init(p6502BE);                 // Always init
   gpio_set_dir(p6502BE, GPIO_OUT);    // Set as output
-  set6502BE(mLOW);                    // disabled
+  BEPin::low();                       // bus disabled
   gBusState = eDISABLED;
 
   gpio_init(p6502RDY);                // Always init
   gpio_set_dir(p6502RDY, GPIO_OUT);   // Set as output
-  set6502RDY(mLOW);                   // halted
+  RDYPin::low();                      // halted
 
   gpio_init(p6502RW);                 // Always init
   gpio_set_dir(p6502RW, GPIO_OUT);    // Set as output
@@ -437,9 +392,9 @@ void setup6502() {
   set6502RW(mREAD);                   // read
 
   gpio_init(p6502IRQ);                // Always init
-  set6502IRQ(mHIGH);                  // no IRQ
+  IRQPin::high();                     // no IRQ
   gpio_set_dir(p6502IRQ, GPIO_OUT);   // Set as output
-  set6502IRQ(mHIGH);                  // no IRQ
+  IRQPin::high();                     // no IRQ
 
   gpio_init(p6502PHI2);               // Always init
   gpio_set_function(p6502PHI2, GPIO_FUNC_PWM); // PWM output

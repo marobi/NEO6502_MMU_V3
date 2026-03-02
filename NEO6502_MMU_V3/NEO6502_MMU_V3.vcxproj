@@ -75,9 +75,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="bios.cpp" />
+    <ClCompile Include="boot.cpp" />
     <ClCompile Include="cmd.cpp" />
+    <ClCompile Include="memory_config.cpp" />
+    <ClCompile Include="sys_config.cpp" />
     <ClCompile Include="neobus.cpp" />
-    <ClCompile Include="cmd_proc.cpp" />
     <ClCompile Include="control.cpp" />
     <ClCompile Include="disasm6502.cpp" />
     <ClCompile Include="mmu.cpp" />
@@ -95,10 +97,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="bios.h" />
+    <ClInclude Include="boot.h" />
     <ClInclude Include="cmd.h" />
     <ClInclude Include="config.h" />
+    <ClInclude Include="memory_config.h" />
+    <ClInclude Include="sys_config.h" />
     <ClInclude Include="neobus.h" />
-    <ClInclude Include="cmd_proc.h" />
     <ClInclude Include="control.h" />
     <ClInclude Include="disasm6502.h" />
     <ClInclude Include="mmu.h" />
@@ -107,9 +111,6 @@
     <ClInclude Include="pins.h" />
     <ClInclude Include="ram.h" />
     <ClInclude Include="rom.h" />
-    <ClInclude Include="rom_bios.h" />
-    <ClInclude Include="rom_monitor.h" />
-    <ClInclude Include="rom_test.h" />
     <ClInclude Include="vdu.h" />
     <ClInclude Include="vdu_graphics.h" />
     <ClInclude Include="vdu_interface.h" />
