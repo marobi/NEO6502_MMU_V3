@@ -21,7 +21,7 @@ DVHSTX8 display(pinConfig, DVHSTX_RESOLUTION_320x240, false);
 
 // visibleCursor cursorStyle blinkCursor textMode geoAspect autoScroll textWrap localEcho ucaseOnly  CRLF
 static const vdu_mode_t vduModes[8] = {
-  {true,         cUNDERLINE, true,       true,    false,    true,      false,   false,    false,     true  }, // Mode 0 text mode + underline cursor
+  {true,         cUNDERLINE, true,       true,    false,    true,      false,   false,    false,     true }, // Mode 0 text mode + underline cursor
   {true,         cBLOCK    , true,       true,    false,    true,      false,   false,    false,     true  }, // Mode 1 text model + block cursor
   {false,        cUNDERLINE, false,      true,    false,    true,      false,   false,    false,     true  }, // Mode 2 text mode no cursor
   {false,        cUNDERLINE, false,      true,    false,    false,     false,   false,    false,     true  }, // Mode 3 text mode no cursor no scroll
@@ -291,13 +291,15 @@ void vduPutc(const uint8_t c) {
   switch (c) {
   case 0:
     break;
-  case '\r':
-    gCursor.col = 0;
+  case '\r':  // CR
+    if (! vduMode->crlf)
+      cmdNewline();
     break;
-  case '\n':
+  case '\n':  // LF
     if (vduMode->crlf)
+      cmdNewline();
+    else
       gCursor.col = 0;
-    cmdNewline();
     break;
   case 0x08: // BS
   case 0x7F:
@@ -306,10 +308,10 @@ void vduPutc(const uint8_t c) {
     }
     break;
   default:   // regular char
-    if ((uint8_t)c >= 0x20) {
+    if (c >= 0x20) {
       textBuffer[gCursor.row][gCursor.col] = c;
 
-      if (c == ' ') {
+      if (c == 0x20) {
         display.fillRect(
           gCursor.col * FONT_CELL_WIDTH,
           gCursor.row * FONT_CELL_HEIGHT,

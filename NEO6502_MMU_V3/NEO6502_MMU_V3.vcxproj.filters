@@ -37,9 +37,6 @@
     <ClCompile Include="disasm6502.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="bios.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="rom.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

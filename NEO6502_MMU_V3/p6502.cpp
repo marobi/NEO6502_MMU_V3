@@ -1,6 +1,16 @@
-// 
-// 
-// 
+/*
+This software is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public
+License as published by the Free Software Foundation; either
+version 2.1 of the License, or (at your option) any later version.
+
+This software is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
+
+*/
+
 #include <hardware/pwm.h>
 #include <arduino.h>
 
@@ -171,12 +181,9 @@ void _ss6502ClockIn() {
   PHI2Pin::low();         // to be sure
 
   DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
 
   PHI2Pin::high();
 
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
   DELAY_FACTOR_SHORT();
   DELAY_FACTOR_SHORT();
 }
@@ -189,9 +196,6 @@ void _ss6502ClockOut() {
   PHI2Pin::low();
 
   DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
 }
 
 /// <summary>
@@ -200,7 +204,8 @@ void _ss6502ClockOut() {
 /// <param name="vToRead"></param>
 /// <returns></returns>
 bool halt6502clock(const bool vToRead) {
-  if (gClockState == eOFF) return true;
+  if (gClockState == eOFF) 
+    return true;
 
   uint8_t lTry = 0;
 
@@ -219,12 +224,13 @@ bool halt6502clock(const bool vToRead) {
 
   gClockState = eOFF;
 
-  if (vToRead) {                                        // should we step through til read cycle?
+  if (vToRead) {  
+    DebugPin::low();
     while ((get6502RW() == mWRITE) && (lTry++ < 8)) {   // continue till in read cycle
       _ss6502ClockIn();                                 // step
       _ss6502ClockOut();
     }
-
+    DebugPin::high();
     if (lTry >= 8) {
       Serial.println("*E: halt6502clock: STOPPED but in unknown clock state");
       return false;
@@ -235,11 +241,11 @@ bool halt6502clock(const bool vToRead) {
 }
 
 /// <summary>
-/// single step the 6502 (cycle)
+/// single cycle the 6502
 /// </summary>
 /// <param name="vSteps"></param>
 /// <param name="vDisplay"></param>
-void singleStep6502(const uint8_t vSteps, const bool vDisplay) {
+void singleCycle6502(const uint8_t vSteps, const bool vDisplay) {
   uint8_t lState = get6502State();
   set6502State(sREAD);
 
@@ -256,6 +262,7 @@ void singleStep6502(const uint8_t vSteps, const bool vDisplay) {
       Serial.printf("s%02d:\t%04X: %02X %1d\n", s, readCPUBusAddress(), read6502Data(), get6502RW());
     }
     _ss6502ClockOut();
+    delayMicroseconds(1);
   }
 
   set6502State(lState);  // restore state
@@ -277,9 +284,10 @@ uint8_t get6502State() {
 /// <param name="vSysState"></param>
 /// <returns></returns>
 bool set6502State(const uint8_t vSysState) {
-  //  Serial.printf("*D: set6502State: %s --> %s\n", lTxtSystemState[gSysState], lTxtSystemState[vSysState]);
+  //Serial.printf("*D: set6502State: %s --> %s\n", lTxtSystemState[gSysState], lTxtSystemState[vSysState]);
 
-  if (vSysState == gSysState) return true;
+  if (vSysState == gSysState) 
+    return true;
 
   switch (vSysState) {
   case sBOOT:  // system in boot mode

@@ -10,7 +10,6 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 Lesser General Public License for more details.
 
 */
-
 #pragma once
 
 #define DEFAULT_COLOR   15      // WHITE
@@ -18,6 +17,27 @@ Lesser General Public License for more details.
 #define DEFAULT_MODE     0      // VDU display mode (0-7)
 
 #define CURSOR_BLINK_INTERVAL_MS 600    // MS
+
+
+// VDU control (TODO)
+#define CONTROL(c) 	((c) & 0x1F)
+
+#define KEY_LEFT 	    CONTROL('A')
+#define KEY_RIGHT 	  CONTROL('D')
+#define KEY_PAGEDOWN	CONTROL('F')
+#define KEY_END 		  CONTROL('G')
+#define KEY_BACKSPACE CONTROL('H')
+#define KEY_TAB  	    CONTROL('I')
+#define KEY_LF  		  CONTROL('J')
+#define KEY_CLS  	    CONTROL('L')
+#define KEY_ENTER 	  CONTROL('M')
+#define KEY_PAGEUP	  CONTROL('R')
+#define KEY_DOWN 	    CONTROL('S')
+#define KEY_HOME 	    CONTROL('T')
+#define KEY_UP  		  CONTROL('W')
+#define KEY_REVERSE   CONTROL('X')
+#define KEY_DELETE 	  CONTROL('Z')
+#define KEY_ESC 		  CONTROL('[')
 
 // the 16 standard colors of the 256 in the palette
 #define BLACK    0

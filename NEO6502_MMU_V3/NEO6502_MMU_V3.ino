@@ -1,4 +1,16 @@
 /*
+This software is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public
+License as published by the Free Software Foundation; either
+version 2.1 of the License, or (at your option) any later version.
+
+This software is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
+
+*/
+/*
  Name:		NEO6502_MMU_V3
  Created:	14.6.2025
  Author:	Rien Matthijsse
@@ -187,7 +199,7 @@ void loop() {
 
   taskVDU();                     // run VDU task to process VDU commands and update display
 
-  monitor();                     // run monitor to update state
+  taskICMonitor();               // run monitor to update state
 
   delay(5);
 }

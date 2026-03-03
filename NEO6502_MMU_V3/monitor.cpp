@@ -1,3 +1,16 @@
+/*
+This software is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public
+License as published by the Free Software Foundation; either
+version 2.1 of the License, or (at your option) any later version.
+
+This software is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
+
+*/
+
 //
 // simple RPI monitor:
 // see help
@@ -76,16 +89,16 @@ static void cmdGoCallback(cmd* c) {
 }
 
 /// <summary>
-/// SINGLE STEP CPU
+/// SINGLE CYCLE CPU
 /// </summary>
 /// <param name="c"></param>
-static void cmdSSCallback(cmd* c) {
+static void cmdSCCallback(cmd* c) {
   Command cmd(c);
 
-  String arg1 = cmd.getArgument("steps").getValue();
+  String arg1 = cmd.getArgument("cycles").getValue();
   uint8_t lStep = atoi(arg1.c_str()) & 0xFF;
 
-  singleStep6502(lStep, true);
+  singleCycle6502(lStep, true);
 }
 
 /// <summary>
@@ -247,7 +260,7 @@ static void cmdHelpCallback(cmd* c) {
  r/eset                reset\n\
  s/top                 stop\n\
  g/o                   go\n\
- ss <steps>            single step (steps)\n\
+ sc <cycles>           single cycle\n\
  i/rq                  generate IRQ\n\
  d/ump <from> <to>     dump memory\n\
  dis <from> <to>       disasm memory\n\
@@ -289,8 +302,8 @@ void initMonitor() {
 
   gCmd = gCli.addCmd("g/o", cmdGoCallback);
 
-  gCmd = gCli.addCmd("ss", cmdSSCallback);
-  gCmd.addPositionalArgument("steps", "1");
+  gCmd = gCli.addCmd("sc", cmdSCCallback);
+  gCmd.addPositionalArgument("cycles", "1");
 
   gCmd = gCli.addCmd("s/top", cmdStopCallback);
 
@@ -341,7 +354,7 @@ static void returnToICM() {
 /// rpi monitor to control the HW
 /// </summary>
 /// <returns>void</returns>
-void monitor() {
+void taskICMonitor() {
   int c;
   uint8_t cnt;
 
