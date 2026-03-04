@@ -22,7 +22,7 @@ Lesser General Public License for more details.
 /// CMD_INCHAR: 6502  -> read a char from this slot
 /// CMD_COMMAND: host -> read a command code from this slot
 /// 
-#define CMD_SLOT_BASE    0xFFF0
+#define CMD_SLOT_BASE    0xF000
 #define CMD_SLOT_OUTCHAR 0        // write to 6502
 #define CMD_SLOT_INCHAR  1        // read from 6502
 #define CMD_SLOT_CMD     2
@@ -34,7 +34,7 @@ Lesser General Public License for more details.
 void initCmdSlots() {
   uint8_t ldata[3] = { 0x00, 0x00, 0x00 };
 
-  snoop_write6502Memory(CMD_SLOT_BASE, 3, ldata);
+  snoop_write6502Memory(CMD_SLOT_BASE, 3, &ldata[0]);
   gMMUIOTrigger = false;
 }
 

@@ -136,12 +136,12 @@ static void writeCPUAddress(const uint16_t vAddress) {
 #if USE_VALIDATION
     uint16_t laddress = readCPUAddress(); // validate
     if (laddress != vAddress) {
-      Serial.printf("*E writeCPUAddress: 0x%04X (0x%04X)\n", vAddress, laddress);
+      Serial1.printf("*E writeCPUAddress: 0x%04X (0x%04X)\n", vAddress, laddress);
     }
 #endif
   }
   else
-    Serial.printf("*E: setCPUAddress: wrong mode\n");
+    Serial1.printf("*E: setCPUAddress: wrong mode\n");
 
 }
 
@@ -184,7 +184,7 @@ uint8_t read6502Memory(const uint16_t vAddress) {
     return ldata;
   }
   else
-    Serial.println("*E: write6502Meory: wrong mode");
+    Serial1.println("*E: write6502Meory: wrong mode");
 
   return 0;
 }
@@ -220,7 +220,7 @@ void write6502Memory(const uint16_t vAddress, const uint8_t vData) {
     CPUARegOEPin::high();      // disable address output
 
     if (ldata != vData) {
-      Serial.printf("*E: write6502Memory: 0x%04X: 0x%02X (0x%02X)\n", vAddress, vData, ldata);
+      Serial1.printf("*E: write6502Memory: 0x%04X: 0x%02X (0x%02X)\n", vAddress, vData, ldata);
     }
 #else
     CPUARegOEPin::high();      // disable address output
@@ -230,7 +230,7 @@ void write6502Memory(const uint16_t vAddress, const uint8_t vData) {
     enableMMUInterrupt();
   }
   else
-    Serial.println("*E: write6502Memory: wrong mode");
+    Serial1.println("*E: write6502Memory: wrong mode");
 }
 
 /// <summary>
@@ -297,6 +297,6 @@ void testBUS() {
   setDebug(mHIGH);
 
   if (vData != lData)
-    Serial.printf("*E: testBus: error %04X : %02X (%02X)\n", lAddress, vData, lData);
+    Serial1.printf("*E: testBus: error %04X : %02X (%02X)\n", lAddress, vData, lData);
 }
 #endif

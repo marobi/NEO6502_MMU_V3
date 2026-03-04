@@ -15,7 +15,7 @@ Lesser General Public License for more details.
 // simple RPI monitor:
 // see help
 // 
-#include <arduino.h>
+#include <Arduino.h>
 #include <SimpleCLI.h>
 #include "cmd.h"
 
@@ -29,6 +29,9 @@ Lesser General Public License for more details.
 #include "neobus.h"
 #include "disasm6502.h"
 
+#include "indicator.h"
+
+#include "vdu.h"
 
 // Create CLI Object
 static SimpleCLI gCli;
@@ -74,7 +77,7 @@ static void cmdResetCallback(cmd* c) {
   Command cmd(c); // Create wrapper object
 
   set6502State(sRESET);
-  Serial.println("Reset");
+  Serial1.println("Reset");
 }
 
 /// <summary>
@@ -85,7 +88,7 @@ static void cmdGoCallback(cmd* c) {
   Command cmd(c); // Create wrapper object
 
   set6502State(sRUNNING);
-  Serial.println("Running");
+  Serial1.println("Running");
 }
 
 /// <summary>
@@ -109,7 +112,7 @@ static void cmdStopCallback(cmd* c) {
   Command cmd(c); // Create wrapper object
 
   set6502State(sHALTED);
-  Serial.println("Halted");
+  Serial1.println("Halted");
 }
 
 /// <summary>
@@ -125,7 +128,7 @@ static void cmdDumpCallback(cmd* c) {
   uint16_t lTo = max(x2i(arg2.c_str()) & 0XFFFF, lFrom + 15);
   if (lTo <= lFrom) lTo = 0xFFFF;
 
-  Serial.printf("Dump %04X - %04X\n", lFrom, lTo);
+  Serial1.printf("Dump %04X - %04X\n", lFrom, lTo);
 
   dumpMemory(lFrom, lTo);
 }
@@ -142,14 +145,14 @@ static void cmdDisAsmCallback(cmd* c) {
   uint16_t lFrom = x2i(arg1.c_str()) & 0XFFFF;
   uint16_t lTo = max(x2i(arg2.c_str()) & 0XFFFF, lFrom + 15);
   if (lTo <= lFrom) lTo = 0xFFFF;
-  Serial.printf("Disassembly %04X - %04X\n", lFrom, lTo);
+  Serial1.printf("Disassembly %04X - %04X\n", lFrom, lTo);
 
   uint16_t lAddress = lFrom;
   while (lAddress < lTo) {
     lAddress = disasm6502(lAddress);
   }
 
-  Serial.println();
+  Serial1.println();
 }
 
 /// <summary>
@@ -163,7 +166,7 @@ static void cmdMemCallback(cmd* c) {
 
   int lCountArgs = cmd.countArgs(); // Get number of arguments
   if (lCountArgs < 2) {
-    Serial.println("*E: not enough parameters\n");
+    Serial1.println("*E: not enough parameters\n");
   }
   else {
     lAddress = x2i(cmd.getArgument(0).getValue().c_str()) & 0XFFFF;
@@ -176,7 +179,7 @@ static void cmdMemCallback(cmd* c) {
     }
 
     // just nice
-    Serial.printf("Dump %04X - %04X\n", lStartAddress, --lAddress);
+    Serial1.printf("Dump %04X - %04X\n", lStartAddress, --lAddress);
     dumpMemory(lStartAddress, lAddress);
   }
 }
@@ -186,9 +189,9 @@ static void cmdMemCallback(cmd* c) {
 /// </summary>
 /// <param name="c"></param>
 static void cmdStatusCallback(cmd* c) {
-  Serial.printf("Status\n");
+  Serial1.printf("Status\n");
   show6502State();
-  Serial.printf("*I: MMU: %02X\n", readMMUContext());
+  Serial1.printf("*I: MMU: %02X\n", readMMUContext());
 }
 
 /// <summary>
@@ -196,7 +199,7 @@ static void cmdStatusCallback(cmd* c) {
 /// </summary>
 /// <param name="c"></param>
 static void cmdIRQCallback(cmd* c) {
-  Serial.printf("IRQ\n");
+  Serial1.printf("IRQ\n");
 }
 
 /// <summary>
@@ -209,7 +212,7 @@ static void cmdMMUCallback(cmd* c) {
 
   uint8_t lContext = x2i(arg1.c_str()) & 0x7F;  // 128
 
-  Serial.printf("MMU: %02X\n", lContext);
+  Serial1.printf("MMU: %02X\n", lContext);
 
   uint8_t lState = get6502State();
   set6502State(sRPI);
@@ -237,7 +240,7 @@ static void cmdPageCallback(cmd* c) {
   writeMMUPage(lContext, lIndex, lPage);
   set6502State(lState);
 
-  Serial.printf("MMU page: %02X:%02X %02X => %02X\n", lContext, lIndex, lPrevPage, lPage);
+  Serial1.printf("MMU page: %02X:%02X %02X => %02X\n", lContext, lIndex, lPrevPage, lPage);
 }
 
 /// <summary>
@@ -255,7 +258,7 @@ static void cmdCommandCallback(cmd* c) {
 /// </summary>
 /// <param name="c"></param>
 static void cmdHelpCallback(cmd* c) {
-  Serial.print("\nRPI ICM help:\n\
+  Serial1.print("\nRPI ICM help:\n\
  c/md                  toggle command\n\
  r/eset                reset\n\
  s/top                 stop\n\
@@ -279,13 +282,13 @@ static void cmdHelpCallback(cmd* c) {
 static void errorCallback(cmd_error* e) {
   CommandError cmdError(e); // Create wrapper object
 
-  Serial.print("*E: ");
-  Serial.println(cmdError.toString());
+  Serial1.print("*E: ");
+  Serial1.println(cmdError.toString());
 
   if (cmdError.hasCommand()) {
-    Serial.print("*I: Did you mean \"");
-    Serial.print(cmdError.getCommand().toString());
-    Serial.println("\"?");
+    Serial1.print("*I: Did you mean \"");
+    Serial1.print(cmdError.getCommand().toString());
+    Serial1.println("\"?");
   }
 }
 
@@ -293,7 +296,7 @@ static void errorCallback(cmd_error* e) {
 /// init the monitor commands
 /// </summary>
 void initMonitor() {
-  Serial.printf("\nRPI I.C.M. (%s) %s\n> ", BIOS_CPU, MON_VERSION);
+  Serial1.printf("\nRPI I.C.M. (%s) %s\n> ", BIOS_CPU, MON_VERSION);
 
   // Create the commands with callback function
   gCmd = gCli.addCmd("c/md", cmdCommandCallback);
@@ -332,6 +335,9 @@ void initMonitor() {
 
   // Set error Callback
   gCli.setOnError(errorCallback);
+
+  // 
+  initIndicator();
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -347,8 +353,9 @@ static void returnToICM() {
   gInputIndex = 0;
   gInputBuffer[0] = '\0';
 
-  Serial.print("> ");                     // new prompt for CLI
+  Serial1.print("> ");                     // new prompt for CLI
 }
+
 
 /// <summary>
 /// rpi monitor to control the HW
@@ -359,8 +366,8 @@ void taskICMonitor() {
   uint8_t cnt;
 
   // Check if user typed something on keyboard
-  if (Serial.available()) {
-    c = Serial.read();
+  if (Serial1.available()) {
+    c = Serial1.read();
     if (gInterface != 0) {
       switch (c) {
       case 0x03:                                // ^C
@@ -369,12 +376,12 @@ void taskICMonitor() {
 
       default:
         cnt = 100;
-        while ((! outChar6502(c)) && (cnt > 0)) {
+        while ((!outChar6502(c)) && (cnt > 0)) {
           cnt--;
           delay(50L);
         }
         if (cnt == 0) {
-          Serial.println("*E: outChar6502: not listener\n");
+          Serial1.println("*E: outChar6502: not listener\n");
 
           returnToICM();
         }
@@ -385,16 +392,16 @@ void taskICMonitor() {
       switch (c) {
       case -1:                                   // no char
         break;
-      
+
       case '\b':                                 // backspace
       case 127:                                  // delete
         if (gInputIndex >= 1) {
           gInputIndex--;                         // delete last char
           gInputBuffer[gInputIndex] = '\0';      // from buffer
-          Serial.print(" \b");
+          Serial1.print(" \b");
         }
         else
-          Serial.print(" ");                     // buffer is empty
+          Serial1.print(" ");                     // buffer is empty
         break;
 
       case '\r':                                 // LF
@@ -404,16 +411,18 @@ void taskICMonitor() {
         // Parse the user input into the CLI & execute
         gCli.parse(gInputBuffer);
         if (gInterface == 0)
-          Serial.print("> ");                   // new prompt
+          Serial1.print("> ");                   // new prompt
         gInputIndex = 0;                        // new buffer
         gInputBuffer[0] = '\0';
         break;
 
       default:                                  // enter in buffer
-          gInputBuffer[gInputIndex++] = c;
-          gInputBuffer[gInputIndex] = '\0';
+        gInputBuffer[gInputIndex++] = c;
+        gInputBuffer[gInputIndex] = '\0';
         break;
       }
     }
   }
+
+  updateIndicator();
 }

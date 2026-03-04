@@ -81,7 +81,7 @@ static void drawLine() {
 /// 
 /// </summary>
 static void drawRect() {
-  //    Serial.printf("*D: RECT %04x %04x %04x %04x\n", vduRegisters->x, vduRegisters->y, vduRegisters->w, vduRegisters->h);
+  //    Serial1.printf("*D: RECT %04x %04x %04x %04x\n", vduRegisters->x, vduRegisters->y, vduRegisters->w, vduRegisters->h);
   switch (vduDrawmode) {
   case 0:
     display.drawRect(REG0 % WIDTH, REG1 % HEIGHT, REG2 % WIDTH, REG3 % HEIGHT, vduGColor);
@@ -96,7 +96,7 @@ static void drawRect() {
 /// 
 /// </summary>
 static void drawRectR() {
-  //    Serial.printf("*D: RECT %04x %04x %04x %04x\n", vduRegisters->x, vduRegisters->y, vduRegisters->w, vduRegisters->h);
+  //    Serial1.printf("*D: RECT %04x %04x %04x %04x\n", vduRegisters->x, vduRegisters->y, vduRegisters->w, vduRegisters->h);
   switch (vduDrawmode) {
   case 0:
     display.drawRoundRect(REG0 % WIDTH, REG1 % HEIGHT, REG2 % WIDTH, REG3 % HEIGHT, REG4, vduGColor);
@@ -111,7 +111,7 @@ static void drawRectR() {
 /// 
 /// </summary>
 static void drawCircle() {
-  //    Serial.printf("*D: CIRC %04x %04x %04x\n", vduRegisters->x, vduRegisters->y, vduRegisters->w);
+  //    Serial1.printf("*D: CIRC %04x %04x %04x\n", vduRegisters->x, vduRegisters->y, vduRegisters->w);
   switch (vduDrawmode) {
   case 0:
     if (vduMode->geoAspect)
@@ -132,7 +132,7 @@ static void drawCircle() {
 /// 
 /// </summary>
 static void drawTriangle() {
-  //    Serial.printf("*D: TRI %04x %04x %04x %04x %04x %04x\n", vduRegisters->x, vduRegisters->y, vduRegisters->w, vduRegisters->h, vduRegisters->a, vduRegisters->b);
+  //    Serial1.printf("*D: TRI %04x %04x %04x %04x %04x %04x\n", vduRegisters->x, vduRegisters->y, vduRegisters->w, vduRegisters->h, vduRegisters->a, vduRegisters->b);
   switch (vduDrawmode) {
   case 0:
     display.drawTriangle(REG0 % WIDTH, REG1 % HEIGHT, REG2 % WIDTH, REG3 % HEIGHT, REG4 % WIDTH, REG5 % HEIGHT, vduGColor);

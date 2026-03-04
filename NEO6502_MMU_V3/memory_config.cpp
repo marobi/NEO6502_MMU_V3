@@ -305,28 +305,28 @@ bool initializeMemoryConfig()
   File file = LittleFS.open("/memory.ini", "r");
 
   if (!file) {
-    Serial.println("*E: MEMORY.INI missing. Using fallback profile.");
+    Serial1.println("*E: MEMORY.INI missing. Using fallback profile.");
     loadFallbackProfile();
     return false;
   }
 
   if (!parseMemoryIni(file)) {
 
-    Serial.printf("*E: MEMORY.INI error: %s (code=%d, line=%d)\n",
+    Serial1.printf("*E: MEMORY.INI error: %s (code=%d, line=%d)\n",
       memoryIniErrorToString(lastMemoryIniError.code),
       lastMemoryIniError.code,
       lastMemoryIniError.line);
 
     file.close();
 
-    Serial.println("*E: Using fallback profile.");
+    Serial1.println("*E: Using fallback profile.");
     loadFallbackProfile();
     return false;
   }
 
   file.close();
 
-  Serial.println("\n*I: Memory config loaded.");
+  Serial1.println("\n*I: Memory config loaded.");
   return true;
 }
 
@@ -432,15 +432,15 @@ bool configureMMUFromActiveModel()
 
 void dumpMemoryConfig()
 {
-  Serial.println("--------------------------------------------------");
-  Serial.println("ACTIVE MEMORY MODEL");
-  Serial.println("--------------------------------------------------");
+  Serial1.println("--------------------------------------------------");
+  Serial1.println("ACTIVE MEMORY MODEL");
+  Serial1.println("--------------------------------------------------");
 
-  Serial.print("Version      : ");
-  Serial.println(memoryConfig.version);
+  Serial1.print("Version      : ");
+  Serial1.println(memoryConfig.version);
 
-  Serial.print("Active model : ");
-  Serial.println(memoryConfig.active_model);
+  Serial1.print("Active model : ");
+  Serial1.println(memoryConfig.active_model);
 
   int active = -1;
 
@@ -454,50 +454,50 @@ void dumpMemoryConfig()
   }
 
   if (active < 0) {
-    Serial.println("*E: Active model not found");
-    Serial.println("--------------------------------------------------");
+    Serial1.println("*E: Active model not found");
+    Serial1.println("--------------------------------------------------");
     return;
   }
 
   MemoryModel* model = &memoryConfig.models[active];
 
-  Serial.print("Contexts     : ");
-  Serial.println(model->contexts);
+  Serial1.print("Contexts     : ");
+  Serial1.println(model->contexts);
 
-  Serial.print("Region count : ");
-  Serial.println(model->region_count);
+  Serial1.print("Region count : ");
+  Serial1.println(model->region_count);
 
-  Serial.println();
+  Serial1.println();
 
   for (int r = 0; r < model->region_count; r++)
   {
     MemoryRegion* region = &model->regions[r];
 
-    Serial.print("Region: ");
-    Serial.println(region->name);
+    Serial1.print("Region: ");
+    Serial1.println(region->name);
 
-    Serial.print("  Start page : ");
-    Serial.println(region->start_position);
+    Serial1.print("  Start page : ");
+    Serial1.println(region->start_position);
 
-    Serial.print("  Pages      : ");
-    Serial.println(region->pages);
+    Serial1.print("  Pages      : ");
+    Serial1.println(region->pages);
 
-    Serial.print("  Type       : ");
+    Serial1.print("  Type       : ");
     if (region->type == MEMORY_REGION_IO)
-      Serial.println("io");
+      Serial1.println("io");
     else
-      Serial.println("normal");
+      Serial1.println("normal");
 
-    Serial.print("  Shared     : ");
-    Serial.println(region->shared ? "true" : "false");
+    Serial1.print("  Shared     : ");
+    Serial1.println(region->shared ? "true" : "false");
 
-    Serial.print("  Trap write : ");
-    Serial.println(region->trap_write ? "true" : "false");
+    Serial1.print("  Trap write : ");
+    Serial1.println(region->trap_write ? "true" : "false");
 
-    Serial.println();
+    Serial1.println();
   }
 
-  Serial.println("--------------------------------------------------");
+  Serial1.println("--------------------------------------------------");
 }
 
 void dumpMMUPhysicalUsage()
@@ -518,7 +518,7 @@ void dumpMMUPhysicalUsage()
   }
 
   if (active < 0) {
-    Serial.println("*E: Active model not found");
+    Serial1.println("*E: Active model not found");
     return;
   }
 
@@ -544,20 +544,20 @@ void dumpMMUPhysicalUsage()
     if (used[i])
       totalUsed++;
 
-  Serial.println("--------------------------------------------------");
-  Serial.println("MMU PHYSICAL PAGE USAGE");
-  Serial.println("--------------------------------------------------");
+  Serial1.println("--------------------------------------------------");
+  Serial1.println("MMU PHYSICAL PAGE USAGE");
+  Serial1.println("--------------------------------------------------");
 
-  Serial.print("Highest page used : ");
-  Serial.println(maxPhys);
+  Serial1.print("Highest page used : ");
+  Serial1.println(maxPhys);
 
-  Serial.print("Total pages used  : ");
-  Serial.print(totalUsed);
-  Serial.print(" / 128 (");
-  Serial.print((totalUsed * 100) / 128);
-  Serial.println("%)");
+  Serial1.print("Total pages used  : ");
+  Serial1.print(totalUsed);
+  Serial1.print(" / 128 (");
+  Serial1.print((totalUsed * 100) / 128);
+  Serial1.println("%)");
 
-  Serial.println("--------------------------------------------------");
+  Serial1.println("--------------------------------------------------");
 }
 
 
@@ -568,14 +568,14 @@ void dumpMMUPhysicalUsage()
 void dumpMMUPageMap(const uint8_t context)
 {
   if (context >= NUM_CONTEXTS) {
-    Serial.println("*E: Invalid context");
+    Serial1.println("*E: Invalid context");
     return;
   }
 
-  Serial.println("--------------------------------------------------");
-  Serial.print("MMU PAGE MAP - Context ");
-  Serial.println(context);
-  Serial.println("--------------------------------------------------");
+  Serial1.println("--------------------------------------------------");
+  Serial1.print("MMU PAGE MAP - Context ");
+  Serial1.println(context);
+  Serial1.println("--------------------------------------------------");
 
   for (int page = 0; page < NUM_CONTEXT_PAGES; page++)
   {
@@ -584,23 +584,23 @@ void dumpMMUPageMap(const uint8_t context)
     uint8_t base = phys & 0x7F;
     bool io = (phys & 0x80) ? true : false;
 
-    Serial.print("L");
-    if (page < 10) Serial.print("0");
-    Serial.print(page);
-    Serial.print(" -> ");
+    Serial1.print("L");
+    if (page < 10) Serial1.print("0");
+    Serial1.print(page);
+    Serial1.print(" -> ");
 
-    if (base < 10) Serial.print("00");
-    else if (base < 100) Serial.print("0");
+    if (base < 10) Serial1.print("00");
+    else if (base < 100) Serial1.print("0");
 
-    Serial.print(base);
+    Serial1.print(base);
 
     if (io)
-      Serial.print("  (IO)");
+      Serial1.print("  (IO)");
 
-    Serial.println();
+    Serial1.println();
   }
 
-  Serial.println("--------------------------------------------------");
+  Serial1.println("--------------------------------------------------");
 }
 
 void dumpMMUPageMapsCompact()
@@ -617,7 +617,7 @@ void dumpMMUPageMapsCompact()
   }
 
   if (active < 0) {
-    Serial.println("*E: Active model not found");
+    Serial1.println("*E: Active model not found");
     return;
   }
 

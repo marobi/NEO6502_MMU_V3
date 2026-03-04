@@ -75,7 +75,7 @@ uint8_t readNEOBus() {
   DELAY_FACTOR_SHORT();
 
   uint32_t lData = ((uint32_t)sio_hw->gpio_hi_in);
-//  Serial.printf("*D: readNEOBus: 0x%08lX\n", lData);
+//  Serial1.printf("*D: readNEOBus: 0x%08lX\n", lData);
 
   return (lData >> 8u) & 0xFF;
 }
@@ -89,7 +89,7 @@ void writeNEOBus(const uint8_t vData) {
 
   uint64_t lData = (uint64_t)vData;
   lData = lData << 40u; // align to pin 40..47
-//  Serial.printf("*D: writeNEOBus2: 0x%02X =>0x%08llX\n", vData, lData);
+//  Serial1.printf("*D: writeNEOBus2: 0x%02X =>0x%08llX\n", vData, lData);
   gpio_put_masked64(DATA_BUS_MASK, lData);
 
   DELAY_FACTOR_SHORT();

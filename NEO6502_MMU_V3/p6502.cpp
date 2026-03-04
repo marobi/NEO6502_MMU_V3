@@ -80,7 +80,7 @@ void set6502RW(const uint8_t vHL) {
   if (gDir6502RW == mOUTPUT)
     RWPin::set(vHL);
   else
-    Serial.printf("*E: set6502RW: not output [%s]\n", lTxtSystemState[gSysState]);
+    Serial1.printf("*E: set6502RW: not output [%s]\n", lTxtSystemState[gSysState]);
 }
 
 /// <summary>
@@ -91,7 +91,7 @@ uint8_t get6502RW() {
   if (gDir6502RW == mINPUT)
     return gpio_get(p6502RW);
   else
-    Serial.printf("*E: get6502RW: not input [%s]\n", lTxtSystemState[gSysState]);
+    Serial1.printf("*E: get6502RW: not input [%s]\n", lTxtSystemState[gSysState]);
 
   return mREAD;
 }
@@ -128,7 +128,7 @@ void dir6502RW(const uint8_t vDir) {
     break;
 
   default:
-    Serial.printf("*E: dir6502RW: invalid direction\n");
+    Serial1.printf("*E: dir6502RW: invalid direction\n");
     break;
   }
 }
@@ -232,7 +232,7 @@ bool halt6502clock(const bool vToRead) {
     }
     DebugPin::high();
     if (lTry >= 8) {
-      Serial.println("*E: halt6502clock: STOPPED but in unknown clock state");
+      Serial1.println("*E: halt6502clock: STOPPED but in unknown clock state");
       return false;
     }
   }
@@ -251,7 +251,7 @@ void singleCycle6502(const uint8_t vSteps, const bool vDisplay) {
 
   if (vSteps == 0) {
     if (vDisplay) {
-      Serial.printf("%02d:\t%04X: %02X %1d\n", 0, readCPUBusAddress(), read6502Data(), get6502RW());
+      Serial1.printf("%02d:\t%04X: %02X %1d\n", 0, readCPUBusAddress(), read6502Data(), get6502RW());
     }
     return;
   }
@@ -259,7 +259,7 @@ void singleCycle6502(const uint8_t vSteps, const bool vDisplay) {
     _ss6502ClockIn();
 
     if (vDisplay) {
-      Serial.printf("s%02d:\t%04X: %02X %1d\n", s, readCPUBusAddress(), read6502Data(), get6502RW());
+      Serial1.printf("s%02d:\t%04X: %02X %1d\n", s, readCPUBusAddress(), read6502Data(), get6502RW());
     }
     _ss6502ClockOut();
     delayMicroseconds(1);
@@ -284,7 +284,7 @@ uint8_t get6502State() {
 /// <param name="vSysState"></param>
 /// <returns></returns>
 bool set6502State(const uint8_t vSysState) {
-  //Serial.printf("*D: set6502State: %s --> %s\n", lTxtSystemState[gSysState], lTxtSystemState[vSysState]);
+  //Serial1.printf("*D: set6502State: %s --> %s\n", lTxtSystemState[gSysState], lTxtSystemState[vSysState]);
 
   if (vSysState == gSysState) 
     return true;
@@ -345,7 +345,7 @@ bool set6502State(const uint8_t vSysState) {
     break;
 
   default:
-    Serial.println("*E: set6502State: unknown state specified");
+    Serial1.println("*E: set6502State: unknown state specified");
     return false;
     break;
   }
@@ -358,7 +358,7 @@ bool set6502State(const uint8_t vSysState) {
 /// show substates of 6502
 /// </summary>
 void show6502State() {
-  Serial.printf("*I: SYS: %s\tBUS: %s\tCTL: %s\tRW: %s\tCLK: %s\n",
+  Serial1.printf("*I: SYS: %s\tBUS: %s\tCTL: %s\tRW: %s\tCLK: %s\n",
     lTxtSystemState[gSysState],
     lTxtBusState[gBusState],
     lTxtControlState[getControlMode()],

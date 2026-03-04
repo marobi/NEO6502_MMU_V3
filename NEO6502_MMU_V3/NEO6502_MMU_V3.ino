@@ -45,21 +45,21 @@ Lesser General Public License for more details.
 /// </summary>
 /// <param name="vFile"></param>
 void printFile(const char* vFile) {
-  Serial.println("----------");
+  Serial1.println("----------");
 
   File f = LittleFS.open(vFile, "r");
   if (f.available()) {
-    Serial.printf("File %s exists\n", vFile);
+    Serial1.printf("File %s exists\n", vFile);
     while (f.available()) {
-      Serial.write(f.read());
+      Serial1.write(f.read());
     }
     f.close();
   }
   else {
-    Serial.printf("File %s does not exist\n", vFile);
+    Serial1.printf("File %s does not exist\n", vFile);
   }
 
-  Serial.println("----------");
+  Serial1.println("----------");
 }
 
 /// <summary>
@@ -115,47 +115,45 @@ void setup() {
   setupCPU();
   setup6502();
 
-  Serial.begin(115200);
+  Serial1.begin(115200);
   delay(2500);
 
   // turn PHI2 on
   init6502();
-  Serial.printf("*I: 6502 init OK\n");
+  Serial1.printf("*I: 6502 init OK\n");
 
   // init & validate setup of MMU
   if (initMMU()) {
-    Serial.printf("*I: MMU init OK\n");
+    Serial1.printf("*I: MMU init OK\n");
   }
   else {
-    Serial.println("*E: MMU init FAILED");
-    Serial.flush();
+    Serial1.println("*E: MMU init FAILED");
+    Serial1.flush();
     delay(5000);
   }
 
 //  testMMU();
 
   if (! LittleFS.begin()) {
-    Serial.println("*E: LittleFS mount failed");
+    Serial1.println("*E: LittleFS mount failed");
   }
   else
-    Serial.println("*I: LittleFS mount OK");
+    Serial1.println("*I: LittleFS mount OK");
 
   initVDU();      // get display running
   initVDUInterface(); // init VDU command interface
   introDisplay();
 
-  initCmdSlots();
-
   printFile("intro.txt");
 
-  Serial.println("*I: setup done");
+  Serial1.println("*I: setup done");
 
-  Serial.printf("*I: BIOS: %s %s\n", BIOS_DATE, BIOS_TIME);
+  Serial1.printf("*I: BIOS: %s %s\n", BIOS_DATE, BIOS_TIME);
   
   // report clock freqs.
   uint32_t freq = clock_get_hz(clk_sys);
-  Serial.printf("*I: Core frequency: %0d MHz\n", freq / MHZ);
-  Serial.printf("*I: 6502 frequency: %0.1f MHz\n", (float)DEFAULT_6502_CLOCK / MHZ);
+  Serial1.printf("*I: Core frequency: %0d MHz\n", freq / MHZ);
+  Serial1.printf("*I: 6502 frequency: %0.1f MHz\n", (float)DEFAULT_6502_CLOCK / MHZ);
 
   initializeMemoryConfig();
   configureMMUFromActiveModel();
@@ -168,6 +166,8 @@ void setup() {
   bootSystemWithMenu();         // boot system with menu to select configuration.
 
   writeMMUContext(DEFAULT_CONTEXT); // set default MMU context for booting
+
+  initCmdSlots();
 
   set6502State(sRESET);
 
@@ -183,9 +183,9 @@ void setup() {
 void loop() {
 #if 0
   // process serial input for 6502
-  if (Serial.available() > 0) {
+  if (Serial1.available() > 0) {
     if (outCharAvailable6502()) {
-      uint8_t c = Serial.read(); // read char from serial
+      uint8_t c = Serial1.read(); // read char from serial
       outChar6502(c);            // write char to 6502, should succeed
  //     vduPutc(c);                // local echo to VDU for testing, remove if not needed
     }

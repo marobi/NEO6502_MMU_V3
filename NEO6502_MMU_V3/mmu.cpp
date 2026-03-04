@@ -86,7 +86,7 @@ uint8_t readMMUIndex() {
     return lindex;
   }
   else
-    Serial.printf("*E: readMMUIndex: wrong mode\n");
+    Serial1.printf("*E: readMMUIndex: wrong mode\n");
 
   return 0;
 }
@@ -97,7 +97,7 @@ uint8_t readMMUIndex() {
 /// <param name="vIndex"></param>
 inline __attribute__((always_inline))
 void writeMMUIndex(const uint8_t vIndex) {
-//  Serial.printf("*D: writeMMUIndex: %02X\n", vIndex);
+//  Serial1.printf("*D: writeMMUIndex: %02X\n", vIndex);
 
   writeCPUAddressH((vIndex & 0x0F) << 4);
 }
@@ -117,7 +117,7 @@ uint8_t readMMUContext() {
 /// <param name="vContext"></param>
 //inline __attribute__((always_inline))
 void writeMMUContext(const uint8_t vContext) {
-//  Serial.printf("*D: writeMMUContext: %02X\n", vContext);
+//  Serial1.printf("*D: writeMMUContext: %02X\n", vContext);
 
   writeNEOBus(vContext); // write context
 
@@ -160,7 +160,7 @@ uint8_t readMMUPage(const uint8_t vContext, const uint8_t vIndex) {
 
   CPUARegOEPin::high();       // disable output address
   
-  //Serial.printf("*D: readMMUPage %02X %02X : %02X\n", vContext, vIndex, lPage);
+  //Serial1.printf("*D: readMMUPage %02X %02X : %02X\n", vContext, vIndex, lPage);
   return lPage;
 }
 
@@ -200,7 +200,7 @@ bool writeMMUPage(const uint8_t vContext, const uint8_t vIndex, const uint8_t vP
   uint8_t lData = readMMUPage(vContext, vIndex);
 
   if (lData != vPage)
-    Serial.printf("*E: writeMMUPage: @%02X %02X (%02X <> %02X)\n", vContext, vIndex & 0x0F, vPage, lData);
+    Serial1.printf("*E: writeMMUPage: @%02X %02X (%02X <> %02X)\n", vContext, vIndex & 0x0F, vPage, lData);
 
   return (lData == vPage);
 #else
@@ -213,12 +213,12 @@ bool writeMMUPage(const uint8_t vContext, const uint8_t vIndex, const uint8_t vP
 /// </summary>
 /// <param name="vContext"></param>
 void dumpMMUContext(const uint8_t vContext) {
-  Serial.printf("C %02X:", vContext);
+  Serial1.printf("C %02X:", vContext);
 
   for (uint8_t lPage = 0; lPage < NUM_CONTEXT_PAGES; lPage++) {
-    Serial.printf(" %02X", readMMUPage(vContext, lPage));
+    Serial1.printf(" %02X", readMMUPage(vContext, lPage));
   }
-  Serial.printf("\n");
+  Serial1.printf("\n");
 }
 
 /// <summary>
@@ -287,7 +287,7 @@ bool initMMU() {
     enableMMUInterrupt(); // interrupt on IO page
   }
   else
-    Serial.printf("*E: initMMU failure\n");
+    Serial1.printf("*E: initMMU failure\n");
 
   return (lErrCount == 0);
 }
@@ -297,7 +297,7 @@ bool initMMU() {
 /// 
 /// </summary>
 void testMMU() {
-  Serial.printf("*D: Testing MMU\n");
+  Serial1.printf("*D: Testing MMU\n");
 
   while (true) {
     writeMMUPage(random(NUM_CONTEXTS), random(NUM_CONTEXT_PAGES), random(256));

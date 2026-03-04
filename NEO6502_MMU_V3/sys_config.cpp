@@ -445,25 +445,25 @@ bool initializeSystemConfig() {
   File file = LittleFS.open("/system.ini", "r");
 
   if (!file) {
-    Serial.println("*E: INI file missing. Using fallback profile.");
+    Serial1.println("*E: INI file missing. Using fallback profile.");
     loadFallbackProfile();
     return false;
   }
 
   if (!parseSystemIni(file)) {
 
-    Serial.printf("*E: INI error: %s (code=%d, line=%d)\n",
+    Serial1.printf("*E: INI error: %s (code=%d, line=%d)\n",
       iniErrorToString(lastIniError.code),
       lastIniError.code,
       lastIniError.line);
 
     file.close();
 
-    Serial.println("*I: Using fallback profile.");
+    Serial1.println("*I: Using fallback profile.");
     loadFallbackProfile();
     return false;
   }
-  Serial.println("\n*I: System config loaded");
+  Serial1.println("\n*I: System config loaded");
 
   file.close();
   return true;

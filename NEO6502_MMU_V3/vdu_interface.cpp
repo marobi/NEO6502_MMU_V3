@@ -112,7 +112,9 @@ void loadVDURegisters(const uint8_t vOffset, const uint8_t vLen) {
 /// 
 /// </summary>
 void execVDUCommand() {
-  uint8_t lCmd, lOffset, lLen = 0;
+  uint8_t lCmd = 0;
+  uint8_t lOffset = 0;
+  uint8_t lLen = 0;
 
   readCpuMemory(&lCmd, VDU_CMD, 1);      // get vdu command
   Serial1.printf("*D: execVDUCommand: cmd = [%02x]", lCmd);

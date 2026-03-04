@@ -31,24 +31,24 @@ static void showConfigMenu() {
 
   buildVisibleConfigList();
 
-  Serial.println();
-  Serial.println("==== SYSTEM CONFIGURATION ====");
+  Serial1.println();
+  Serial1.println("==== SYSTEM CONFIGURATION ====");
 
   for (uint8_t i = 0; i < visibleCount; i++) {
 
     int cfgIndex = visibleConfigs[i];
 
-    Serial.printf("[%d] %s", i, configs[cfgIndex].name);
+    Serial1.printf("[%d] %s", i, configs[cfgIndex].name);
 
     if (cfgIndex == systemConfig.defaultConfig)
-      Serial.print("  (default)");
+      Serial1.print("  (default)");
 
-    Serial.println();
+    Serial1.println();
   }
 
-  Serial.println();
-  Serial.println("Enter number and press ENTER.");
-  Serial.println("Press ENTER only to boot default.");
+  Serial1.println();
+  Serial1.println("Enter number and press ENTER.");
+  Serial1.println("Press ENTER only to boot default.");
 }
 
 /// <summary>
@@ -65,9 +65,9 @@ static int waitForUserSelection(unsigned long timeoutMs) {
 
   while (millis() - start < timeoutMs) {
 
-    if (Serial.available()) {
+    if (Serial1.available()) {
 
-      String input = Serial.readStringUntil('\n');
+      String input = Serial1.readStringUntil('\n');
       input.trim();
 
       if (input.length() == 0)
@@ -78,12 +78,12 @@ static int waitForUserSelection(unsigned long timeoutMs) {
       if (selection >= 0 && selection < visibleCount)
         return visibleConfigs[selection];
 
-      Serial.println("Invalid selection.");
+      Serial1.println("Invalid selection.");
       showConfigMenu();
     }
   }
 
-  Serial.println("Timeout. Booting default.");
+  Serial1.println("Timeout. Booting default.");
   return systemConfig.defaultConfig;
 }
 
@@ -109,7 +109,7 @@ bool activateConfiguration(int cfgIndex) {
     char fullPath[64];
     snprintf(fullPath, sizeof(fullPath), "/system/%s", cartridges[cartIndex].file);
 
-    Serial.printf("*D: Loading ROM %s into context %d\n", fullPath, ctx);
+    Serial1.printf("*D: Loading ROM %s into context %d\n", fullPath, ctx);
     
     // read image of ROM file into memory
     data = readBinaryFile(fullPath);
@@ -119,12 +119,12 @@ bool activateConfiguration(int cfgIndex) {
 
       // load ROM
       if (!loadROMCartridge(data)) {
-        Serial.println("*E: Cartridge load failed.");
+        Serial1.println("*E: Cartridge load failed.");
         return false;
       }
     }
     else {
-      Serial.println("*E: Cartridge load failed.");
+      Serial1.println("*E: Cartridge load failed.");
       return false;
     }
   }
@@ -145,12 +145,12 @@ void bootSystemWithMenu() {
 
   int cfgIndex = waitForUserSelection(5000);
 
-  Serial.printf("*I: Activating configuration: %s\n",
+  Serial1.printf("*I: Activating configuration: %s\n",
     configs[cfgIndex].name);
 
   if (!activateConfiguration(cfgIndex)) {
 
-    Serial.println("*E: Activation failed. Using fallback.");
+    Serial1.println("*E: Activation failed. Using fallback.");
 
     loadFallbackProfile();
     activateConfiguration(systemConfig.defaultConfig);

@@ -26,18 +26,18 @@ inline __attribute__((always_inline))
 void dump16(const uint16_t vAddress) {
   uint8_t dat;
 
-  Serial.printf("%04X:", vAddress);
+  Serial1.printf("%04X:", vAddress);
   for (uint8_t m = 0; m < 8; m++) {
     snoop_read6502Memory(vAddress + m, 1, &dat);
-    Serial.printf(" %02X", dat);
+    Serial1.printf(" %02X", dat);
   }
-  Serial.printf(" ");
+  Serial1.printf(" ");
   for (uint8_t m = 8; m < 16; m++) {
     snoop_read6502Memory(vAddress + m, 1, &dat);
-    Serial.printf(" %02X", dat);
+    Serial1.printf(" %02X", dat);
   }
 
-  Serial.println();
+  Serial1.println();
 }
 
 /// <summary>
@@ -50,7 +50,7 @@ void dumpMemory(const uint16_t vStartAddress, const uint16_t vEndAddress) {
     dump16(vStartAddress + (ad * 16));
   }
 
-  Serial.println();
+  Serial1.println();
 }
 
 /// <summary>
@@ -62,7 +62,7 @@ void dumpMemory(const uint16_t vStartAddress, const uint16_t vEndAddress) {
 /// <returns></returns>
 bool loadBinary(const uint16_t vAddress, const uint16_t vSize, const uint8_t* vBinary) {
   if ((vAddress + vSize) < vAddress) {
-    Serial.printf("*E: loadBinary: binary @0x%04X with size 0x%04X does not fit\n", vAddress, vSize);
+    Serial1.printf("*E: loadBinary: binary @0x%04X with size 0x%04X does not fit\n", vAddress, vSize);
     return false;
   }
 

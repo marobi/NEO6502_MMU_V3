@@ -80,7 +80,7 @@ uint16_t disasm6502(const uint16_t vAddress) {
     previousbyte = currentbyte;
     currentbyte = buffer[i];
     if (paramcount == 0) {
-      Serial.printf("%04X   ", address);                            //Display current address at beginning of line
+      Serial1.printf("%04X   ", address);                            //Display current address at beginning of line
       paramcount = opcode_props[currentbyte][0];              //Get instruction length
       opcode = instruction[opcode_props[currentbyte][1]];     //Get opcode name
       addrmode = opcode_props[currentbyte][2];                //Get info required to display addressing mode
@@ -93,22 +93,22 @@ uint16_t disasm6502(const uint16_t vAddress) {
     if (paramcount != 0)                                        //Keep track of possition within instruction
       paramcount--;
 
-    Serial.printf("%02X ", currentbyte);                              //Display the current byte in HEX
+    Serial1.printf("%02X ", currentbyte);                              //Display the current byte in HEX
 
     if (paramcount == 0) {
-      Serial.printf(" %s %s %s", pad, opcode, pre);                  //Pad text, display instruction name and pre-operand chars
+      Serial1.printf(" %s %s %s", pad, opcode, pre);                  //Pad text, display instruction name and pre-operand chars
       if (!strcmp(pad, "    ")) {                             //Check if single operand instruction
         if (addrmode != 8) {                                //If not using relative addressing ...
-          Serial.printf("$%02X", currentbyte);                   //...display operand
+          Serial1.printf("$%02X", currentbyte);                   //...display operand
         }
         else {                                            //Addressing mode is relative...
-          Serial.printf("$%04X", (address + ((currentbyte < 128) ? currentbyte : currentbyte - 256))); //...display relative address.
+          Serial1.printf("$%04X", (address + ((currentbyte < 128) ? currentbyte : currentbyte - 256))); //...display relative address.
         }
       }
 
       if (!strcmp(pad, " "))                                   //Check if two operand instruction and if so...
-        Serial.printf("$%02X%02X", currentbyte, previousbyte);     //...display operand
-      Serial.printf("%s\n", post);                                   //Display post-operand chars
+        Serial1.printf("$%02X%02X", currentbyte, previousbyte);     //...display operand
+      Serial1.printf("%s\n", post);                                   //Display post-operand chars
 
       return address;
     }
