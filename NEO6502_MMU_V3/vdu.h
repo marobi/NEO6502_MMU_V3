@@ -18,27 +18,6 @@ Lesser General Public License for more details.
 
 #define CURSOR_BLINK_INTERVAL_MS 600    // MS
 
-
-// VDU control (TODO)
-#define CONTROL(c) 	((c) & 0x1F)
-
-#define KEY_LEFT 	    CONTROL('A')
-#define KEY_RIGHT 	  CONTROL('D')
-#define KEY_PAGEDOWN	CONTROL('F')
-#define KEY_END 		  CONTROL('G')
-#define KEY_BACKSPACE CONTROL('H')
-#define KEY_TAB  	    CONTROL('I')
-#define KEY_LF  		  CONTROL('J')
-#define KEY_CLS  	    CONTROL('L')
-#define KEY_ENTER 	  CONTROL('M')
-#define KEY_PAGEUP	  CONTROL('R')
-#define KEY_DOWN 	    CONTROL('S')
-#define KEY_HOME 	    CONTROL('T')
-#define KEY_UP  		  CONTROL('W')
-#define KEY_REVERSE   CONTROL('X')
-#define KEY_DELETE 	  CONTROL('Z')
-#define KEY_ESC 		  CONTROL('[')
-
 // the 16 standard colors of the 256 in the palette
 #define BLACK    0
 #define MAROON   1
@@ -82,7 +61,7 @@ typedef enum {
 /// </summary>
 typedef struct {
   boolean        visibleCursor;
-  cursor_shape_t cursorStyle;
+  cursor_shape_t cursorShape;
   boolean        blinkCursor;
   boolean        textMode;
   boolean        geoAspect;
@@ -103,6 +82,7 @@ extern void taskVDU(void);
 extern void setTColor(const uint8_t);
 extern void setBGColor(const uint8_t);
 
+extern void alterCursor(const cursor_shape_t);
 extern void moveCursor(const uint16_t, const uint16_t);
 
 extern void vduSetMode(const uint8_t);
@@ -114,5 +94,7 @@ extern void vduPrintStr(const char*);
 extern void vduPrintf(char const* fmt, ...);
 
 extern uint8_t vduReadc(const uint16_t, const uint16_t);
+extern void vduGetScreenline(const uint8_t, uint8_t*);
+extern void vduGetCurrentScreenline(uint8_t* buffer);
 
 extern void initVDU();

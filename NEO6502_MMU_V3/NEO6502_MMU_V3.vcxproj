@@ -77,6 +77,7 @@
     <ClCompile Include="boot.cpp" />
     <ClCompile Include="cmd.cpp" />
     <ClCompile Include="indicator.cpp" />
+    <ClCompile Include="input.cpp" />
     <ClCompile Include="memory_config.cpp" />
     <ClCompile Include="sys_config.cpp" />
     <ClCompile Include="neobus.cpp" />
@@ -100,7 +101,9 @@
     <ClInclude Include="boot.h" />
     <ClInclude Include="cmd.h" />
     <ClInclude Include="config.h" />
+    <ClInclude Include="fifo.h" />
     <ClInclude Include="indicator.h" />
+    <ClInclude Include="input.h" />
     <ClInclude Include="memory_config.h" />
     <ClInclude Include="sys_config.h" />
     <ClInclude Include="neobus.h" />

@@ -375,10 +375,21 @@ void taskICMonitor() {
         break;
 
       default:
-        cnt = 100;
-        while ((!outChar6502(c)) && (cnt > 0)) {
+        switch (c) {
+        case '\n':                              // translate LF to CR
+          c = '\r';
+          {
+            uint8_t lBuffer[80];
+            vduGetCurrentScreenline(lBuffer);
+            Serial1.printf("*D: screenline: [%s]\n", lBuffer);
+          }
+          break;
+        }
+
+        cnt = 250;
+        while ((! outChar6502(c)) && (cnt > 0)) {
           cnt--;
-          delay(50L);
+          delay(10L);
         }
         if (cnt == 0) {
           Serial1.println("*E: outChar6502: not listener\n");
