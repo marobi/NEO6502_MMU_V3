@@ -141,16 +141,13 @@ static void cmdDisAsmCallback(cmd* c) {
   Command cmd(c);
 
   String arg1 = cmd.getArgument("from").getValue();
-  String arg2 = cmd.getArgument("to").getValue();
+  String arg2 = cmd.getArgument("lines").getValue();
   uint16_t lFrom = x2i(arg1.c_str()) & 0XFFFF;
-  uint16_t lTo = max(x2i(arg2.c_str()) & 0XFFFF, lFrom + 15);
-  if (lTo <= lFrom) lTo = 0xFFFF;
-  Serial1.printf("Disassembly %04X - %04X\n", lFrom, lTo);
+  uint16_t lLines = x2i(arg2.c_str()) & 0XFF;
+  if (lLines < 1) lLines = 1;
+  Serial1.printf("Disassembly %04X:\n", lFrom);
 
-  uint16_t lAddress = lFrom;
-  while (lAddress < lTo) {
-    lAddress = disasm6502(lAddress);
-  }
+  disasm6502(lFrom, lLines);
 
   Serial1.println();
 }
@@ -266,7 +263,7 @@ static void cmdHelpCallback(cmd* c) {
  sc <cycles>           single cycle\n\
  i/rq                  generate IRQ\n\
  d/ump <from> <to>     dump memory\n\
- dis <from> <to>       disasm memory\n\
+ dis <from> <lines>    disasm memory\n\
  m/em <address> <data> modify memory address(es)\n\
  st/at                 status of cpus/bus\n\
  mmu  <context>        set mmu context\n\
@@ -316,7 +313,7 @@ void initMonitor() {
 
   gCmd = gCli.addCmd("dis", cmdDisAsmCallback);
   gCmd.addPositionalArgument("from");
-  gCmd.addPositionalArgument("to", "0");
+  gCmd.addPositionalArgument("lines", "1");
 
   gCmd = gCli.addBoundlessCommand("m/em", cmdMemCallback);
 

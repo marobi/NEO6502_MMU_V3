@@ -1,118 +1,276 @@
 /*
-This software is free software; you can redistribute it and/or
-modify it under the terms of the GNU Lesser General Public
-License as published by the Free Software Foundation; either
-version 2.1 of the License, or (at your option) any later version.
-
-This software is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-Lesser General Public License for more details.
-
+   W65C02 Disassembler
+   - integrated opcode table
+   - two-pass label discovery
+   - automatic vector labels (NMI, RESET, IRQ)
 */
-/*
-  basics of code taken from : http://forum.6502.org/viewtopic.php?t=3644
-*/
-#include <arduino.h>
+
+#include <Arduino.h>
 #include "disasm6502.h"
 #include "neobus.h"
 
-// Padding for 1,2 & 3 byte instructions
-static const char* padding[3] = { "       ","    "," " };
+#define LABEL_WIDTH 7
 
-// 57 Instructions + Undefined ("???")
-static const char* instruction[58] = {
-  //       0     1     2     3     4     5     6     7     8     9
-         "ADC","AND","ASL","BCC","BCS","BEQ","BIT","BMI","BNE","BPL", // 0
-         "BRK","BVC","BVS","CLC","CLD","CLI","CLV","CMP","CPX","CPY", // 1
-         "DEC","DEX","DEY","EOR","INC","INX","INY","JMP","JSR","LDA", // 2
-         "LDX","LDY","LSR","NOP","ORA","PHA","PHP","PLA","PLP","ROL", // 3
-         "ROR","ROT","RTI","RTS","SBC","SEC","SED","SEI","STA","STX", // 4
-         "STY","TAX","TAY","TSX","TXA","TXS","TYA","???" };            // 5
+/* --------------------------------------------------
+   Addressing modes
+-------------------------------------------------- */
 
-// This is a lookup of the text formating required for mode output, plus one entry to distinguish relative mode
-static const char* modes[9][2] = { {"",""},{"#",""},{"",",X"},{"",",Y"},{"(",",X)"},{"(","),Y"},{"(",")"},{"A",""},{"",""} };
-
-// Opcode Properties for 256 opcodes {length_in_bytes, mnemonic_lookup, mode_chars_lookup}
-static const uint8_t opcode_props[256][3] = {
-  //         0        1        2        3        4        5        6        7        8        9        A        B        C        D        E        F
-  //     ******** -------- ******** -------- ******** -------- ******** -------- ******** -------- ******** -------- ******** -------- ******** --------
-         {1,10,0},{2,34,4},{1,57,0},{1,57,0},{1,57,0},{2,34,0},{2,2,0}, {1,57,0},{1,36,0},{2,34,1},{1,2,7}, {1,57,0},{1,57,0},{3,34,0},{3,2,0}, {1,57,0}, // 0
-         {2,9,8}, {2,34,5},{1,57,0},{1,57,0},{1,57,0},{2,34,2},{2,2,2}, {1,57,0},{1,13,0},{3,34,3},{1,57,0},{1,57,0},{1,57,0},{3,34,2},{3,2,2}, {1,57,0}, // 1
-         {3,28,0},{2,1,4}, {1,57,0},{1,57,0},{2,6,0}, {2,1,0}, {2,39,0},{1,57,0},{1,38,0},{2,1,1}, {1,39,7},{1,57,0},{3,6,0}, {3,1,0}, {3,39,0},{1,57,0}, // 2
-         {2,7,8}, {2,1,5}, {1,57,0},{1,57,0},{1,57,0},{2,1,2}, {2,39,2},{1,57,0},{1,45,0},{3,1,3}, {1,57,0},{1,57,0},{1,57,0},{3,1,2}, {3,39,2},{1,57,0}, // 3
-         {1,42,0},{2,23,4},{1,57,0},{1,57,0},{1,57,0},{2,23,0},{2,32,0},{1,57,0},{1,35,0},{2,23,1},{1,32,7},{1,57,0},{3,27,0},{3,23,0},{3,32,0},{1,57,0}, // 4
-         {2,11,8},{2,23,5},{1,57,0},{1,57,0},{1,57,0},{2,23,2},{2,32,2},{1,57,0},{1,15,0},{3,23,3},{1,57,0},{1,57,0},{1,57,0},{3,23,2},{3,32,2},{1,57,0}, // 5
-         {1,43,0},{2,0,4}, {1,57,0},{1,57,0},{1,57,0},{2,0,0}, {2,40,0},{1,57,0},{1,37,0},{2,0,1}, {1,40,7},{1,57,0},{3,27,6},{3,0,0}, {3,40,0},{1,57,0}, // 6
-         {2,12,8},{2,0,5}, {1,57,0},{1,57,0},{1,57,0},{2,0,2}, {2,40,2},{1,57,0},{1,47,0},{3,0,3}, {1,57,0},{1,57,0},{1,57,0},{3,0,2}, {3,40,2},{1,57,0}, // 7
-         {1,57,0},{2,48,4},{1,57,0},{1,57,0},{2,50,0},{2,48,0},{2,49,0},{1,57,0},{1,22,0},{1,57,0},{1,54,0},{1,57,0},{3,50,0},{3,48,0},{3,49,0},{1,57,0}, // 8
-         {2,3,8}, {2,48,5},{1,57,0},{1,57,0},{2,50,2},{2,48,2},{2,49,3},{1,57,0},{1,56,0},{3,48,3},{1,55,0},{1,57,0},{1,57,0},{3,48,2},{1,57,0},{1,57,0}, // 9
-         {2,31,1},{2,29,4},{2,30,1},{1,57,0},{2,31,0},{2,29,0},{2,30,0},{1,57,0},{1,52,0},{2,29,1},{1,51,0},{1,57,0},{3,31,0},{3,29,0},{3,30,0},{1,57,0}, // A
-         {2,4,8}, {2,29,5},{1,57,0},{1,57,0},{2,31,2},{2,29,2},{2,30,3},{1,57,0},{1,16,0},{3,29,3},{1,53,0},{1,57,0},{3,31,2},{3,29,2},{3,30,3},{1,57,0}, // B
-         {2,19,1},{2,17,4},{1,57,0},{1,57,0},{2,19,0},{2,17,0},{2,20,0},{1,57,0},{1,26,0},{2,17,1},{1,21,0},{1,57,0},{3,19,0},{3,17,0},{3,20,0},{1,57,0}, // C
-         {2,8,8}, {2,17,5},{1,57,0},{1,57,0},{1,57,0},{2,17,2},{2,20,2},{1,57,0},{1,14,0},{3,17,3},{1,57,0},{1,57,0},{1,57,0},{3,17,2},{3,20,2},{1,57,0}, // D
-         {2,18,1},{2,44,4},{1,57,0},{1,57,0},{2,18,0},{2,44,0},{2,24,0},{1,57,0},{1,25,0},{2,44,1},{1,33,0},{1,57,0},{3,18,0},{3,44,0},{3,24,0},{1,57,0}, // E
-         {2,5,8}, {2,44,5},{1,57,0},{1,57,0},{1,57,0},{2,44,2},{2,24,2},{1,57,0},{1,46,0},{3,44,3},{1,57,0},{1,57,0},{1,57,0},{3,44,2},{3,24,2},{1,57,0}  // F
+enum AddrMode
+{
+  IMP, ACC, IMM, ZP, ZPX, ZPY, ABS, ABSX, ABSY, IND, INDX, INDY, ZPIND, REL
 };
 
-/// <summary>
-/// 
-/// </summary>
-/// <param name="vAddress"></param>
-/// <returns></returns>
-uint16_t disasm6502(const uint16_t vAddress) {
-  uint16_t address;
-  uint8_t buffer[4];
-  int currentbyte = 0;
-  int previousbyte = 0;
-  uint8_t paramcount = 0;
-  uint8_t addrmode;
-  const char* opcode;
-  const char* pad;
-  const char* pre;
-  const char* post;
+struct Opcode
+{
+  const char* name;
+  uint8_t mode;
+  uint8_t len;
+};
 
-  address = vAddress;
+/* --------------------------------------------------
+   Label support
+-------------------------------------------------- */
 
-  snoop_read6502Memory(vAddress, 3, buffer);
+#define MAX_LABELS 128
 
-  for (uint8_t i = 0; i < 3; ++i) {                                 //Start proccessing loop.
-    previousbyte = currentbyte;
-    currentbyte = buffer[i];
-    if (paramcount == 0) {
-      Serial1.printf("%04X   ", address);                            //Display current address at beginning of line
-      paramcount = opcode_props[currentbyte][0];              //Get instruction length
-      opcode = instruction[opcode_props[currentbyte][1]];     //Get opcode name
-      addrmode = opcode_props[currentbyte][2];                //Get info required to display addressing mode
-      pre = modes[addrmode][0];                               //Look up pre-operand formatting text
-      post = modes[addrmode][1];                              //Look up post-operand formatting text
-      pad = padding[(paramcount - 1)];                        //Calculate correct padding for output alignment
-      address = address + paramcount;                         //Increment address
-    }
+struct Label
+{
+  uint16_t addr;
+  char name[8];
+  bool fixed;
+};
 
-    if (paramcount != 0)                                        //Keep track of possition within instruction
-      paramcount--;
+static Label labels[MAX_LABELS];
+static uint8_t labelCount = 0;
 
-    Serial1.printf("%02X ", currentbyte);                              //Display the current byte in HEX
+static const char* findLabel(uint16_t addr)
+{
+  for (uint8_t i = 0; i < labelCount; i++)
+    if (labels[i].addr == addr)
+      return labels[i].name;
 
-    if (paramcount == 0) {
-      Serial1.printf(" %s %s %s", pad, opcode, pre);                  //Pad text, display instruction name and pre-operand chars
-      if (!strcmp(pad, "    ")) {                             //Check if single operand instruction
-        if (addrmode != 8) {                                //If not using relative addressing ...
-          Serial1.printf("$%02X", currentbyte);                   //...display operand
-        }
-        else {                                            //Addressing mode is relative...
-          Serial1.printf("$%04X", (address + ((currentbyte < 128) ? currentbyte : currentbyte - 256))); //...display relative address.
-        }
-      }
+  return nullptr;
+}
 
-      if (!strcmp(pad, " "))                                   //Check if two operand instruction and if so...
-        Serial1.printf("$%02X%02X", currentbyte, previousbyte);     //...display operand
-      Serial1.printf("%s\n", post);                                   //Display post-operand chars
+static void createNamedLabel(uint16_t addr, const char* name)
+{
+  if (labelCount >= MAX_LABELS)
+    return;
 
-      return address;
-    }
+  Label* l = &labels[labelCount++];
+
+  l->addr = addr;
+  strncpy(l->name, name, sizeof(l->name));
+  l->name[sizeof(l->name) - 1] = 0;
+  l->fixed = true;
+}
+
+static const char* createLabel(uint16_t addr)
+{
+  const char* existing = findLabel(addr);
+  if (existing)
+    return existing;
+
+  if (labelCount >= MAX_LABELS)
+    return nullptr;
+
+  Label* l = &labels[labelCount++];
+
+  l->addr = addr;
+  sprintf(l->name, "L%04X", addr);
+  l->fixed = false;
+
+  return l->name;
+}
+
+void disasmResetLabels()
+{
+  labelCount = 0;
+}
+
+/* --------------------------------------------------
+   Memory helper
+-------------------------------------------------- */
+
+static uint16_t readWord(uint16_t addr)
+{
+  uint8_t b[2];
+  snoop_read6502Memory(addr, 2, b);
+  return b[0] | (b[1] << 8);
+}
+
+/* --------------------------------------------------
+   Seed interrupt vectors
+-------------------------------------------------- */
+
+static void seedVectors()
+{
+  uint16_t nmi = readWord(0xFFFA);
+  uint16_t reset = readWord(0xFFFC);
+  uint16_t irq = readWord(0xFFFE);
+
+  createNamedLabel(nmi, "NMI");
+  createNamedLabel(reset, "RESET");
+  createNamedLabel(irq, "IRQ");
+}
+
+/* --------------------------------------------------
+   W65C02 opcode table
+-------------------------------------------------- */
+
+static const Opcode optable[256] PROGMEM =
+{
+{"BRK",IMP,1},{"ORA",INDX,2},{"???",IMP,1},{"???",IMP,1},{"TSB",ZP,2},{"ORA",ZP,2},{"ASL",ZP,2},{"RMB0",ZP,2},
+{"PHP",IMP,1},{"ORA",IMM,2},{"ASL",ACC,1},{"???",IMP,1},{"TSB",ABS,3},{"ORA",ABS,3},{"ASL",ABS,3},{"BBR0",REL,3},
+
+{"BPL",REL,2},{"ORA",INDY,2},{"ORA",ZPIND,2},{"???",IMP,1},{"TRB",ZP,2},{"ORA",ZPX,2},{"ASL",ZPX,2},{"RMB1",ZP,2},
+{"CLC",IMP,1},{"ORA",ABSY,3},{"INC",ACC,1},{"???",IMP,1},{"TRB",ABS,3},{"ORA",ABSX,3},{"ASL",ABSX,3},{"BBR1",REL,3},
+
+{"JSR",ABS,3},{"AND",INDX,2},{"???",IMP,1},{"???",IMP,1},{"BIT",ZP,2},{"AND",ZP,2},{"ROL",ZP,2},{"RMB2",ZP,2},
+{"PLP",IMP,1},{"AND",IMM,2},{"ROL",ACC,1},{"???",IMP,1},{"BIT",ABS,3},{"AND",ABS,3},{"ROL",ABS,3},{"BBR2",REL,3},
+
+{"BMI",REL,2},{"AND",INDY,2},{"AND",ZPIND,2},{"???",IMP,1},{"BIT",ZPX,2},{"AND",ZPX,2},{"ROL",ZPX,2},{"RMB3",ZP,2},
+{"SEC",IMP,1},{"AND",ABSY,3},{"DEC",ACC,1},{"???",IMP,1},{"BIT",ABSX,3},{"AND",ABSX,3},{"ROL",ABSX,3},{"BBR3",REL,3},
+
+{"RTI",IMP,1},{"EOR",INDX,2},{"???",IMP,1},{"???",IMP,1},{"???",IMP,1},{"EOR",ZP,2},{"LSR",ZP,2},{"RMB4",ZP,2},
+{"PHA",IMP,1},{"EOR",IMM,2},{"LSR",ACC,1},{"???",IMP,1},{"JMP",ABS,3},{"EOR",ABS,3},{"LSR",ABS,3},{"BBR4",REL,3},
+
+{"BVC",REL,2},{"EOR",INDY,2},{"EOR",ZPIND,2},{"???",IMP,1},{"???",IMP,1},{"EOR",ZPX,2},{"LSR",ZPX,2},{"RMB5",ZP,2},
+{"CLI",IMP,1},{"EOR",ABSY,3},{"PHY",IMP,1},{"???",IMP,1},{"???",IMP,1},{"EOR",ABSX,3},{"LSR",ABSX,3},{"BBR5",REL,3},
+
+{"RTS",IMP,1},{"ADC",INDX,2},{"???",IMP,1},{"???",IMP,1},{"STZ",ZP,2},{"ADC",ZP,2},{"ROR",ZP,2},{"RMB6",ZP,2},
+{"PLA",IMP,1},{"ADC",IMM,2},{"ROR",ACC,1},{"???",IMP,1},{"JMP",IND,3},{"ADC",ABS,3},{"ROR",ABS,3},{"BBR6",REL,3},
+
+{"BVS",REL,2},{"ADC",INDY,2},{"ADC",ZPIND,2},{"???",IMP,1},{"STZ",ZPX,2},{"ADC",ZPX,2},{"ROR",ZPX,2},{"RMB7",ZP,2},
+{"SEI",IMP,1},{"ADC",ABSY,3},{"PLY",IMP,1},{"???",IMP,1},{"JMP",ABSX,3},{"ADC",ABSX,3},{"ROR",ABSX,3},{"BBR7",REL,3},
+
+{"BRA",REL,2},{"STA",INDX,2},{"???",IMP,1},{"???",IMP,1},{"STY",ZP,2},{"STA",ZP,2},{"STX",ZP,2},{"SMB0",ZP,2},
+{"DEY",IMP,1},{"BIT",IMM,2},{"TXA",IMP,1},{"???",IMP,1},{"STY",ABS,3},{"STA",ABS,3},{"STX",ABS,3},{"BBS0",REL,3},
+
+{"BCC",REL,2},{"STA",INDY,2},{"STA",ZPIND,2},{"???",IMP,1},{"STY",ZPX,2},{"STA",ZPX,2},{"STX",ZPY,2},{"SMB1",ZP,2},
+{"TYA",IMP,1},{"STA",ABSY,3},{"TXS",IMP,1},{"???",IMP,1},{"STZ",ABS,3},{"STA",ABSX,3},{"STZ",ABSX,3},{"BBS1",REL,3},
+
+{"LDY",IMM,2},{"LDA",INDX,2},{"LDX",IMM,2},{"???",IMP,1},{"LDY",ZP,2},{"LDA",ZP,2},{"LDX",ZP,2},{"SMB2",ZP,2},
+{"TAY",IMP,1},{"LDA",IMM,2},{"TAX",IMP,1},{"???",IMP,1},{"LDY",ABS,3},{"LDA",ABS,3},{"LDX",ABS,3},{"BBS2",REL,3},
+
+{"BCS",REL,2},{"LDA",INDY,2},{"LDA",ZPIND,2},{"???",IMP,1},{"LDY",ZPX,2},{"LDA",ZPX,2},{"LDX",ZPY,2},{"SMB3",ZP,2},
+{"CLV",IMP,1},{"LDA",ABSY,3},{"TSX",IMP,1},{"???",IMP,1},{"LDY",ABSX,3},{"LDA",ABSX,3},{"LDX",ABSY,3},{"BBS3",REL,3},
+
+{"CPY",IMM,2},{"CMP",INDX,2},{"???",IMP,1},{"???",IMP,1},{"CPY",ZP,2},{"CMP",ZP,2},{"DEC",ZP,2},{"SMB4",ZP,2},
+{"INY",IMP,1},{"CMP",IMM,2},{"DEX",IMP,1},{"???",IMP,1},{"CPY",ABS,3},{"CMP",ABS,3},{"DEC",ABS,3},{"BBS4",REL,3},
+
+{"BNE",REL,2},{"CMP",INDY,2},{"CMP",ZPIND,2},{"???",IMP,1},{"???",IMP,1},{"CMP",ZPX,2},{"DEC",ZPX,2},{"SMB5",ZP,2},
+{"CLD",IMP,1},{"CMP",ABSY,3},{"PHX",IMP,1},{"???",IMP,1},{"???",IMP,1},{"CMP",ABSX,3},{"DEC",ABSX,3},{"BBS5",REL,3},
+
+{"CPX",IMM,2},{"SBC",INDX,2},{"???",IMP,1},{"???",IMP,1},{"CPX",ZP,2},{"SBC",ZP,2},{"INC",ZP,2},{"SMB6",ZP,2},
+{"INX",IMP,1},{"SBC",IMM,2},{"NOP",IMP,1},{"???",IMP,1},{"CPX",ABS,3},{"SBC",ABS,3},{"INC",ABS,3},{"BBS6",REL,3},
+
+{"BEQ",REL,2},{"SBC",INDY,2},{"SBC",ZPIND,2},{"???",IMP,1},{"???",IMP,1},{"SBC",ZPX,2},{"INC",ZPX,2},{"SMB7",ZP,2},
+{"SED",IMP,1},{"SBC",ABSY,3},{"PLX",IMP,1},{"???",IMP,1},{"???",IMP,1},{"SBC",ABSX,3},{"INC",ABSX,3},{"BBS7",REL,3}
+};
+
+/* --------------------------------------------------
+   Label scan
+-------------------------------------------------- */
+
+static void scanLabels(uint16_t addr, uint16_t lines)
+{
+  for (uint16_t i = 0; i < lines; i++)
+  {
+    uint8_t b[3];
+    snoop_read6502Memory(addr, 3, b);
+
+    Opcode op;
+    memcpy_P(&op, &optable[b[0]], sizeof(Opcode));
+
+    if (op.mode == REL)
+      createLabel(addr + 2 + (int8_t)b[1]);
+
+    if (op.mode == ABS)
+      if (!strcmp(op.name, "JSR") || !strcmp(op.name, "JMP"))
+        createLabel((b[2] << 8) | b[1]);
+
+    addr += op.len;
   }
-  //    printf("$%04X                .END\n", address);                 //Add .END directive to end of output
-  return address;
+}
+
+/* --------------------------------------------------
+   Disassembler
+-------------------------------------------------- */
+
+uint16_t disasm6502(uint16_t addr, uint16_t lines)
+{
+  disasmResetLabels();
+  seedVectors();
+  scanLabels(addr, lines);
+
+  for (uint16_t line = 0; line < lines; line++)
+  {
+    const char* lbl = findLabel(addr);
+
+    if (lbl)
+    {
+      Serial1.println();
+      char labelbuf[10];
+      snprintf(labelbuf, sizeof(labelbuf), "%s:", lbl);
+      Serial1.printf("%-*s", LABEL_WIDTH, labelbuf);
+    }
+    else
+      Serial1.printf("       ");
+
+    uint8_t b[3];
+    snoop_read6502Memory(addr, 3, b);
+
+    Opcode op;
+    memcpy_P(&op, &optable[b[0]], sizeof(Opcode));
+
+    Serial1.printf("%04X  ", addr);
+
+    Serial1.printf("%02X ", b[0]);
+    if (op.len > 1) Serial1.printf("%02X ", b[1]); else Serial1.printf("   ");
+    if (op.len > 2) Serial1.printf("%02X ", b[2]); else Serial1.printf("   ");
+
+    Serial1.printf(" %-4s ", op.name);
+
+    switch (op.mode)
+    {
+    case IMM:  Serial1.printf("#$%02X", b[1]); break;
+    case ZP:   Serial1.printf("$%02X", b[1]); break;
+    case ZPX:  Serial1.printf("$%02X,X", b[1]); break;
+    case ZPY:  Serial1.printf("$%02X,Y", b[1]); break;
+
+    case ABS:
+    {
+      uint16_t t = (b[2] << 8) | b[1];
+      const char* l = findLabel(t);
+      if (l) Serial1.printf("%s", l);
+      else Serial1.printf("$%04X", t);
+      break;
+    }
+
+    case ABSX: Serial1.printf("$%02X%02X,X", b[2], b[1]); break;
+    case ABSY: Serial1.printf("$%02X%02X,Y", b[2], b[1]); break;
+    case IND:  Serial1.printf("($%02X%02X)", b[2], b[1]); break;
+    case INDX: Serial1.printf("($%02X,X)", b[1]); break;
+    case INDY: Serial1.printf("($%02X),Y", b[1]); break;
+    case ZPIND:Serial1.printf("($%02X)", b[1]); break;
+
+    case REL:
+    {
+      uint16_t t = addr + 2 + (int8_t)b[1];
+      const char* l = findLabel(t);
+      if (l) Serial1.printf("%s", l);
+      else Serial1.printf("$%04X", t);
+      break;
+    }
+
+    case ACC: Serial1.printf("A"); break;
+    default: break;
+    }
+
+    Serial1.println();
+    addr += op.len;
+  }
+
+  return addr;
 }

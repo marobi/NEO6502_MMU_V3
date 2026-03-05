@@ -12,7 +12,7 @@ Lesser General Public License for more details.
 */
 #pragma once
 
-#define MON_VERSION "v1.11.001"
+#define MON_VERSION "v1.15.072"
 
 void initMonitor();
 
