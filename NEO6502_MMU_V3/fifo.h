@@ -34,8 +34,7 @@ private:
 
 public:
 
-  enum StatusBits : uint8_t
-  {
+  enum StatusBits : uint8_t {
     EMPTY = 1 << 0,
     FULL = 1 << 1,
     DATA = 1 << 2,   // data available
@@ -44,23 +43,19 @@ public:
 
   static constexpr uint32_t capacity = SIZE - 1;
 
-  inline bool isEmpty() const
-  {
+  inline bool isEmpty() const {
     return head == tail;
   }
 
-  inline bool isFull() const
-  {
+  inline bool isFull() const {
     return ((head + 1) & MASK) == tail;
   }
 
-  inline uint32_t count() const
-  {
+  inline uint32_t count() const {
     return (head - tail) & MASK;
   }
 
-  inline uint8_t status() const
-  {
+  inline uint8_t status() const {
     uint8_t s = 0;
 
     if (head == tail)
@@ -76,8 +71,7 @@ public:
     return s;
   }
 
-  inline bool push(T value)
-  {
+  inline bool push(T value) {
     uint32_t h = head;
     uint32_t next = (h + 1) & MASK;
 
@@ -90,8 +84,7 @@ public:
     return true;
   }
 
-  inline bool pop(T& value)
-  {
+  inline bool pop(T& value) {
     uint32_t t = tail;
 
     if (t == head)
@@ -103,9 +96,7 @@ public:
     return true;
   }
 
-  inline void clear()
-  {
+  inline void clear() {
     head = tail = 0;
   }
 };
-

@@ -12,7 +12,7 @@ Lesser General Public License for more details.
 */
 #pragma once
 
-extern bool loadROMCartridge(const uint8_t*);
+bool loadROMCartridge(const uint8_t*);
 
-extern uint8_t* readBinaryFile(const char *vFile);
+uint8_t* readBinaryFile(const char *vFile);
 

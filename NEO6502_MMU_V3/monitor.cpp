@@ -29,9 +29,8 @@ Lesser General Public License for more details.
 #include "neobus.h"
 #include "disasm6502.h"
 
-#include "indicator.h"
-
 #include "vdu.h"
+#include "input.h"
 
 // Create CLI Object
 static SimpleCLI gCli;
@@ -144,9 +143,8 @@ static void cmdDisAsmCallback(cmd* c) {
   String arg2 = cmd.getArgument("lines").getValue();
   uint16_t lFrom = x2i(arg1.c_str()) & 0XFFFF;
   uint16_t lLines = x2i(arg2.c_str()) & 0XFF;
-  if (lLines < 1) lLines = 1;
-  Serial1.printf("Disassembly %04X:\n", lFrom);
 
+  Serial1.printf("Disassembly %04X\n", lFrom);
   disasm6502(lFrom, lLines);
 
   Serial1.println();
@@ -332,9 +330,6 @@ void initMonitor() {
 
   // Set error Callback
   gCli.setOnError(errorCallback);
-
-  // 
-  initIndicator();
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -353,6 +348,51 @@ static void returnToICM() {
   Serial1.print("> ");                     // new prompt for CLI
 }
 
+/// <summary>
+/// 
+/// </summary>
+/// <param name="c"></param>
+static void normalInput(uint8_t c) {
+  switch (c) {
+  case 0x03:                                // ^C
+    returnToICM();
+    break;
+
+  default:
+    if ((c == '\n') || (c == '\r')) {
+      uint8_t lBuffer[COLS + 1];
+      uint8_t* lPtr = lBuffer;
+
+      if (getAsScreenMode()) {
+        vduGetCurrentScreenline(lBuffer);
+//        Serial1.printf("*D: normalInput: [%s]\n\n", lBuffer);
+
+        vduRestoreCursor();
+
+        while (*lPtr) {
+          if (!writeCPUQ(*lPtr++)){
+            returnToICM();
+            break;
+          }
+        }
+
+        writeCPUQ('\r');                     // ???????
+      }
+    }
+    else {
+      Serial1.printf("*D: ICM->VDU: [%02X]\n", c);
+      writeVDUQ(c);
+    }
+
+    if (! getAsScreenMode()) {              // normal mode
+      if (!writeCPUQ(c)) {
+        returnToICM();
+      }
+    }
+   
+    break;
+  }
+}
 
 /// <summary>
 /// rpi monitor to control the HW
@@ -360,41 +400,13 @@ static void returnToICM() {
 /// <returns>void</returns>
 void taskICMonitor() {
   int c;
-  uint8_t cnt;
+  //  uint8_t cnt;
 
-  // Check if user typed something on keyboard
+    // Check if user typed something on keyboard
   if (Serial1.available()) {
     c = Serial1.read();
     if (gInterface != 0) {
-      switch (c) {
-      case 0x03:                                // ^C
-        returnToICM();
-        break;
-
-      default:
-        switch (c) {
-        case '\n':                              // translate LF to CR
-          c = '\r';
-          {
-            uint8_t lBuffer[80];
-            vduGetCurrentScreenline(lBuffer);
-            Serial1.printf("*D: screenline: [%s]\n", lBuffer);
-          }
-          break;
-        }
-
-        cnt = 250;
-        while ((! outChar6502(c)) && (cnt > 0)) {
-          cnt--;
-          delay(10L);
-        }
-        if (cnt == 0) {
-          Serial1.println("*E: outChar6502: not listener\n");
-
-          returnToICM();
-        }
-        break;
-      }
+      normalInput(c);
     }
     else {
       switch (c) {
@@ -420,17 +432,15 @@ void taskICMonitor() {
         gCli.parse(gInputBuffer);
         if (gInterface == 0)
           Serial1.print("> ");                   // new prompt
-        gInputIndex = 0;                        // new buffer
+        gInputIndex = 0;                         // new buffer
         gInputBuffer[0] = '\0';
         break;
 
-      default:                                  // enter in buffer
+      default:                                   // enter in buffer
         gInputBuffer[gInputIndex++] = c;
         gInputBuffer[gInputIndex] = '\0';
         break;
       }
     }
   }
-
-  updateIndicator();
 }

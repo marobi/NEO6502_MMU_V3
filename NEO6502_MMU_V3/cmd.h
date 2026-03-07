@@ -12,7 +12,7 @@ Lesser General Public License for more details.
 */
 #pragma once
 
-void initCmdSlots();
+void initCmdInterface();
 
 uint8_t inChar6502();
 

@@ -39,6 +39,9 @@ Lesser General Public License for more details.
 #include "boot.h"
 
 #include "monitor.h"
+#include "input.h"
+
+#include "indicator.h"
 
 /// <summary>
 /// print the contents of a file from LittleFS to the serial console for debugging purposes.
@@ -71,7 +74,7 @@ void introDisplay() {
 
   vduSetReg(R6, DEFAULT_MODE);  vduSetCmd(CMD_VDU);    // VDU mode
 
-  setTColor(9); // text color red
+  setTColor(RED); // text color red
 
   vduSetReg(R7, FUCHSIA); vduSetCmd(CMD_GCOLOR);
   vduSetCmdx(CMD_CIRC, 3, 100, 100, 100);
@@ -167,11 +170,13 @@ void setup() {
 
   writeMMUContext(DEFAULT_CONTEXT); // set default MMU context for booting
 
-  initCmdSlots();
+  initCmdInterface();
 
   set6502State(sRESET);
 
   initMonitor();                // init monitor after boot
+
+  initIndicator();
 }
 
 /// <summary>
@@ -181,25 +186,13 @@ void setup() {
 /// and running the monitor.
 /// </summary>
 void loop() {
-#if 0
-  // process serial input for 6502
-  if (Serial1.available() > 0) {
-    if (outCharAvailable6502()) {
-      uint8_t c = Serial1.read(); // read char from serial
-      outChar6502(c);            // write char to 6502, should succeed
- //     vduPutc(c);                // local echo to VDU for testing, remove if not needed
-    }
-  }
-#endif
+  updateIndicator();             // manage status LED
 
-  uint8_t c = inChar6502();
-  if (c != 0x00) {
-    vduPutc(c);                  // echo char from 6502 to VDU
-  }
+  taskICMonitor();               // ICM
 
-  taskVDU();                     // run VDU task to process VDU commands and update display
+  inpExecute();                  // process FIFOs
 
-  taskICMonitor();               // run monitor to update state
+  taskVDU();                     // VDU task, mainly control of cursor blinking
 
   delay(5);
 }

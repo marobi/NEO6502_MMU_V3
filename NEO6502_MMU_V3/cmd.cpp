@@ -15,6 +15,7 @@ Lesser General Public License for more details.
 #include "mmu.h"
 #include "cmd.h"
 #include "neobus.h"
+#include "input.h"
 
 ///-------------------------------------------------------------
 /// CMD_LOT_BASE:
@@ -31,11 +32,13 @@ Lesser General Public License for more details.
 /// <summary>
 /// init cmd slots: set to 0x00
 /// </summary>
-void initCmdSlots() {
+void initCmdInterface() {
   uint8_t ldata[3] = { 0x00, 0x00, 0x00 };
 
   snoop_write6502Memory(CMD_SLOT_BASE, 3, &ldata[0]);
   gMMUIOTrigger = false;
+
+  inpInit();
 }
 
 /// <summary>
@@ -75,7 +78,7 @@ uint8_t inChar6502() {
   if (gMMUIOTrigger) {
     lChar = readCmdSlot(CMD_SLOT_INCHAR);
     if (lChar == 0x00) {
-      return false;
+      return 0x00;
     }
     else {
       writeCmdSlot(CMD_SLOT_INCHAR, 0x00);  // ACK

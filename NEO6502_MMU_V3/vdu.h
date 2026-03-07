@@ -14,9 +14,10 @@ Lesser General Public License for more details.
 
 #define DEFAULT_COLOR   15      // WHITE
 #define DEFAULT_BG_COLOR 4      // DARK BLUE
-#define DEFAULT_MODE     0      // VDU display mode (0-7)
+#define DEFAULT_MODE     0      // VDU display mode (0-9)
+#define NUMBER_OF_MODES 10      // number of VDU modes
 
-#define CURSOR_BLINK_INTERVAL_MS 600    // MS
+#define CURSOR_BLINK_INTERVAL_MS 400    // MS
 
 // the 16 standard colors of the 256 in the palette
 #define BLACK    0
@@ -37,7 +38,8 @@ Lesser General Public License for more details.
 #define WHITE   15
 
 ////////////////////////////////////////////////////////////////////////
-#define IDX_CURSOR       254   // palette index for cursor color
+#define IDX_CURSOR_FG    253   // palette index for cursor FG color
+#define IDX_CURSOR_BG    254   // palette index for cursor BG color
 #define WIDTH            320   // TBD display.width()
 #define HEIGHT           240   // TBD display.height()
 #define FONT_CHAR_WIDTH  5  
@@ -70,31 +72,38 @@ typedef struct {
   boolean        localEcho;
   boolean        ucaseOnly;
   boolean        crlf;
+  boolean        screenMode;
 } vdu_mode_t;
 
 extern const vdu_mode_t* vduMode;              // treat as RO
 
-extern void setCursor(const boolean);
-extern void resetDisplay(const uint8_t);
+void setCursor(const boolean);
+void resetDisplay(const uint8_t);
 
-extern void taskVDU(void);
+void taskVDU(void);
 
-extern void setTColor(const uint8_t);
-extern void setBGColor(const uint8_t);
+void setTColor(const uint8_t);
+void setBGColor(const uint8_t);
 
-extern void alterCursor(const cursor_shape_t);
-extern void moveCursor(const uint16_t, const uint16_t);
+void alterCursor(const cursor_shape_t);
+void moveCursor(const uint16_t, const uint16_t);
 
-extern void vduSetMode(const uint8_t);
+void vduSaveCursor();
+void vduRestoreCursor();
 
-extern void cmdClearDisplay();
+bool getAsScreenMode();
+void setAsScreenMode(const bool);
 
-extern void vduPutc(const uint8_t);
-extern void vduPrintStr(const char*);
-extern void vduPrintf(char const* fmt, ...);
+void vduSetMode(const uint8_t);
 
-extern uint8_t vduReadc(const uint16_t, const uint16_t);
-extern void vduGetScreenline(const uint8_t, uint8_t*);
-extern void vduGetCurrentScreenline(uint8_t* buffer);
+void cmdClearScreen();
 
-extern void initVDU();
+void vduPutc(const uint8_t);
+void vduPrintStr(const char*);
+void vduPrintf(char const* fmt, ...);
+
+uint8_t vduReadc(const uint16_t, const uint16_t);
+void vduGetScreenline(const uint8_t, uint8_t*);
+void vduGetCurrentScreenline(uint8_t* buffer);
+
+void initVDU();

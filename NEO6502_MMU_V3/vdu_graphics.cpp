@@ -154,7 +154,7 @@ static void cmdDMode() {
 /// 
 /// </summary>
 static void cmdCLS() {
-  cmdClearDisplay();
+  cmdClearScreen();
 }
 
 /// <summary>

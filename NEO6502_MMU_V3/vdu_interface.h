@@ -17,5 +17,4 @@ Lesser General Public License for more details.
 
 #define VDU_REGISTER_BASE 0x0100    // Base of register list
 
-extern void initVDUInterface();
-
+void initVDUInterface();

@@ -65,6 +65,6 @@ extern SystemConfig systemConfig;
 // Public API
 // --------------------------------------------------
 
-extern void loadFallbackProfile();
+void loadFallbackProfile();
 
-extern bool initializeSystemConfig();
+bool initializeSystemConfig();

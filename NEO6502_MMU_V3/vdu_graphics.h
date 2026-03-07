@@ -84,11 +84,11 @@ typedef union {
   uint8_t  block[NUM_VDU_REGISTERS * 2];  // same memory as bytes
 } vdu_registers_t;
 
-extern void dumpVDURegisterSet();
+void dumpVDURegisterSet();
 
-extern void setVDURegisterSet(vdu_registers_t*);
+void setVDURegisterSet(vdu_registers_t*);
 
-extern void vduSetReg(const uint8_t, const uint16_t);
-extern void vduSetCmd(const uint8_t);
+void vduSetReg(const uint8_t, const uint16_t);
+void vduSetCmd(const uint8_t);
 
-extern void vduSetCmdx(const uint8_t, const uint8_t, ...);
+void vduSetCmdx(const uint8_t, const uint8_t, ...);
