@@ -95,7 +95,6 @@ uint8_t readMMUIndex() {
 /// latch address register A12..15
 /// </summary>
 /// <param name="vIndex"></param>
-inline __attribute__((always_inline))
 void writeMMUIndex(const uint8_t vIndex) {
 //  Serial1.printf("*D: writeMMUIndex: %02X\n", vIndex);
 
@@ -115,7 +114,6 @@ uint8_t readMMUContext() {
 /// latch context register 00..127
 /// </summary>
 /// <param name="vContext"></param>
-//inline __attribute__((always_inline))
 void writeMMUContext(const uint8_t vContext) {
 //  Serial1.printf("*D: writeMMUContext: %02X\n", vContext);
 

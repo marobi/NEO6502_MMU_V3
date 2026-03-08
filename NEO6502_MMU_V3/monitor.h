@@ -14,6 +14,11 @@ Lesser General Public License for more details.
 
 #define MON_VERSION "v1.15.072"
 
+// a little helper
+constexpr char ctrl(char c) {
+  return c & 0x1F;
+}
+
 void initMonitor();
 
 void taskICMonitor();

@@ -44,7 +44,6 @@ static uint8_t gInterface = 0x00;
 /// </summary>
 /// <param name="s"></param>
 /// <returns></returns>
-inline __attribute__((always_inline))
 int x2i(const char* s)
 {
   int x = 0;
@@ -76,7 +75,7 @@ static void cmdResetCallback(cmd* c) {
   Command cmd(c); // Create wrapper object
 
   set6502State(sRESET);
-  Serial1.println("Reset");
+  Serial1.println("CPU Reset");
 }
 
 /// <summary>
@@ -87,7 +86,7 @@ static void cmdGoCallback(cmd* c) {
   Command cmd(c); // Create wrapper object
 
   set6502State(sRUNNING);
-  Serial1.println("Running");
+  Serial1.println("CPU Running");
 }
 
 /// <summary>
@@ -111,7 +110,7 @@ static void cmdStopCallback(cmd* c) {
   Command cmd(c); // Create wrapper object
 
   set6502State(sHALTED);
-  Serial1.println("Halted");
+  Serial1.println("CPU Halted");
 }
 
 /// <summary>
@@ -142,7 +141,7 @@ static void cmdDisAsmCallback(cmd* c) {
   String arg1 = cmd.getArgument("from").getValue();
   String arg2 = cmd.getArgument("lines").getValue();
   uint16_t lFrom = x2i(arg1.c_str()) & 0XFFFF;
-  uint16_t lLines = x2i(arg2.c_str()) & 0XFF;
+  uint16_t lLines = atoi(arg2.c_str()) & 0XFF;
 
   Serial1.printf("Disassembly %04X\n", lFrom);
   disasm6502(lFrom, lLines);
@@ -253,7 +252,7 @@ static void cmdCommandCallback(cmd* c) {
 /// </summary>
 /// <param name="c"></param>
 static void cmdHelpCallback(cmd* c) {
-  Serial1.print("\nRPI ICM help:\n\
+  Serial1.print("\nMICmon help:\n\
  c/md                  toggle command\n\
  r/eset                reset\n\
  s/top                 stop\n\
@@ -277,13 +276,10 @@ static void cmdHelpCallback(cmd* c) {
 static void errorCallback(cmd_error* e) {
   CommandError cmdError(e); // Create wrapper object
 
-  Serial1.print("*E: ");
-  Serial1.println(cmdError.toString());
+  Serial1.printf("*E: MICmon: %s\n", cmdError.toString());
 
   if (cmdError.hasCommand()) {
-    Serial1.print("*I: Did you mean \"");
-    Serial1.print(cmdError.getCommand().toString());
-    Serial1.println("\"?");
+    Serial1.printf("*E: Did you mean [%s]?\n", cmdError.getCommand().toString());
   }
 }
 
@@ -291,42 +287,42 @@ static void errorCallback(cmd_error* e) {
 /// init the monitor commands
 /// </summary>
 void initMonitor() {
-  Serial1.printf("\nRPI I.C.M. (%s) %s\n> ", BIOS_CPU, MON_VERSION);
+  Serial1.printf("\nMICmon (%s) %s\n> ", BIOS_CPU, MON_VERSION);
 
   // Create the commands with callback function
   gCmd = gCli.addCmd("c/md", cmdCommandCallback);
 
-  gCmd = gCli.addCmd("r/eset", cmdResetCallback);
+  gCmd = gCli.addCmd("dis", cmdDisAsmCallback);
+  gCmd.addPositionalArgument("from");
+  gCmd.addPositionalArgument("lines", "1");
+
+  gCmd = gCli.addCmd("d/ump", cmdDumpCallback);
+  gCmd.addPositionalArgument("from");
+  gCmd.addPositionalArgument("to", "0");
 
   gCmd = gCli.addCmd("g/o", cmdGoCallback);
+
+  gCmd = gCli.addCmd("h/elp", cmdHelpCallback);
+
+  gCmd = gCli.addCmd("i/rq", cmdIRQCallback);
+
+  gCmd = gCli.addBoundlessCommand("m/em", cmdMemCallback);
+
+  gCmd = gCli.addCmd("mmu", cmdMMUCallback);
+  gCmd.addPositionalArgument("context", "0");
+
+  gCmd = gCli.addCmd("r/eset", cmdResetCallback);
 
   gCmd = gCli.addCmd("sc", cmdSCCallback);
   gCmd.addPositionalArgument("cycles", "1");
 
   gCmd = gCli.addCmd("s/top", cmdStopCallback);
 
-  gCmd = gCli.addCmd("d/ump", cmdDumpCallback);
-  gCmd.addPositionalArgument("from");
-  gCmd.addPositionalArgument("to", "0");
-
-  gCmd = gCli.addCmd("dis", cmdDisAsmCallback);
-  gCmd.addPositionalArgument("from");
-  gCmd.addPositionalArgument("lines", "1");
-
-  gCmd = gCli.addBoundlessCommand("m/em", cmdMemCallback);
-
   gCmd = gCli.addCmd("st/at", cmdStatusCallback);
-
-  gCmd = gCli.addCmd("i/rq", cmdIRQCallback);
-
-  gCmd = gCli.addCmd("mmu", cmdMMUCallback);
-  gCmd.addPositionalArgument("context", "0");
 
   gCmd = gCli.addCmd("page", cmdPageCallback);
   gCmd.addPositionalArgument("index");
   gCmd.addPositionalArgument("page");
-
-  gCmd = gCli.addCmd("h/elp", cmdHelpCallback);
 
   // Set error Callback
   gCli.setOnError(errorCallback);
@@ -354,7 +350,7 @@ static void returnToICM() {
 /// <param name="c"></param>
 static void normalInput(uint8_t c) {
   switch (c) {
-  case 0x03:                                // ^C
+  case ctrl('Z'):                         // ^Z
     returnToICM();
     break;
 
@@ -376,11 +372,11 @@ static void normalInput(uint8_t c) {
           }
         }
 
-        writeCPUQ('\r');                     // ???????
+        writeCPUQ('\r');                     // go
       }
     }
     else {
-      Serial1.printf("*D: ICM->VDU: [%02X]\n", c);
+//      Serial1.printf("*D: ICM->VDU: [%02X]\n", c);
       writeVDUQ(c);
     }
 

@@ -18,6 +18,7 @@ Lesser General Public License for more details.
 #define NUMBER_OF_MODES 10      // number of VDU modes
 
 #define CURSOR_BLINK_INTERVAL_MS 400    // MS
+#define SCROLL_INTERVAL_MS       8
 
 // the 16 standard colors of the 256 in the palette
 #define BLACK    0
@@ -68,6 +69,7 @@ typedef struct {
   boolean        textMode;
   boolean        geoAspect;
   boolean        autoScroll;
+  boolean        smoothScroll;
   boolean        textWrap;
   boolean        localEcho;
   boolean        ucaseOnly;
@@ -76,6 +78,7 @@ typedef struct {
 } vdu_mode_t;
 
 extern const vdu_mode_t* vduMode;              // treat as RO
+extern bool  scrollActive;
 
 void setCursor(const boolean);
 void resetDisplay(const uint8_t);

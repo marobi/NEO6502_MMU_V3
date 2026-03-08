@@ -80,7 +80,7 @@ static void processCPUoutQ() {
 static void processVDUoutQ() {
   uint8_t data = 0;
 
-  if (! vdu_tx_fifo.isEmpty()) {     // process all pending vdu data
+  while (! vdu_tx_fifo.isEmpty()) {     // process all pending vdu data
     vdu_tx_fifo.pop(data);           // get data from fifo
     vduPutc(data);                   // send to VDU
 //    Serial1.printf("*D: processVDUoutQ: [%02x]\n", data);

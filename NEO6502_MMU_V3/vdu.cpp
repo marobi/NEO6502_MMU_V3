@@ -18,18 +18,18 @@ Lesser General Public License for more details.
 DVHSTXPinout pinConfig = { 14, 18, 16, 12 };
 DVHSTX8 display(pinConfig, DVHSTX_RESOLUTION_320x240, false);
 
-// visibleCursor cursorShape blinkCursor textMode geoAspect autoScroll textWrap localEcho ucaseOnly  CRLF, SceenMode
+// visibleCursor cursorShape blinkCursor textMode geoAspect autoScroll smoothScroll textWrap localEcho ucaseOnly  CRLF, SceenMode
 static const vdu_mode_t vduModes[NUMBER_OF_MODES] = {
-  {true,         cBLOCK,     true,       true,    false,    true,      false,   false,    false,     true,  true  }, // Mode 0 text mode + block cursor + sceen mode
-  {true,         cUNDERLINE, true,       true,    false,    true,      false,   false,    false,     true,  true  }, // Mode 1 text model + underline cursor + sceen mode
-  {true,         cBLOCK,     true,       true,    false,    true,      false,   false,    false,     true,  false }, // Mode 0 text mode + block cursor
-  {true,         cUNDERLINE, true,       true,    false,    true,      false,   false,    false,     true,  false }, // Mode 1 text model + underline cursor
-  {false,        cUNDERLINE, false,      true,    false,    true,      false,   false,    false,     true,  false }, // Mode 2 text mode no cursor
-  {false,        cUNDERLINE, false,      true,    false,    false,     false,   false,    false,     true,  false }, // Mode 3 text mode no cursor no scroll
-  {false,        cUNDERLINE, false,      false,   false,    false,     false,   false,    false,     true,  false }, // Mode 4 text graphics mode no cursor no scroll
-  {true,         cBLOCK,     true,       true,    true,     true,      false,   false,    false,     true,  false }, // Mode 5 = mode 0 + geo aspect correction
-  {false,        cUNDERLINE, false,      false,   true,     false,     false,   false,    false,     true,  false }, // Mode 6 = mode 4 + geo aspect correction
-  {false,        cUNDERLINE, false,      true,    true,     false,     false,   false,    false,     true,  false }, // Mode 7 = mode 3 + geo aspect correction
+  {true,         cBLOCK,     true,       true,    false,    true,      true,        false,   false,    false,     true,  true  }, // Mode 0 text mode + block cursor + sceen mode
+  {true,         cUNDERLINE, true,       true,    false,    true,      true,        false,   false,    false,     true,  true  }, // Mode 1 text model + underline cursor + sceen mode
+  {true,         cBLOCK,     true,       true,    false,    true,      false,       false,   false,    false,     true,  false }, // Mode 0 text mode + block cursor
+  {true,         cUNDERLINE, true,       true,    false,    true,      false,       false,   false,    false,     true,  false }, // Mode 1 text model + underline cursor
+  {false,        cUNDERLINE, false,      true,    false,    true,      false,       false,   false,    false,     true,  false }, // Mode 2 text mode no cursor
+  {false,        cUNDERLINE, false,      true,    false,    false,     false,       false,   false,    false,     true,  false }, // Mode 3 text mode no cursor no scroll
+  {false,        cUNDERLINE, false,      false,   false,    false,     false,       false,   false,    false,     true,  false }, // Mode 4 text graphics mode no cursor no scroll
+  {true,         cBLOCK,     true,       true,    true,     true,      false,       false,   false,    false,     true,  false }, // Mode 5 = mode 0 + geo aspect correction
+  {false,        cUNDERLINE, false,      false,   true,     false,     false,       false,   false,    false,     true,  false }, // Mode 6 = mode 4 + geo aspect correction
+  {false,        cUNDERLINE, false,      true,    true,     false,     false,       false,   false,    false,     true,  false }, // Mode 7 = mode 3 + geo aspect correction
 };
 
 /// <summary>
@@ -41,11 +41,12 @@ const vdu_mode_t* vduMode = &vduModes[DEFAULT_MODE];
 /// cursor definition
 /// </summary>
 typedef struct {
-  uint8_t        col;
-  uint8_t        row;
+  uint8_t col;
+  uint8_t row;
   cursor_shape_t shape;
-  bool           visible;
-  bool           blink_on;
+  bool enabled;     // cursor allowed in this mode
+  bool drawn;       // cursor currently rendered
+  bool blink_on;
 } cursor_def_t;
 
 // our output text cursor
@@ -62,11 +63,17 @@ typedef struct {
 } vdu_cell_t;
 
 static vdu_cell_t     gScreen[ROWS][COLS];
+static bool           gInEditmode = false;
 
 static uint8_t        currentColor = DEFAULT_COLOR;
 static uint8_t        currentBGColor = DEFAULT_BG_COLOR;
 static bool           gInsertMode = false;
 static bool           gAsScreenMode = false;
+
+static bool           smoothScroll = false;
+bool                  scrollActive = false;
+static uint8_t        scrollPixel = 0;
+static int            pendingCursorRow = -1;
 
 /// <summary>
 /// helper routine to convert RGB to BRG
@@ -85,15 +92,14 @@ uint32_t rgb_to_brg(uint32_t rgb) {
 /// <summary>
 /// load default palette 
 /// </summary>
-inline __attribute__((always_inline))
 void loadPalette() {
   // load default palette
   for (uint16_t c = 0; c < 256; c++) {
     display.setColor(c, rgb_to_brg(default_palette[c]));
   }
 
-  display.setColor(IDX_CURSOR_BG, rgb_to_brg(0x000000));
-  display.setColor(IDX_CURSOR_FG, rgb_to_brg(0xFFFFFF));
+  display.setColor(IDX_CURSOR_BG, rgb_to_brg(currentBGColor));
+  display.setColor(IDX_CURSOR_FG, rgb_to_brg(currentColor));
 }
 
 /// <summary>
@@ -120,16 +126,25 @@ void vduSetMode(const uint8_t vMode) {
   vduMode = &vduModes[vMode % NUMBER_OF_MODES];
 
   setAsScreenMode(vduMode->screenMode);
+  smoothScroll = vduMode->smoothScroll;
+
   gCursor.shape = vduMode->cursorShape;
-  gCursor.visible = vduMode->visibleCursor;
+  gCursor.enabled = vduMode->visibleCursor;
   gCursor.blink_on = vduMode->blinkCursor;
+}
+
+/// <summary>
+/// 
+/// </summary>
+/// <param name="on"></param>
+void vduSetSmoothscroll(const bool on) {
+  smoothScroll = on;
 }
 
 /// <summary>
 /// helper to init text buffer
 /// </summary>
 /// <param name=""></param>
-inline __attribute__((always_inline))
 void initTextbuffer() {
   for (int r = 0; r < ROWS; r++) {
     for (int c = 0; c < COLS; c++) {
@@ -163,9 +178,7 @@ void setTColor(const uint8_t vColor) {
 /// </summary>
 /// <param name="col"></param>
 /// <param name="row"></param>
-inline __attribute__((always_inline))
-void vduDrawCell(int col, int row)
-{
+void vduDrawCell(const uint8_t col, const uint8_t row) {
   vdu_cell_t c = gScreen[row][col];
 
   uint16_t x = col * FONT_CELL_WIDTH;
@@ -189,9 +202,8 @@ void vduDrawCell(int col, int row)
 /// <summary>
 /// show cursor 
 /// </summary>
-inline __attribute__((always_inline))
 void showCursor() {
-  if (gCursor.visible)
+  if (!gCursor.enabled || gCursor.drawn)
     return;
 
   vdu_cell_t cell = gScreen[gCursor.row][gCursor.col];
@@ -239,20 +251,32 @@ void showCursor() {
     break;
   }
 
-  gCursor.visible = true;
+  gCursor.drawn = true;
 }
 
 /// <summary>
 /// hide cursor
 /// </summary>
-inline __attribute__((always_inline))
 void hideCursor() {
-  if (!gCursor.visible)
+  if (!gCursor.drawn)
     return;
+
+  vdu_cell_t cell = gScreen[gCursor.row][gCursor.col];
+
+  // restore original colors
+  display.setColor(
+    IDX_CURSOR_BG,
+    rgb_to_brg(default_palette[cell.bg])
+  );
+
+  display.setColor(
+    IDX_CURSOR_FG,
+    rgb_to_brg(default_palette[cell.fg])
+  );
 
   vduDrawCell(gCursor.col, gCursor.row);
 
-  gCursor.visible = false;
+  gCursor.drawn = false;
 }
 
 /// <summary>
@@ -263,7 +287,7 @@ void alterCursor(const cursor_shape_t vShape) {
   if (gCursor.shape != vShape) {
     gCursor.shape = vShape;
     Serial1.printf("*D: alterCursor [%02X]\n", vShape);
-    if (gCursor.visible) {
+    if (gCursor.enabled) {
       hideCursor();
       showCursor();
     }
@@ -274,9 +298,10 @@ void alterCursor(const cursor_shape_t vShape) {
 /// control show/hide cursor
 /// </summary>
 /// <param name="vVisible"></param>
-inline __attribute__((always_inline))
 void setCursor(const boolean vShow) {
-  if ((vduMode->textMode) && (vduMode->visibleCursor)) {
+  if (vduMode->textMode) {
+    gCursor.enabled = vduMode->visibleCursor;
+
     if (vShow)
       showCursor();
     else
@@ -289,9 +314,8 @@ void setCursor(const boolean vShow) {
 /// </summary>
 /// <param name="x"></param>
 /// <param name="y"></param>
-void moveCursor(const uint16_t x, const uint16_t y)
-{
-  bool wasVisible = gCursor.visible;
+void moveCursor(const uint16_t x, const uint16_t y) {
+  bool wasVisible = gCursor.drawn;
 
   if (wasVisible)
     hideCursor();
@@ -303,33 +327,138 @@ void moveCursor(const uint16_t x, const uint16_t y)
     showCursor();
 }
 
-static bool gInEditmode = false;
+/// <summary>
+/// vdu redraw a text line (used after insert/delete char to redraw the line from text buffer)
+/// </summary>
+/// <param name="row"></param>
+static void vduRedrawLine(uint8_t row) {
+  uint16_t y = row * FONT_CELL_HEIGHT;
+
+  /* clear the full text line once */
+  display.fillRect(
+    0,
+    y,
+    WIDTH,
+    FONT_CELL_HEIGHT,
+    currentBGColor
+  );
+
+  for (int col = 0; col < COLS; col++) {
+    vdu_cell_t* cell = &gScreen[row][col];
+
+    if (cell->ch != ' ') {
+      display.setTextColor(cell->fg, cell->bg);
+
+      display.setCursor(
+        col * FONT_CELL_WIDTH,
+        y
+      );
+
+      display.write(cell->ch);
+    }
+  }
+}
+
+
+/// <summary>
+/// 
+/// </summary>
+static void scrollStep() {
+  uint8_t* fb = display.getBuffer();
+
+  // move framebuffer up one scanline
+  memmove(fb, fb + WIDTH, WIDTH * (HEIGHT - 1));
+
+  // clear new bottom scanline
+  memset(fb + WIDTH * (HEIGHT - 1), currentBGColor, WIDTH);
+
+  scrollPixel++;
+
+  if (scrollPixel == FONT_CELL_HEIGHT) {
+    scrollPixel = 0;
+    scrollActive = false;
+
+    // rotate text buffer
+    for (uint8_t r = 1; r < ROWS; r++)
+      memcpy(gScreen[r - 1], gScreen[r], COLS * sizeof(vdu_cell_t));
+
+    // clear bottom line
+    for (uint8_t c = 0; c < COLS; c++) {
+      gScreen[ROWS - 1][c].ch = ' ';
+      gScreen[ROWS - 1][c].fg = currentColor;
+      gScreen[ROWS - 1][c].bg = currentBGColor;
+    }
+
+    // redraw the full bottom row
+    if (pendingCursorRow >= 0) {
+      gCursor.row = pendingCursorRow;
+      pendingCursorRow = -1;
+    }
+
+    vduRedrawLine(ROWS - 1);
+
+    /* force cursor redraw after scroll */
+    gCursor.drawn = false;
+    showCursor();
+  }
+}
 
 /// <summary>
 /// scroll up screen one line
 /// </summary>
 /// <param name="vLines"></param>
-inline __attribute__((always_inline))
 void cmdScrollUp() {
-  memmove(display.getBuffer(), display.getBuffer() + WIDTH * FONT_CELL_HEIGHT, WIDTH * (HEIGHT - FONT_CELL_HEIGHT));
-  display.fillRect(
-    0,
-    HEIGHT - FONT_CELL_HEIGHT,
-    WIDTH,
-    FONT_CELL_HEIGHT,
-    currentBGColor);
-
-  // shift text buffer up
-  for (uint8_t r = 1; r < ROWS; r++) {
-    memcpy(gScreen[r - 1], gScreen[r], COLS * sizeof(vdu_cell_t));
+  if (gCursor.drawn) {
+    hideCursor();
   }
 
-  // empty line at the bottom of text buffer
+  /* smooth pixel scrolling */
+  if (smoothScroll) {
+    scrollPixel = 0;
+    scrollActive = true;
+    return;
+  }
+
+  /* ----- instant scroll ----- */
+
+  uint8_t* fb = display.getBuffer();
+
+  /* move framebuffer up one text row */
+  memmove(
+    fb,
+    fb + WIDTH * FONT_CELL_HEIGHT,
+    WIDTH * (HEIGHT - FONT_CELL_HEIGHT)
+  );
+
+  /* clear new bottom area */
+  memset(
+    fb + WIDTH * (HEIGHT - FONT_CELL_HEIGHT),
+    currentBGColor,
+    WIDTH * FONT_CELL_HEIGHT
+  );
+
+  /* rotate text buffer */
+  for (uint8_t r = 1; r < ROWS; r++)
+    memcpy(gScreen[r - 1], gScreen[r], COLS * sizeof(vdu_cell_t));
+
+  /* clear bottom row */
   for (uint8_t c = 0; c < COLS; c++) {
     gScreen[ROWS - 1][c].ch = ' ';
     gScreen[ROWS - 1][c].fg = currentColor;
     gScreen[ROWS - 1][c].bg = currentBGColor;
   }
+
+  /* update cursor row if pending */
+  if (pendingCursorRow >= 0) {
+    gCursor.row = pendingCursorRow;
+    pendingCursorRow = -1;
+  }
+
+  /* redraw bottom line */
+  vduRedrawLine(ROWS - 1);
+
+  gCursor.drawn = false;
+  showCursor();
 }
 
 /// <summary>
@@ -366,14 +495,17 @@ void vduRestoreCursor() {
 /// <summary>
 /// 
 /// </summary>
-inline __attribute__((always_inline))
 void cmdNewline() {
   gCursor.col = 0;
 
   if (++gCursor.row >= ROWS) {
-    if (vduMode->autoScroll)
+    if (vduMode->autoScroll) {
+      pendingCursorRow = ROWS - 1;
       cmdScrollUp();
-    gCursor.row = ROWS - 1;
+    }
+    else {
+      gCursor.row = ROWS - 1;
+    }
   }
 }
 
@@ -400,7 +532,6 @@ uint8_t vduReadc(const uint16_t x, const uint16_t y) {
 /// </summary>
 /// <param name="col"></param>
 /// <param name="row"></param>
-inline __attribute__((always_inline))
 void vduDisplayClearcell(const int col, const int row) {
   display.fillRect(
     col * FONT_CELL_WIDTH,
@@ -411,45 +542,10 @@ void vduDisplayClearcell(const int col, const int row) {
   );
 }
 
-/// <summary>
-/// vdu redraw a text line (used after insert/delete char to redraw the line from text buffer)
-/// </summary>
-/// <param name="row"></param>
-inline __attribute__((always_inline))
-static void vduRedrawLine(uint8_t row)
-{
-  uint16_t y = row * FONT_CELL_HEIGHT;
-
-  /* clear the full text line once */
-  display.fillRect(
-    0,
-    y,
-    WIDTH,
-    FONT_CELL_HEIGHT,
-    currentBGColor
-  );
-
-  for (int col = 0; col < COLS; col++) {
-    vdu_cell_t* cell = &gScreen[row][col];
-
-    if (cell->ch != ' ') {
-      display.setTextColor(cell->fg, cell->bg);
-
-      display.setCursor(
-        col * FONT_CELL_WIDTH,
-        y
-      );
-
-      display.write(cell->ch);
-    }
-  }
-}
-
 
 /// <summary>
 /// vdu delete char at cursor position, rest of line move left, last char on line = space
 /// </summary>
-inline __attribute__((always_inline))
 void vduDisplayDeletechar()
 {
   uint8_t* fb = display.getBuffer();
@@ -476,7 +572,6 @@ void vduDisplayDeletechar()
 /// vdu insert space at cursor position, rest of line move right, last char on line lost
 /// </summary>
 /// <param name="c"></param>
-inline __attribute__((always_inline))
 void vduDisplayInsertspace()
 {
   if (gCursor.col >= COLS - 1)
@@ -527,7 +622,6 @@ void vduDeletec() {
 /// vdu insert char at cursor position, rest of line move right, last char on line lost
 /// </summary>
 /// <param name="c"></param>
-inline __attribute__((always_inline))
 void vduInsertc(uint8_t c) {
   vdu_cell_t* line = gScreen[gCursor.row];
 
@@ -548,7 +642,6 @@ void vduInsertc(uint8_t c) {
 /// vdu display char at cursor position, update text buffer, move cursor right, scroll if needed
 /// </summary>
 /// <param name="c"></param>
-inline __attribute__((always_inline))
 void vduDisplayc(const uint8_t c) {
   if (c >= 0x20) {
     gScreen[gCursor.row][gCursor.col].ch = c;
@@ -630,6 +723,14 @@ static void cmdOverwriteMode() {
   gInsertMode = false;
 }
 
+static void cmdSmoothScroll() {
+  vduSetSmoothscroll(true);
+}
+
+static void cmdInstantScroll() {
+  vduSetSmoothscroll(false);
+}
+
 void cmdClearScreen()
 {
   // hide cursor during redraw
@@ -673,7 +774,7 @@ static const vdu_cmd_t ctrlTable[32] = {
     cmdDelete,       // ^D
     cmdCursorEOL,    // ^E
     cmdCursorRight,  // ^F
-    NULL,            // ^G
+    NULL,            // ^G  TBI: beep
     NULL,            // ^H  (backspace)
     cmdInsertMode,   // ^I
     NULL,            // ^J  LF
@@ -682,7 +783,17 @@ static const vdu_cmd_t ctrlTable[32] = {
     NULL,            // ^M  CR
     cmdCursorDown,   // ^N
     cmdOverwriteMode,// ^O
-    cmdCursorUp      // ^P
+    cmdCursorUp,     // ^P
+    NULL,            // ^Q
+    NULL,            // ^R
+    NULL,            // ^S
+    cmdInstantScroll,// ^T
+    cmdSmoothScroll, // ^U
+    NULL,            // ^V
+    NULL,            // ^W
+    NULL,            // ^X
+    NULL,            // ^Y
+    NULL             // ^Z  (return to monitor)
 };
 
 //-----------------------------------------------------------------------------------------
@@ -692,7 +803,8 @@ static const vdu_cmd_t ctrlTable[32] = {
 /// <param name="c"></param>
 /// <returns></returns>
 void vduPutc(const uint8_t c) {
-  static bool lFirstControlCmd = true;
+  while (scrollActive)
+    taskVDU();
 
   if (!vduMode->textMode) {
     display.setColor(currentColor, currentBGColor);
@@ -825,24 +937,6 @@ void vduPrintf(char const* fmt, ...) {
   }
 }
 
-
-#if 0
-/// <summary>
-/// clear display
-/// </summary>
-void cmdClearDisplay() {
-  display.fillScreen(currentBGColor);
-  display.setCursor(0, 0);
-  gCursor.row = 0;
-  gCursor.col = 0;
-  gCursor.visible = false;
-
-  initTextbuffer();
-
-  setCursor(true);
-}
-#endif
-
 /// <summary>
 /// some default startup screen
 /// </summary>
@@ -907,11 +1001,20 @@ void initVDU() {
 void taskVDU() {
   static bool reverse = false;
   static uint32_t last = 0;
+  static uint32_t lastScroll = 0;
 
   uint32_t now = millis();
 
+  if (scrollActive && (now - lastScroll) >= SCROLL_INTERVAL_MS) {
+    scrollStep();
+    lastScroll = now;
+  }
+
+  if (scrollActive)
+    return;
+
   if (now - last >= CURSOR_BLINK_INTERVAL_MS) {
-    if (vduMode->blinkCursor && gCursor.visible) {
+    if (vduMode->blinkCursor && gCursor.drawn) {
       vdu_cell_t cell = gScreen[gCursor.row][gCursor.col];
 
       uint8_t fg = reverse ? cell.bg : cell.fg;

@@ -48,7 +48,6 @@ void setControlMode(const uint8_t vMode) {
 /// set NEObus direction to input or output
 /// </summary>
 /// <param name="lDirection"></param>
-inline __attribute__((always_inline))
 void  setNEOBusDir(const bool lDirection) {
   if (lDirection != gBusDir) {
     switch (lDirection) {

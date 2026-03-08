@@ -52,14 +52,14 @@ void printFile(const char* vFile) {
 
   File f = LittleFS.open(vFile, "r");
   if (f.available()) {
-    Serial1.printf("File %s exists\n", vFile);
+//    Serial1.printf("File %s exists\n", vFile);
     while (f.available()) {
       Serial1.write(f.read());
     }
     f.close();
   }
   else {
-    Serial1.printf("File %s does not exist\n", vFile);
+    Serial1.printf("*E: printFile: File %s does not exist\n", vFile);
   }
 
   Serial1.println("----------");
@@ -100,7 +100,7 @@ void introDisplay() {
   vduSetReg(R7, RED); vduSetCmd(CMD_GCOLOR);
   vduSetCmdx(CMD_LINE, 4, 100, 100, WIDTH - 10, HEIGHT - 10);
 
-  vduPrintStr("Happy?\n");
+  vduPrintStr("Hello world\n");
 
   setTColor(DEFAULT_COLOR);
 
@@ -121,7 +121,7 @@ void setup() {
   Serial1.begin(115200);
   delay(2500);
 
-  // turn PHI2 on
+  // init 6502 into BOOT-mode
   init6502();
   Serial1.printf("*I: 6502 init OK\n");
 
@@ -143,9 +143,9 @@ void setup() {
   else
     Serial1.println("*I: LittleFS mount OK");
 
-  initVDU();      // get display running
-  initVDUInterface(); // init VDU command interface
-  introDisplay();
+  initVDU();           // get display running
+  initVDUInterface();  // init VDU command interface
+  introDisplay();      // show intro
 
   printFile("intro.txt");
 
@@ -194,5 +194,5 @@ void loop() {
 
   taskVDU();                     // VDU task, mainly control of cursor blinking
 
-  delay(5);
+//  delay(1);
 }

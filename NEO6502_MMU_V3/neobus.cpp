@@ -110,7 +110,6 @@ void writeCPUAddressH(const uint8_t vAddress) {
 /// write Address A00..07
 /// </summary>
 /// <param name="vAddress"></param>
-inline __attribute__((always_inline))
 static void writeCPUAddressL(const uint8_t vAddress) {
   // set LowAddress A0..7
   writeNEOBus(vAddress);   // write hight byte of address on NEObus
@@ -127,7 +126,6 @@ static void writeCPUAddressL(const uint8_t vAddress) {
 /// latch CPU address in AREG
 /// </summary>
 /// <param name="vAddress"></param>
-inline __attribute__((always_inline))
 static void writeCPUAddress(const uint16_t vAddress) {
   if (getControlMode() == mRPI) {         // only in MMU mode
     writeCPUAddressH(vAddress >> 8);      // latch AddressH

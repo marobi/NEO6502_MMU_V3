@@ -176,7 +176,6 @@ void init6502Clock() {
 //// <summary>
 /// clock step in
 /// </summary>
-inline __attribute__((always_inline))
 void _ss6502ClockIn() {
   PHI2Pin::low();         // to be sure
 
@@ -191,7 +190,6 @@ void _ss6502ClockIn() {
 /// <summary>
 /// clock step out
 /// </summary>
-inline __attribute__((always_inline))
 void _ss6502ClockOut() {
   PHI2Pin::low();
 
@@ -374,7 +372,7 @@ void init6502() {
 
   set6502State(sBOOT);
 
-  show6502State();
+//  show6502State();
 }
 
 /// <summary>

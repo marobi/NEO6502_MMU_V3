@@ -22,7 +22,6 @@ Lesser General Public License for more details.
 /// dump 16 bytes of memory
 /// </summary>
 /// <param name="vAddress"></param>
-inline __attribute__((always_inline))
 void dump16(const uint16_t vAddress) {
   uint8_t dat;
 
