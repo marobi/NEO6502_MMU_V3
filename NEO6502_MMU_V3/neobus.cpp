@@ -198,7 +198,7 @@ void write6502Memory(const uint16_t vAddress, const uint8_t vData) {
 
     writeCPUAddress(vAddress);  // latch address
 
-      CPUARegOEPin::low();      // output on address bus
+    CPUARegOEPin::low();        // output on address bus
 
     writeNEOBus(vData);         // write data to Neodbus
 
@@ -237,7 +237,7 @@ void write6502Memory(const uint16_t vAddress, const uint8_t vData) {
 /// <param name="vAddress"></param>
 /// <param name="vBytes"></param>
 /// <param name="vBuffer"></param>
-void snoop_read6502Memory(const uint16_t vAddress, const uint16_t vBytes, uint8_t* vBuffer) {
+void snoop_read6502Memory(const uint16_t vAddress, const uint32_t vBytes, uint8_t* vBuffer) {
   uint8_t lState = get6502State();
   set6502State(sRPI);
 
@@ -256,7 +256,7 @@ void snoop_read6502Memory(const uint16_t vAddress, const uint16_t vBytes, uint8_
 /// <param name="vAddress"></param>
 /// <param name="vBytes"></param>
 /// <param name="vBuffer"></param>
-void snoop_write6502Memory(const uint16_t vAddress, uint16_t vBytes, const uint8_t* vBuffer) {
+void snoop_write6502Memory(const uint16_t vAddress, uint32_t vBytes, const uint8_t* vBuffer) {
   uint8_t lState = get6502State();
   set6502State(sRPI);
 

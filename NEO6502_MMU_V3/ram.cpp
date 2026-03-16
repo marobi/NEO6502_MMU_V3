@@ -71,3 +71,14 @@ bool loadBinary(const uint16_t vAddress, const uint16_t vSize, const uint8_t* vB
 
   return true;
 }
+
+/// <summary>
+/// fill memory with a value. 
+/// You better not have your CPU running :-)
+/// BTW current context
+/// </summary>
+void fillMemory(const uint8_t vVal) {
+  for (int m = 0; m < 65536; m++) {
+    write6502Memory(m, vVal);
+  }
+}

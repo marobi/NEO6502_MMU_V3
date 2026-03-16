@@ -20,8 +20,8 @@ DVHSTX8 display(pinConfig, DVHSTX_RESOLUTION_320x240, false);
 
 // visibleCursor cursorShape blinkCursor textMode geoAspect autoScroll smoothScroll textWrap localEcho ucaseOnly  CRLF, SceenMode
 static const vdu_mode_t vduModes[NUMBER_OF_MODES] = {
-  {true,         cBLOCK,     true,       true,    false,    true,      true,        false,   false,    false,     true,  true  }, // Mode 0 text mode + block cursor + sceen mode
-  {true,         cUNDERLINE, true,       true,    false,    true,      true,        false,   false,    false,     true,  true  }, // Mode 1 text model + underline cursor + sceen mode
+  {true,         cBLOCK,     true,       true,    false,    true,      true,        false,   false,    false,     true,  true  }, // Mode 0 text mode + block cursor + smoothscroll + sceen mode
+  {true,         cUNDERLINE, true,       true,    false,    true,      true,        false,   false,    false,     true,  true  }, // Mode 1 text model + underline cursor + smoothscroll + sceen mode
   {true,         cBLOCK,     true,       true,    false,    true,      false,       false,   false,    false,     true,  false }, // Mode 0 text mode + block cursor
   {true,         cUNDERLINE, true,       true,    false,    true,      false,       false,   false,    false,     true,  false }, // Mode 1 text model + underline cursor
   {false,        cUNDERLINE, false,      true,    false,    true,      false,       false,   false,    false,     true,  false }, // Mode 2 text mode no cursor
@@ -818,26 +818,26 @@ void vduPutc(const uint8_t c) {
   switch (c) {
   case 0:
     break;
+
   case '\r':  // CR
-    if (!vduMode->crlf) {
-      cmdNewline();
-    }
+    cmdNewline();
     vduSaveCursor();
+//    Serial1.println("VDU: CR");
     break;
+
   case '\n':  // LF
-    if (vduMode->crlf)
-      cmdNewline();
-    else {
-      gCursor.col = 0;
-    }
+    cmdNewline();
     vduSaveCursor();
+//    Serial1.println("VDU: LF");
     break;
+
   case 0x08: // BS
   case 0x7F:
     if (gCursor.col > 0) {
       gCursor.col--;
     }
     break;
+
   default:   // regular char
     if ((c < 0x20) && gAsScreenMode) {  // control char in as-screen mode
       vdu_cmd_t lCmd = ctrlTable[c];

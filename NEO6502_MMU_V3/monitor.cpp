@@ -29,6 +29,7 @@ Lesser General Public License for more details.
 #include "neobus.h"
 #include "disasm6502.h"
 
+#include "boot.h"
 #include "vdu.h"
 #include "input.h"
 
@@ -75,6 +76,8 @@ static void cmdResetCallback(cmd* c) {
   Command cmd(c); // Create wrapper object
 
   set6502State(sRESET);
+  inpInit();
+  initCmdInterface();
   Serial1.println("CPU Reset");
 }
 
@@ -100,6 +103,22 @@ static void cmdSCCallback(cmd* c) {
   uint8_t lStep = atoi(arg1.c_str()) & 0xFF;
 
   singleCycle6502(lStep, true);
+}
+
+/// <summary>
+/// SINGLE STEP CPU
+/// </summary>
+/// <param name="c"></param>
+static void cmdSSCallback(cmd* c) {
+  Command cmd(c);
+
+  String arg1 = cmd.getArgument("steps").getValue();
+  uint8_t lStep = atoi(arg1.c_str()) & 0xFF;
+
+  for (uint8_t s = 0; s < lStep; s++) {
+    singleStep6502(false);
+    disasm6502(readCPUBusAddress(), 1, true);
+  }
 }
 
 /// <summary>
@@ -144,7 +163,7 @@ static void cmdDisAsmCallback(cmd* c) {
   uint16_t lLines = atoi(arg2.c_str()) & 0XFF;
 
   Serial1.printf("Disassembly %04X\n", lFrom);
-  disasm6502(lFrom, lLines);
+  disasm6502(lFrom, lLines, false);
 
   Serial1.println();
 }
@@ -247,24 +266,46 @@ static void cmdCommandCallback(cmd* c) {
   gInterface++;
 }
 
+static void cmdSysConfigCallback(cmd* c) {
+  Command cmd(c);
+
+  set6502State(sBOOT);
+  bootSystemWithMenu();
+}
+
+static void cmdZeroCallback(cmd* c) {
+  Command cmd(c);
+
+  uint8_t save_state = get6502State();
+
+  set6502State(sBOOT);
+  fillMemory(0x00);
+  set6502State(save_state);
+
+  Serial1.println("Memory zeroed");
+}
+
 /// <summary>
 /// help overview of commands
 /// </summary>
 /// <param name="c"></param>
 static void cmdHelpCallback(cmd* c) {
   Serial1.print("\nMICmon help:\n\
- c/md                  toggle command\n\
  r/eset                reset\n\
  s/top                 stop\n\
  g/o                   go\n\
  sc <cycles>           single cycle\n\
+ ss <steps>            single step\n\
  i/rq                  generate IRQ\n\
  d/ump <from> <to>     dump memory\n\
  dis <from> <lines>    disasm memory\n\
  m/em <address> <data> modify memory address(es)\n\
  st/at                 status of cpus/bus\n\
+ syscfg                system configuration\n\
+ t/erm                 terminal mode\n\
  mmu  <context>        set mmu context\n\
  page <index> <page>   set mmu page\n\
+ zero                  zero memory\n\
  help                  help\n\
 \n");
 }
@@ -276,7 +317,7 @@ static void cmdHelpCallback(cmd* c) {
 static void errorCallback(cmd_error* e) {
   CommandError cmdError(e); // Create wrapper object
 
-  Serial1.printf("*E: MICmon: %s\n", cmdError.toString());
+  Serial1.printf("*E: MIC ICM: %s\n", cmdError.toString());
 
   if (cmdError.hasCommand()) {
     Serial1.printf("*E: Did you mean [%s]?\n", cmdError.getCommand().toString());
@@ -287,11 +328,9 @@ static void errorCallback(cmd_error* e) {
 /// init the monitor commands
 /// </summary>
 void initMonitor() {
-  Serial1.printf("\nMICmon (%s) %s\n> ", BIOS_CPU, MON_VERSION);
+  Serial1.printf("\nMIC ICM (%s) %s\n> ", BIOS_CPU, MON_VERSION);
 
   // Create the commands with callback function
-  gCmd = gCli.addCmd("c/md", cmdCommandCallback);
-
   gCmd = gCli.addCmd("dis", cmdDisAsmCallback);
   gCmd.addPositionalArgument("from");
   gCmd.addPositionalArgument("lines", "1");
@@ -316,13 +355,22 @@ void initMonitor() {
   gCmd = gCli.addCmd("sc", cmdSCCallback);
   gCmd.addPositionalArgument("cycles", "1");
 
+  gCmd = gCli.addCmd("ss", cmdSSCallback);
+  gCmd.addPositionalArgument("steps", "1");
+
   gCmd = gCli.addCmd("s/top", cmdStopCallback);
 
   gCmd = gCli.addCmd("st/at", cmdStatusCallback);
 
+  gCmd = gCli.addCmd("syscfg", cmdSysConfigCallback);
+
+  gCmd = gCli.addCmd("t/erm", cmdCommandCallback);
+
   gCmd = gCli.addCmd("page", cmdPageCallback);
   gCmd.addPositionalArgument("index");
   gCmd.addPositionalArgument("page");
+
+  gCmd = gCli.addCmd("zero", cmdZeroCallback);
 
   // Set error Callback
   gCli.setOnError(errorCallback);
@@ -359,6 +407,8 @@ static void normalInput(uint8_t c) {
       uint8_t lBuffer[COLS + 1];
       uint8_t* lPtr = lBuffer;
 
+      writeVDUQ('\r');
+
       if (getAsScreenMode()) {
         vduGetCurrentScreenline(lBuffer);
 //        Serial1.printf("*D: normalInput: [%s]\n\n", lBuffer);
@@ -366,7 +416,7 @@ static void normalInput(uint8_t c) {
         vduRestoreCursor();
 
         while (*lPtr) {
-          if (!writeCPUQ(*lPtr++)){
+          if (! writeCPUQ(*lPtr++)){
             returnToICM();
             break;
           }

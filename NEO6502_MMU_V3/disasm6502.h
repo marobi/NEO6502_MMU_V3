@@ -12,4 +12,4 @@ Lesser General Public License for more details.
 */
 #pragma once
 
-uint16_t disasm6502(const uint16_t, const uint16_t);
+uint16_t disasm6502( uint16_t, const uint16_t, const bool);

@@ -198,18 +198,18 @@ static void scanLabels(uint16_t addr, uint16_t lines)
    Disassembler
 -------------------------------------------------- */
 
-uint16_t disasm6502(uint16_t addr, uint16_t lines)
+uint16_t disasm6502(uint16_t addr, const uint16_t lines, const bool simple)
 {
-  disasmResetLabels();
-  seedVectors();
-  scanLabels(addr, lines);
+  if (!simple) {
+    disasmResetLabels();
+    seedVectors();
+    scanLabels(addr, lines);
+  }
 
-  for (uint16_t line = 0; line < lines; line++)
-  {
+  for (uint16_t line = 0; line < lines; line++) {
     const char* lbl = findLabel(addr);
 
-    if (lbl)
-    {
+    if (lbl) {
       Serial1.println();
       char labelbuf[10];
       snprintf(labelbuf, sizeof(labelbuf), "%s:", lbl);
@@ -255,8 +255,7 @@ uint16_t disasm6502(uint16_t addr, uint16_t lines)
     case INDY: Serial1.printf("($%02X),Y", b[1]); break;
     case ZPIND:Serial1.printf("($%02X)", b[1]); break;
 
-    case REL:
-    {
+    case REL:{
       uint16_t t = addr + 2 + (int8_t)b[1];
       const char* l = findLabel(t);
       if (l) Serial1.printf("%s", l);

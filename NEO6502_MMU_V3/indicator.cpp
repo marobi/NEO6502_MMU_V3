@@ -19,7 +19,7 @@ Lesser General Public License for more details.
 #include "p6502.h"
 
 constexpr uint LED_PIN = LED_BUILTIN;       // the pin number of the LED used for the indicator, this should be defined in the board definition header and can be changed if necessary
-constexpr uint16_t PWM_TOP = 100;            // the maximum value for the PWM, this determines the resolution of the brightness control for the LED.
+constexpr uint16_t MAX_BRIGHTNESS = 80;    // the maximum value for the PWM, this determines the resolution of the brightness control for the LED.
 
 /// <summary>
 /// Led modes for the indicator. Off, on, blink and fade. Blink and fade will use the parameters defined in the LedProfile structure to determine the behavior of the LED.
@@ -47,13 +47,13 @@ struct LedProfile {
 /// </summary>
 static const LedProfile ledProfiles[] = {
   // sBOOT
-  { LED_BLINK, 0, 0, 50, 50 },         // fast blink
+  { LED_BLINK, 0, 0, 50, 20 },         // fast blink
 
   // sRESET
   { LED_BLINK, 0, 0, 50, 50 },         // fast blink
 
   // sHALTED
-  { LED_BLINK, 0, 0, 20, 200 },        // short pulse
+  { LED_FADE, 250, 250, 0, 0 },        // quick breathing
 
   // sRUNNING
   { LED_FADE, 500, 500, 0, 0 },        // slow breathing
@@ -62,7 +62,7 @@ static const LedProfile ledProfiles[] = {
   { LED_ON, 0, 0, 0, 0 },              // solid on
 
   // sRPI
-  { LED_OFF, 0, 0, 0, 0 }              // off
+  { LED_BLINK, 0, 0, 100, 1000 }       // slow blink
 };
 
 static uint pwmSlice;                 // the PWM slice number associated with the LED pin
@@ -107,13 +107,13 @@ void updateIndicator() {
     break;
 
   case LED_ON:
-    setBrightness(PWM_TOP);
+    setBrightness(MAX_BRIGHTNESS);
     break;
 
   case LED_BLINK:
     if (now - lastTime > (blinkState ? p.onTime : p.offTime)) {
       blinkState = !blinkState;
-      setBrightness(blinkState ? PWM_TOP : 0);
+      setBrightness(blinkState ? MAX_BRIGHTNESS : 0);
       lastTime = now;
     }
     break;
@@ -125,7 +125,7 @@ void updateIndicator() {
     if (interval == 0)
       interval = 1;
 
-    uint32_t step = interval / PWM_TOP;
+    uint32_t step = interval / MAX_BRIGHTNESS;
     if (step == 0) step = 1;
 
     if (now - lastTime > step) {
@@ -134,7 +134,7 @@ void updateIndicator() {
       else
         brightness--;
 
-      if (brightness >= PWM_TOP)
+      if (brightness >= MAX_BRIGHTNESS)
         direction = false;
 
       if (brightness == 0)
@@ -159,6 +159,6 @@ void initIndicator()
 
   pwmSlice = pwm_gpio_to_slice_num(LED_PIN);
 
-  pwm_set_wrap(pwmSlice, PWM_TOP);
+  pwm_set_wrap(pwmSlice, MAX_BRIGHTNESS);
   pwm_set_enabled(pwmSlice, true);
 }

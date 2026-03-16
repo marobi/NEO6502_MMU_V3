@@ -18,6 +18,12 @@ cpu_rx_fifo.push(data);
 /// <typeparam name="T"></typeparam>
 /// <typeparam name="SIZE"></typeparam>
 
+#pragma once
+#include <stdint.h>
+
+#pragma once
+#include <stdint.h>
+
 template<typename T, size_t SIZE>
 class FIFO
 {
@@ -34,28 +40,38 @@ private:
 
 public:
 
-  enum StatusBits : uint8_t {
+  enum StatusBits : uint8_t
+  {
     EMPTY = 1 << 0,
     FULL = 1 << 1,
-    DATA = 1 << 2,   // data available
-    SPACE = 1 << 3    // space available
+    DATA = 1 << 2,
+    SPACE = 1 << 3
   };
 
   static constexpr uint32_t capacity = SIZE - 1;
 
-  inline bool isEmpty() const {
+  inline void clear()
+  {
+    head = tail = 0;
+  }
+
+  inline bool isEmpty() const
+  {
     return head == tail;
   }
 
-  inline bool isFull() const {
+  inline bool isFull() const
+  {
     return ((head + 1) & MASK) == tail;
   }
 
-  inline uint32_t count() const {
+  inline uint32_t count() const
+  {
     return (head - tail) & MASK;
   }
 
-  inline uint8_t status() const {
+  inline uint8_t status() const
+  {
     uint8_t s = 0;
 
     if (head == tail)
@@ -71,7 +87,9 @@ public:
     return s;
   }
 
-  inline bool push(T value) {
+  // append element
+  inline bool push(const T& value)
+  {
     uint32_t h = head;
     uint32_t next = (h + 1) & MASK;
 
@@ -84,7 +102,9 @@ public:
     return true;
   }
 
-  inline bool pop(T& value) {
+  // remove first element
+  inline bool pop(T& value)
+  {
     uint32_t t = tail;
 
     if (t == head)
@@ -96,7 +116,37 @@ public:
     return true;
   }
 
-  inline void clear() {
-    head = tail = 0;
+  // inspect first element without removing it
+  inline bool peek(T& value) const
+  {
+    if (head == tail)
+      return false;
+
+    value = buffer[tail];
+    return true;
+  }
+
+  // remove last pushed element
+  inline bool unpush()
+  {
+    if (head == tail)
+      return false;
+
+    head = (head - 1) & MASK;
+    return true;
+  }
+
+  // insert element at front
+  inline bool unpop(const T& value)
+  {
+    uint32_t prev = (tail - 1) & MASK;
+
+    if (prev == head)
+      return false;
+
+    tail = prev;
+    buffer[tail] = value;
+
+    return true;
   }
 };

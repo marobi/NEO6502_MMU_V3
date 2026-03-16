@@ -27,9 +27,9 @@ uint8_t read6502Memory(const uint16_t);
 
 void write6502Memory(const uint16_t, const uint8_t);
 
-void snoop_read6502Memory(const uint16_t, const uint16_t, uint8_t*);
+void snoop_read6502Memory(const uint16_t, const uint32_t, uint8_t*);
 
-void snoop_write6502Memory(const uint16_t, uint16_t, const uint8_t*);
+void snoop_write6502Memory(const uint16_t, uint32_t, const uint8_t*);
 
 #if 1
 void testBUS();

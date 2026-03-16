@@ -12,9 +12,9 @@ Lesser General Public License for more details.
 */
 #pragma once
 
-#define VERSION "3.1.009"
+#define VERSION "3.2.183"
 
-#define USE_VALIDATION 0
+#define USE_VALIDATION 1
 
 constexpr uint32_t DEFAULT_6502_CLOCK = (1 * 1000000L); // 1 MHZ;
 

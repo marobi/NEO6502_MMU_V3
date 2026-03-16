@@ -82,6 +82,9 @@ using MMUARegHLatchPin = FastPin<pMMUARegHLatch>;
 constexpr uint32_t pMMUDRegOE = 23u;
 using MMUDRegOEPin = FastPin<pMMUDRegOE>;
 
+constexpr uint32_t p6502SYNC = 20u;
+using SYNCPin = FastPin<p6502SYNC>;
+
 constexpr uint32_t p6502PHI2 = 26u;
 using PHI2Pin = FastPin<p6502PHI2>;
 

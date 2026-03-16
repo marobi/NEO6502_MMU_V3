@@ -159,7 +159,7 @@ void set6502Clock(const uint32_t target_freq) {
   pwm_set_clkdiv_int_frac(slice_num, divider16 / 16, divider16 & 0xF);
   pwm_set_wrap(slice_num, wrap);
   pwm_set_chan_level(slice_num, channel, wrap / 2);  // 50% duty cycle
-//  pwm_set_chan_level(slice_num, channel, wrap * 60 / 100);  // duty cycle
+//  pwm_set_chan_level(slice_num, channel, (wrap * 40) / 100);  // duty cycle
   pwm_set_enabled(slice_num, true);
 
   gClockState = eON;
@@ -176,32 +176,32 @@ void init6502Clock() {
 //// <summary>
 /// clock step in
 /// </summary>
-void _ss6502ClockIn() {
-  PHI2Pin::low();         // to be sure
+static void ss6502ClockStep() {
+  PHI2Pin::low();
 
+  DELAY_FACTOR_SHORT();
+  DELAY_FACTOR_SHORT();
+  DELAY_FACTOR_SHORT();
+  DELAY_FACTOR_SHORT();
+  DELAY_FACTOR_SHORT();
+  DELAY_FACTOR_SHORT();
+  DELAY_FACTOR_SHORT();
   DELAY_FACTOR_SHORT();
 
   PHI2Pin::high();
 
   DELAY_FACTOR_SHORT();
   DELAY_FACTOR_SHORT();
-}
-
-/// <summary>
-/// clock step out
-/// </summary>
-void _ss6502ClockOut() {
-  PHI2Pin::low();
-
+  DELAY_FACTOR_SHORT();
   DELAY_FACTOR_SHORT();
 }
 
 /// <summary>
-/// stop the clock in low state; optional in a read cycle
+/// stop the clock in given state; optional in a read cycle
 /// </summary>
 /// <param name="vToRead"></param>
 /// <returns></returns>
-bool halt6502clock(const bool vToRead) {
+static bool halt6502clock(const bool vToRead) {
   if (gClockState == eOFF) 
     return true;
 
@@ -218,17 +218,14 @@ bool halt6502clock(const bool vToRead) {
   gpio_init(p6502PHI2);
   gpio_set_dir(p6502PHI2, GPIO_OUT);
 
-  PHI2Pin::low();                                       // force low
+  PHI2Pin::high();                                       // force high
 
   gClockState = eOFF;
 
   if (vToRead) {  
-    DebugPin::low();
     while ((get6502RW() == mWRITE) && (lTry++ < 8)) {   // continue till in read cycle
-      _ss6502ClockIn();                                 // step
-      _ss6502ClockOut();
+      ss6502ClockStep();                                // step
     }
-    DebugPin::high();
     if (lTry >= 8) {
       Serial1.println("*E: halt6502clock: STOPPED but in unknown clock state");
       return false;
@@ -254,14 +251,37 @@ void singleCycle6502(const uint8_t vSteps, const bool vDisplay) {
     return;
   }
   for (uint8_t s = 0; s < vSteps; s++) {
-    _ss6502ClockIn();
+    ss6502ClockStep();
 
     if (vDisplay) {
       Serial1.printf("s%02d:\t%04X: %02X %1d\n", s, readCPUBusAddress(), read6502Data(), get6502RW());
     }
-    _ss6502ClockOut();
     delayMicroseconds(1);
   }
+
+  set6502State(lState);  // restore state
+}
+
+/// <summary>
+/// SINGLE STEP CPU
+/// </summary>
+/// <param name="vDisplay"></param>
+void singleStep6502(const bool vDisplay) {
+  uint8_t lState = get6502State();
+
+  set6502State(sHALTED);
+  set6502State(sREAD);
+
+    do {
+      ss6502ClockStep();
+
+      if (gpio_get(p6502SYNC)) {
+        if (vDisplay) {
+          Serial1.printf("%04X: %02X\n", readCPUBusAddress(), read6502Data());
+        }
+      }
+      delayMicroseconds(1);
+    } while (!gpio_get(p6502SYNC));
 
   set6502State(lState);  // restore state
 }
@@ -290,7 +310,7 @@ bool set6502State(const uint8_t vSysState) {
   switch (vSysState) {
   case sBOOT:  // system in boot mode
     RESETPin::low();                    // reset
-    halt6502clock(false);
+    halt6502clock(false);        // PHI2 = high
     RDYPin::low();
     BEPin::low();
     dir6502RW(mOUTPUT);
@@ -307,8 +327,7 @@ bool set6502State(const uint8_t vSysState) {
     break;
 
   case sHALTED: // cpu stopped
-//    set6502Reset(mHIGH);
-    halt6502clock(true);
+    halt6502clock(true);      // PHI2 = high
     RDYPin::low();
     BEPin::high();
     dir6502RW(mINPUT);
@@ -326,7 +345,7 @@ bool set6502State(const uint8_t vSysState) {
 
   case sREAD:  // SS mode
     RESETPin::high();
-    halt6502clock(true);
+    halt6502clock(true);     // PHI2 = high
     RDYPin::high();
     BEPin::high();
     dir6502RW(mINPUT);
@@ -334,8 +353,7 @@ bool set6502State(const uint8_t vSysState) {
     break;
 
   case sRPI: // rpi control mode, cpu halted
-  //  set6502Reset(mHIGH);
-    halt6502clock(true);
+    halt6502clock(true);     // PHI2 = high
     RDYPin::low();
     BEPin::low();
     dir6502RW(mOUTPUT);
@@ -372,7 +390,7 @@ void init6502() {
 
   set6502State(sBOOT);
 
-//  show6502State();
+  show6502State();
 }
 
 /// <summary>
@@ -396,6 +414,9 @@ void setup6502() {
   gpio_set_dir(p6502RW, GPIO_OUT);    // Set as output
   gDir6502RW = mOUTPUT;
   set6502RW(mREAD);                   // read
+
+  gpio_init(p6502SYNC);               // Always init
+  gpio_set_dir(p6502SYNC, GPIO_IN);   // Set as input
 
   gpio_init(p6502IRQ);                // Always init
   IRQPin::high();                     // no IRQ

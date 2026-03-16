@@ -166,9 +166,11 @@ void setup() {
 
   initializeSystemConfig();     // init system configuration from /system.ini
 
-  bootSystemWithMenu();         // boot system with menu to select configuration.
-
   writeMMUContext(DEFAULT_CONTEXT); // set default MMU context for booting
+
+  fillMemory(0x00);             // only when CPU not in control
+
+  bootSystemWithMenu();         // boot system with menu to select configuration.
 
   initCmdInterface();
 
@@ -194,5 +196,5 @@ void loop() {
 
   taskVDU();                     // VDU task, mainly control of cursor blinking
 
-//  delay(1);
+  delay(1);
 }
