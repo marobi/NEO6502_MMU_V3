@@ -13,8 +13,8 @@ Lesser General Public License for more details.
 #pragma once
 
 // VDU register definitions
-#define VDU_CMD           0xE000    // CMD register
+#define GDU_CMD           0xE000    // CMD register
 
-#define VDU_REGISTER_BASE 0x0100    // Base of register list
+#define GDU_REGISTER_BASE 0x0100    // Base of register list
 
-void initVDUInterface();
+void initGDUInterface();

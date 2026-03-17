@@ -8,42 +8,41 @@ This software is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 Lesser General Public License for more details.
-
 */
 
 #include <Adafruit_dvhstx.h>
 #include "config.h"
 #include "vdu.h"
-#include "vdu_graphics.h"
+#include "gdu.h"
 
 // our display
 extern DVHSTX8 display;
 
 typedef void (*cmdFunction)(void);
 
-static vdu_registers_t  vduRegistersDefault;                   // default register array
-static vdu_registers_t* vduRegisters = &vduRegistersDefault;   // ptr to registers array
-static uint8_t          vduGColor    = DEFAULT_COLOR;          // graphics FG color
-static uint8_t          vduDrawmode  = 0x00;                   // graphics draw mode, outline
+static gdu_registers_t  gduRegistersDefault;                   // default register array
+static gdu_registers_t* gduRegisters = &gduRegistersDefault;   // ptr to registers array
+static uint8_t          gduGColor    = DEFAULT_COLOR;          // graphics FG color
+static uint8_t          gduDrawmode  = 0x00;                   // graphics draw mode, outline
 
 // convenience
-#define REG0    (vduRegisters->reg[0])      // X | X1
-#define REG1    (vduRegisters->reg[1])      // Y | Y1
-#define REG2    (vduRegisters->reg[2])      // W | R | X2
-#define REG3    (vduRegisters->reg[3])      // H | Y2
-#define REG4    (vduRegisters->reg[4])      // R | X3
-#define REG5    (vduRegisters->reg[5])      // Y3
+#define REG0    (gduRegisters->reg[0])      // X | X1
+#define REG1    (gduRegisters->reg[1])      // Y | Y1
+#define REG2    (gduRegisters->reg[2])      // W | R | X2
+#define REG3    (gduRegisters->reg[3])      // H | Y2
+#define REG4    (gduRegisters->reg[4])      // R | X3
+#define REG5    (gduRegisters->reg[5])      // Y3
 
-#define REG6    (vduRegisters->reg[6])      // M | I | V
-#define REG7    (vduRegisters->reg[7])      // FG | BG | C
-#define REG8    (vduRegisters->reg[8])      // I/O
+#define REG6    (gduRegisters->reg[6])      // M | I | V
+#define REG7    (gduRegisters->reg[7])      // FG | BG | C
+#define REG8    (gduRegisters->reg[8])      // I/O
 
 /// <summary>
 /// 
 /// </summary>
-void dumpVDURegisterSet() {
-  for (uint8_t r = 0; r < NUM_VDU_REGISTERS; r++) {
-    Serial1.printf("R%d = %04d\n", r, vduRegisters->reg[r]);
+void dumpGDURegisterSet() {
+  for (uint8_t r = 0; r < NUM_GDU_REGISTERS; r++) {
+    Serial1.printf("R%d = %04d\n", r, gduRegisters->reg[r]);
   }
 }
 
@@ -51,8 +50,8 @@ void dumpVDURegisterSet() {
 /// 
 /// </summary>
 /// <param name="vRegisters"></param>
-void setVDURegisterSet(vdu_registers_t* vRegisters) {
-  vduRegisters = vRegisters;
+void setGDURegisterSet(gdu_registers_t* vRegisters) {
+  gduRegisters = vRegisters;
 }
 
 /// <summary>
@@ -67,27 +66,27 @@ uint8_t getPixel() {
 /// 
 /// </summary>
 static void drawPixel() {
-  display.drawPixel(REG0 % WIDTH, REG1 % HEIGHT, vduGColor);
+  display.drawPixel(REG0 % WIDTH, REG1 % HEIGHT, gduGColor);
 }
 
 /// <summary>
 /// 
 /// </summary>
 static void drawLine() {
-  display.drawLine(REG0 % WIDTH, REG1 % HEIGHT, REG2 % WIDTH, REG3 % HEIGHT, vduGColor);
+  display.drawLine(REG0 % WIDTH, REG1 % HEIGHT, REG2 % WIDTH, REG3 % HEIGHT, gduGColor);
 }
 
 /// <summary>
 /// 
 /// </summary>
 static void drawRect() {
-  //    Serial1.printf("*D: RECT %04x %04x %04x %04x\n", vduRegisters->x, vduRegisters->y, vduRegisters->w, vduRegisters->h);
-  switch (vduDrawmode) {
+  //    Serial1.printf("*D: RECT %04x %04x %04x %04x\n", gduRegisters->x, gduRegisters->y, gduRegisters->w, gduRegisters->h);
+  switch (gduDrawmode) {
   case 0:
-    display.drawRect(REG0 % WIDTH, REG1 % HEIGHT, REG2 % WIDTH, REG3 % HEIGHT, vduGColor);
+    display.drawRect(REG0 % WIDTH, REG1 % HEIGHT, REG2 % WIDTH, REG3 % HEIGHT, gduGColor);
     break;
   default:
-    display.fillRect(REG0 % WIDTH, REG1 % HEIGHT, REG2 % WIDTH, REG3 % HEIGHT, vduGColor);
+    display.fillRect(REG0 % WIDTH, REG1 % HEIGHT, REG2 % WIDTH, REG3 % HEIGHT, gduGColor);
     break;
   }
 }
@@ -96,13 +95,13 @@ static void drawRect() {
 /// 
 /// </summary>
 static void drawRectR() {
-  //    Serial1.printf("*D: RECT %04x %04x %04x %04x\n", vduRegisters->x, vduRegisters->y, vduRegisters->w, vduRegisters->h);
-  switch (vduDrawmode) {
+  //    Serial1.printf("*D: RECT %04x %04x %04x %04x\n", gduRegisters->x, gduRegisters->y, gduRegisters->w, gduRegisters->h);
+  switch (gduDrawmode) {
   case 0:
-    display.drawRoundRect(REG0 % WIDTH, REG1 % HEIGHT, REG2 % WIDTH, REG3 % HEIGHT, REG4, vduGColor);
+    display.drawRoundRect(REG0 % WIDTH, REG1 % HEIGHT, REG2 % WIDTH, REG3 % HEIGHT, REG4, gduGColor);
     break;
   default:
-    display.fillRoundRect(REG0 % WIDTH, REG1 % HEIGHT, REG2 % WIDTH, REG3 % HEIGHT, REG4, vduGColor);
+    display.fillRoundRect(REG0 % WIDTH, REG1 % HEIGHT, REG2 % WIDTH, REG3 % HEIGHT, REG4, gduGColor);
     break;
   }
 }
@@ -111,19 +110,19 @@ static void drawRectR() {
 /// 
 /// </summary>
 static void drawCircle() {
-  //    Serial1.printf("*D: CIRC %04x %04x %04x\n", vduRegisters->x, vduRegisters->y, vduRegisters->w);
-  switch (vduDrawmode) {
+  //    Serial1.printf("*D: CIRC %04x %04x %04x\n", gduRegisters->x, gduRegisters->y, gduRegisters->w);
+  switch (gduDrawmode) {
   case 0:
     if (vduMode->geoAspect)
-      display.drawEllipse(REG0 % WIDTH, REG1 % HEIGHT, REG2 % WIDTH, (REG3 * 4 / 3) % WIDTH, vduGColor);
+      display.drawEllipse(REG0 % WIDTH, REG1 % HEIGHT, REG2 % WIDTH, (REG3 * 4 / 3) % WIDTH, gduGColor);
     else
-      display.drawCircle(REG0 % WIDTH, REG1 % HEIGHT, REG2 % WIDTH, vduGColor);
+      display.drawCircle(REG0 % WIDTH, REG1 % HEIGHT, REG2 % WIDTH, gduGColor);
     break;
   default:
     if (vduMode->geoAspect)
-      display.drawEllipse(REG0 % WIDTH, REG1 % HEIGHT, REG2 % WIDTH, (REG3 * 4 / 3) % WIDTH, vduGColor);
+      display.drawEllipse(REG0 % WIDTH, REG1 % HEIGHT, REG2 % WIDTH, (REG3 * 4 / 3) % WIDTH, gduGColor);
     else
-      display.drawCircle(REG0 % WIDTH, REG1 % HEIGHT, REG2 % WIDTH, vduGColor);
+      display.drawCircle(REG0 % WIDTH, REG1 % HEIGHT, REG2 % WIDTH, gduGColor);
     break;
   }
 }
@@ -132,13 +131,13 @@ static void drawCircle() {
 /// 
 /// </summary>
 static void drawTriangle() {
-  //    Serial1.printf("*D: TRI %04x %04x %04x %04x %04x %04x\n", vduRegisters->x, vduRegisters->y, vduRegisters->w, vduRegisters->h, vduRegisters->a, vduRegisters->b);
-  switch (vduDrawmode) {
+  //    Serial1.printf("*D: TRI %04x %04x %04x %04x %04x %04x\n", gduRegisters->x, gduRegisters->y, gduRegisters->w, gduRegisters->h, gduRegisters->a, gduRegisters->b);
+  switch (gduDrawmode) {
   case 0:
-    display.drawTriangle(REG0 % WIDTH, REG1 % HEIGHT, REG2 % WIDTH, REG3 % HEIGHT, REG4 % WIDTH, REG5 % HEIGHT, vduGColor);
+    display.drawTriangle(REG0 % WIDTH, REG1 % HEIGHT, REG2 % WIDTH, REG3 % HEIGHT, REG4 % WIDTH, REG5 % HEIGHT, gduGColor);
     break;
   default:
-    display.fillTriangle(REG0 % WIDTH, REG1 % HEIGHT, REG2 % WIDTH, REG3 % HEIGHT, REG4 % WIDTH, REG5 % HEIGHT, vduGColor);
+    display.fillTriangle(REG0 % WIDTH, REG1 % HEIGHT, REG2 % WIDTH, REG3 % HEIGHT, REG4 % WIDTH, REG5 % HEIGHT, gduGColor);
     break;
   }
 }
@@ -147,7 +146,7 @@ static void drawTriangle() {
 /// 
 /// </summary>
 static void cmdDMode() {
-  vduDrawmode = vduRegisters->block[P6L];
+  gduDrawmode = gduRegisters->block[P6L];
 }
 
 /// <summary>
@@ -161,14 +160,14 @@ static void cmdCLS() {
 /// 
 /// </summary>
 static void cmdGColor() {
-  vduGColor = vduRegisters->block[P7L];
+  gduGColor = gduRegisters->block[P7L];
 }
 
 /// <summary>
 /// 
 /// </summary>
-static void cmdVDUMode() {
-  vduSetMode(vduRegisters->block[P6L]);
+static void cmdGDUMode() {
+  vduSetMode(gduRegisters->block[P6L]);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -191,11 +190,11 @@ static void cmdTBD() {
 /// 
 /// </summary>
 /// <param name="val"></param>
-void vduSetReg(const uint8_t vRegister, const uint16_t vVal) {
+void gduSetReg(const uint8_t vRegister, const uint16_t vVal) {
   Serial1.printf("*D: vduSetReg %02d = %4d\n", vRegister, vVal);
 
-  if (vRegister < NUM_VDU_REGISTERS)
-    vduRegisters->reg[vRegister] = vVal;
+  if (vRegister < NUM_GDU_REGISTERS)
+    gduRegisters->reg[vRegister] = vVal;
   else
     Serial1.printf("*E: vduSetReg invalid reg [%02d] = [%4dx]\n", vRegister, vVal);
 }
@@ -204,7 +203,7 @@ void vduSetReg(const uint8_t vRegister, const uint16_t vVal) {
 /// <summary>
 /// table with avaialble vdu command functions
 /// </summary>
-static cmdFunction cmdCommands[MAX_VDU_COMMANDS] = {
+static cmdFunction cmdCommands[MAX_GDU_COMMANDS] = {
   cmdVoid,      // 0
   cmdCLS,       // 1
   cmdTBD,       // 2
@@ -236,20 +235,20 @@ static cmdFunction cmdCommands[MAX_VDU_COMMANDS] = {
   cmdVoid, // 1C
   cmdVoid, // 1D
   cmdVoid, // 1E
-  cmdVDUMode,  // 1F
+  cmdGDUMode,  // 1F
 };
 
 /// <summary>
 /// exec a command on the display
 /// </summary>
 /// <param name="vCmd"></param>
-void vduSetCmd(const uint8_t vCmd) {
-  Serial1.printf("*D: vduSetCmd %02d\n", vCmd);
+void gduSetCmd(const uint8_t vCmd) {
+  Serial1.printf("*D: gduSetCmd %02d\n", vCmd);
   if (vCmd == CMD_SANE) {
     resetDisplay(0);
   }
   else {
-    cmdFunction cmd = cmdCommands[vCmd % MAX_VDU_COMMANDS];
+    cmdFunction cmd = cmdCommands[vCmd % MAX_GDU_COMMANDS];
     cmd(); // lets do it
   }
 }
@@ -261,17 +260,17 @@ void vduSetCmd(const uint8_t vCmd) {
 /// <param name="vCmd"></param>
 /// <param name="nRegs"></param>
 /// <param name=""></param>
-void vduSetCmdx(const uint8_t vCmd, const uint8_t nRegs, ...)
+void gduSetCmdx(const uint8_t vCmd, const uint8_t nRegs, ...)
 {
   va_list ap;
   va_start(ap, nRegs);
 
-  for (uint8_t r = 0; r < (nRegs % NUM_VDU_REGISTERS); r++) {
+  for (uint8_t r = 0; r < (nRegs % NUM_GDU_REGISTERS); r++) {
     uint16_t v = (uint16_t)va_arg(ap, int); // promoted
-    vduSetReg(r, v);
+    gduSetReg(r, v);
   }
 
   va_end(ap);
 
-  vduSetCmd(vCmd);
+  gduSetCmd(vCmd);
 }

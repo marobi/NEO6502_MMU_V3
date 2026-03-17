@@ -12,8 +12,8 @@ Lesser General Public License for more details.
 */
 #pragma once
 
-#define MAX_VDU_COMMANDS   32 
-#define NUM_VDU_REGISTERS   9
+#define MAX_GDU_COMMANDS   32 
+#define NUM_GDU_REGISTERS   9
 
 // VDU commands
 #define CMD_NONE    0x00
@@ -80,15 +80,15 @@ Lesser General Public License for more details.
 /// 
 /// </summary>
 typedef union {
-  uint16_t reg[NUM_VDU_REGISTERS];        // × 16-bit
-  uint8_t  block[NUM_VDU_REGISTERS * 2];  // same memory as bytes
-} vdu_registers_t;
+  uint16_t reg[NUM_GDU_REGISTERS];        // × 16-bit
+  uint8_t  block[NUM_GDU_REGISTERS * 2];  // same memory as bytes
+} gdu_registers_t;
 
-void dumpVDURegisterSet();
+void dumpGDURegisterSet();
 
-void setVDURegisterSet(vdu_registers_t*);
+void setGDURegisterSet(gdu_registers_t*);
 
-void vduSetReg(const uint8_t, const uint16_t);
-void vduSetCmd(const uint8_t);
+void gduSetReg(const uint8_t, const uint16_t);
+void gduSetCmd(const uint8_t);
 
-void vduSetCmdx(const uint8_t, const uint8_t, ...);
+void gduSetCmdx(const uint8_t, const uint8_t, ...);

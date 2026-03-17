@@ -12,8 +12,8 @@ Lesser General Public License for more details.
 */
 #include <Arduino.h>
 #include "config.h"
-#include "vdu_interface.h"
-#include "vdu_graphics.h"
+#include "gdu_interface.h"
+#include "gdu.h"
 
 /// <summary>
 /// 
@@ -22,21 +22,21 @@ typedef enum {
   cGET = 0,
   cPUT,
   cNOC               // NO Command
-} vdu_cmd_type_t;
+} gdu_cmd_type_t;
 
 /// <summary>
 /// 
 /// </summary>
 typedef struct {
-  vdu_cmd_type_t cmd_type;
+  gdu_cmd_type_t cmd_type;
   uint8_t register_offset;
   uint8_t num_bytes;
-} vdu_cmd_exec_type_t;
+} gdu_cmd_exec_type_t;
 
 /// <summary>
 /// param table to process vdu commands
 /// </summary>
-static vdu_cmd_exec_type_t vduCmds[MAX_VDU_COMMANDS] = {
+static gdu_cmd_exec_type_t gduCmds[MAX_GDU_COMMANDS] = {
   { cNOC, 0,  0},            // 0 CMD_VOID
   { cGET, 0,  0},            // 1 CMD_CLS
   { cGET, 0,  4},            // 2 CMD_MOVE
@@ -71,7 +71,7 @@ static vdu_cmd_exec_type_t vduCmds[MAX_VDU_COMMANDS] = {
   { cGET, 12, 1},            // 1F CMD_VDU
 };
 
-static vdu_registers_t vduRegisters;
+static gdu_registers_t gduRegisters;
 
 /// <summary>
 /// dummy
@@ -95,8 +95,8 @@ void writeCpuMemory(const uint16_t vAddress, const uint8_t vData) {
 /// <summary>
 /// 
 /// </summary>
-void initVDUInterface() {
-  setVDURegisterSet(&vduRegisters);
+void initGDUInterface() {
+  setGDURegisterSet(&gduRegisters);
 }
 
 /// <summary>
@@ -104,40 +104,40 @@ void initVDUInterface() {
 /// </summary>
 /// <param name="vOffset"></param>
 /// <param name="vLen"></param>
-void loadVDURegisters(const uint8_t vOffset, const uint8_t vLen) {
-  readCpuMemory(&vduRegisters.block[vOffset], VDU_REGISTER_BASE + vOffset, vLen);
+void loadGDURegisters(const uint8_t vOffset, const uint8_t vLen) {
+  readCpuMemory(&gduRegisters.block[vOffset], GDU_REGISTER_BASE + vOffset, vLen);
 }
 
 /// <summary>
 /// 
 /// </summary>
-void execVDUCommand() {
+void execGDUCommand() {
   uint8_t lCmd = 0;
   uint8_t lOffset = 0;
   uint8_t lLen = 0;
 
-  readCpuMemory(&lCmd, VDU_CMD, 1);      // get vdu command
-  Serial1.printf("*D: execVDUCommand: cmd = [%02x]", lCmd);
+  readCpuMemory(&lCmd, GDU_CMD, 1);      // get vdu command
+  Serial1.printf("*D: execGDUCommand: cmd = [%02x]", lCmd);
 
-  switch (vduCmds[lCmd].cmd_type) {
+  switch (gduCmds[lCmd].cmd_type) {
   case cGET:
-    lOffset = vduCmds[lCmd].register_offset;
-    lLen    = vduCmds[lCmd].num_bytes;
-    loadVDURegisters(lOffset, lLen);
+    lOffset = gduCmds[lCmd].register_offset;
+    lLen    = gduCmds[lCmd].num_bytes;
+    loadGDURegisters(lOffset, lLen);
 
-    writeCpuMemory(VDU_CMD, CMD_NONE);
+    writeCpuMemory(GDU_CMD, CMD_NONE);
     
-    vduSetCmd(lCmd);
+    gduSetCmd(lCmd);
     
     break;
 
   case cPUT:
-    Serial1.printf("*E: execVDUCommand: TBD [%02x]", lCmd);
+    Serial1.printf("*E: execGDUCommand: TBD [%02x]", lCmd);
       break;
   
   case cNOC:
   default:
-    Serial1.printf("*E: execVDUCommand: invalid cmd [%02x]\n", lCmd);
+    Serial1.printf("*E: execGDUCommand: invalid cmd [%02x]\n", lCmd);
     break;
   }
 }

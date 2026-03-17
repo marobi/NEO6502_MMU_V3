@@ -46,10 +46,10 @@
     <ClCompile Include="vdu.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="vdu_graphics.cpp">
+    <ClCompile Include="gdu.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="vdu_interface.cpp">
+    <ClCompile Include="gdu_interface.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="sys_config.cpp">
@@ -111,10 +111,10 @@
     <ClInclude Include="vdu.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="vdu_graphics.h">
+    <ClInclude Include="gdu.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="vdu_interface.h">
+    <ClInclude Include="gdu_interface.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="sys_config.h">
