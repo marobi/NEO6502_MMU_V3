@@ -100,7 +100,7 @@ void introDisplay() {
   gduSetReg(R7, RED); gduSetCmd(CMD_GCOLOR);
   gduSetCmdx(CMD_LINE, 4, 100, 100, WIDTH - 10, HEIGHT - 10);
 
-  vduPrintStr("Hello world\n");
+  vduPrintStr("Hello world ...\n");
 
   setTColor(DEFAULT_COLOR);
 
@@ -194,7 +194,7 @@ void loop() {
 
   inpExecute();                  // process FIFOs
 
-  taskVDU();                     // vdu task, mainly control of cursor blinking
+  taskVDU();                     // vdu task, mainly control of cursor blinking ans smooth scroll
 
 //  delay(1);
 }

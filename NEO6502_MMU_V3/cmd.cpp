@@ -10,7 +10,6 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 Lesser General Public License for more details.
 
 */
-
 #include <arduino.h>
 #include "mmu.h"
 #include "cmd.h"
@@ -23,7 +22,7 @@ Lesser General Public License for more details.
 /// CMD_INCHAR: 6502  -> read a char from this slot
 /// CMD_COMMAND: host -> read a command code from this slot
 /// 
-#define CMD_SLOT_BASE    0xF000
+#define CMD_SLOT_BASE    0xD000   // sync with memory.ini
 #define CMD_SLOT_OUTCHAR 0        // write to 6502
 #define CMD_SLOT_INCHAR  1        // read from 6502
 #define CMD_SLOT_CMD     2
@@ -65,6 +64,8 @@ void writeCmdSlot(const uint8_t vSlot, uint8_t vData) {
 
 // --------------------------------------------------------------
 
+static uint32_t inCount = 0;                           // TODO ugly clutch because for unknown reason we mis mmuInt interrupts
+
 /// <summary>
 /// read a char from 6502
 /// </summary>
@@ -73,15 +74,18 @@ void writeCmdSlot(const uint8_t vSlot, uint8_t vData) {
 uint8_t inChar6502() {
   uint8_t lChar = 0x00;
 
-  if (gMMUIOTrigger) {
+  inCount++;
+
+  if (gMMUIOTrigger || (! (inCount % 100L))) {        // got mmuInt interrupt or force checking
+//    if ((!gMMUIOTrigger) && (!(inCount % 100L)))
+//      DebugPin::low();
+
     lChar = readCmdSlot(CMD_SLOT_INCHAR);
-    if (lChar == 0x00) {
-      return 0x00;
+    if (lChar != 0x00) {
+      writeCmdSlot(CMD_SLOT_INCHAR, 0x00);            // ACK
+      gMMUIOTrigger = false;                          // reset MMU IO trigger
     }
-    else {
-      writeCmdSlot(CMD_SLOT_INCHAR, 0x00);  // ACK
-      gMMUIOTrigger = false;  // reset MMU IO trigger
-    }
+//    DebugPin::high();
   }
 
   return lChar;

@@ -9,14 +9,15 @@ but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 Lesser General Public License for more details.
 */
+
 #include "Arduino.h"
 #include "input.h"
 #include "vdu.h"
 #include "cmd.h"
 
-FIFO<uint8_t, 64> cpu_tx_fifo;          // FIFO to write to CPU
+FIFO<uint8_t,64>   cpu_tx_fifo;          // FIFO to write to CPU
 
-FIFO<uint8_t, 64> vdu_tx_fifo;          // FIFO to write to VDU/user output
+FIFO<uint8_t, 128> vdu_tx_fifo;          // FIFO to write to VDU/user output
 
 /// <summary>
 /// inpInit initializes the input system by clearing all the FIFOs used for communication
@@ -93,7 +94,7 @@ static void processVDUoutQ() {
 static void processCPUinQ() {
   if (!vdu_tx_fifo.isFull()) {
     uint8_t data = inChar6502();
-    if (data > 0) {
+    if (data != 0) {
       writeVDUQ(data);
 //      Serial1.printf("*D: processCPUinQ: [%02x]\n", data);
     }

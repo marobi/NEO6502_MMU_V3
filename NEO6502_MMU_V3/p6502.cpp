@@ -197,7 +197,7 @@ static void ss6502ClockStep() {
 }
 
 /// <summary>
-/// stop the clock in given state; optional in a read cycle
+/// stop the clock in high state; optional in a read cycle
 /// </summary>
 /// <param name="vToRead"></param>
 /// <returns></returns>
@@ -217,6 +217,11 @@ static bool halt6502clock(const bool vToRead) {
   gpio_set_function(p6502PHI2, GPIO_FUNC_SIO);          // GPIO output
   gpio_init(p6502PHI2);
   gpio_set_dir(p6502PHI2, GPIO_OUT);
+
+  DELAY_FACTOR_SHORT();
+  DELAY_FACTOR_SHORT();
+  DELAY_FACTOR_SHORT();
+  DELAY_FACTOR_SHORT();
 
   PHI2Pin::high();                                       // force high
 
@@ -281,6 +286,7 @@ void singleStep6502(const bool vDisplay) {
         }
       }
       delayMicroseconds(1);
+
     } while (!gpio_get(p6502SYNC));
 
   set6502State(lState);  // restore state
@@ -367,6 +373,9 @@ bool set6502State(const uint8_t vSysState) {
   }
 
   gSysState = vSysState;
+  
+  delayMicroseconds(1);
+
   return true;
 }
 

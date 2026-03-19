@@ -117,7 +117,7 @@ static void cmdSSCallback(cmd* c) {
 
   for (uint8_t s = 0; s < lStep; s++) {
     singleStep6502(false);
-    disasm6502(readCPUBusAddress(), 1, true);
+    disasm6502(readCPUBusAddress(), 1, false);
   }
 }
 
