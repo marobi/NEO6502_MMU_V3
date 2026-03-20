@@ -29,6 +29,8 @@ Lesser General Public License for more details.
 #include "neobus.h"
 #include "disasm6502.h"
 
+#include "memory_config_v2.h"
+
 #include "boot.h"
 #include "vdu.h"
 #include "input.h"
@@ -225,12 +227,14 @@ static void cmdMMUCallback(cmd* c) {
 
   uint8_t lContext = x2i(arg1.c_str()) & 0x7F;  // 128
 
-  Serial1.printf("MMU: %02X\n", lContext);
+ // Serial1.printf("MMU: %02X\n", lContext);
 
   uint8_t lState = get6502State();
   set6502State(sRPI);
+  
   writeMMUContext(lContext);  // set the context
-  dumpMMUContext(lContext);   // dump context
+  dumpMMUPageMap(lContext);   // dump context
+  
   set6502State(lState);
 }
 

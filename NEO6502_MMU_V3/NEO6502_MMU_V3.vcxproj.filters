@@ -58,13 +58,13 @@
     <ClCompile Include="boot.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="memory_config.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="indicator.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="input.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="memory_config_v2.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -123,9 +123,6 @@
     <ClInclude Include="boot.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="memory_config.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="indicator.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -133,6 +130,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="fifo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="memory_config_v2.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

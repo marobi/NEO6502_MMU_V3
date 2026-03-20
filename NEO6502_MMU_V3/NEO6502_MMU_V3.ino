@@ -33,7 +33,8 @@ Lesser General Public License for more details.
 
 #include "rom.h"
 
-#include "memory_config.h"
+//#include "memory_config.h"
+#include "memory_config_v2.h"
 
 #include "sys_config.h"
 #include "boot.h"

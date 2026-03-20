@@ -14,7 +14,7 @@ Lesser General Public License for more details.
 
 #define VERSION "3.5.283"
 
-#define USE_VALIDATION 1
+#define USE_VALIDATION 0
 
 constexpr uint32_t DEFAULT_6502_CLOCK = (1 * 1000000L); // 1 MHZ;
 
