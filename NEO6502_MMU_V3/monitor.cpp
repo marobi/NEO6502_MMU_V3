@@ -268,7 +268,7 @@ static void cmdCommandCallback(cmd* c) {
   Command cmd(c);
 
   gInterface++;
-  Serial1.println("Enter terminal");
+  Serial1.println("Entering terminal ...");
 }
 
 static void cmdSysConfigCallback(cmd* c) {
@@ -289,28 +289,44 @@ static void cmdZeroCallback(cmd* c) {
   Serial1.println("Memory zeroed");
 }
 
+static void cmdClockCallback(cmd* c) {
+  Command cmd(c);
+
+  String arg1 = cmd.getArgument("freq").getValue();
+
+  uint32_t lFreq = atof(arg1.c_str()) * MEGA_HZ;
+
+  if (lFreq < 0.001 * MEGA_HZ)
+    lFreq = DEFAULT_6502_CLOCK;
+
+  set6502Clockfrequency(lFreq);
+
+  Serial1.printf("*I: Clock = %4.2f MHz\n", (float)lFreq / MEGA_HZ);
+}
+
 /// <summary>
 /// help overview of commands
 /// </summary>
 /// <param name="c"></param>
 static void cmdHelpCallback(cmd* c) {
   Serial1.print("\nMICmon help:\n\
- r/eset                reset\n\
- s/top                 stop\n\
+ > <address> <data>    modify memory address(es)\n\
+ clock <freq MHz>      set 6502 clock frequency\n\
+ d/is <from> <lines>   disasm memory\n\
  g/o                   go\n\
- sc <cycles>           single cycle\n\
- ss <steps>            single step\n\
+ help                  help\n\
  i/rq                  generate IRQ\n\
  m/em <from> <to>      dump memory\n\
- d/is <from> <lines>   disasm memory\n\
- > <address> <data>    modify memory address(es)\n\
+ mmu  <context>        set mmu context\n\
+ page <index> <page>   set mmu page\n\
+ r/eset                reset\n\
+ s/top                 stop\n\
+ sc <cycles>           single cycle\n\
+ ss <steps>            single step\n\
  st/at                 status of cpus/bus\n\
  syscfg                system configuration\n\
  t/erm                 terminal mode\n\
- mmu  <context>        set mmu context\n\
- page <index> <page>   set mmu page\n\
  zero                  zero memory\n\
- help                  help\n\
 \n");
 }
 
@@ -321,7 +337,7 @@ static void cmdHelpCallback(cmd* c) {
 static void errorCallback(cmd_error* e) {
   CommandError cmdError(e); // Create wrapper object
 
-  Serial1.printf("*E: MIC ICM: %s\n", cmdError.toString());
+  Serial1.printf("*E: MIC-ICM: %s\n", cmdError.toString());
 
   if (cmdError.hasCommand()) {
     Serial1.printf("*E: Did you mean [%s]?\n", cmdError.getCommand().toString());
@@ -332,9 +348,12 @@ static void errorCallback(cmd_error* e) {
 /// init the monitor commands
 /// </summary>
 void initMonitor() {
-  Serial1.printf("\nMIC ICM (%s) %s\n> ", BIOS_CPU, MON_VERSION);
+  Serial1.printf("\nMIC-ICM (%s) %s\n> ", BIOS_CPU, MON_VERSION);
 
   // Create the commands with callback function
+  gCmd = gCli.addCmd("clock", cmdClockCallback);
+  gCmd.addPositionalArgument("freq");
+
   gCmd = gCli.addCmd("d/is", cmdDisAsmCallback);
   gCmd.addPositionalArgument("from");
   gCmd.addPositionalArgument("lines", "1");

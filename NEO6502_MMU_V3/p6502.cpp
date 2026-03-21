@@ -23,7 +23,8 @@ Lesser General Public License for more details.
 /// <summary>
 /// system states
 /// </summary>
-static const char lTxtSystemState[6][6] = {
+static const char lTxtSystemState[7][6] = {
+  "SUP",
   "BOOT",
   "RESET",
   "HALT",
@@ -65,7 +66,7 @@ static const char lTxtControlState[2][4] = {
 };
 
 // desired frequency in Hz
-static uint32_t gClockFrequency = DEFAULT_6502_CLOCK;  // 4 MHz default
+static uint32_t gClockFrequency = DEFAULT_6502_CLOCK;
 
 static uint8_t gSysState;       // will be init in setup6502
 static uint8_t gBusState;       // will be init in setup6502
@@ -134,10 +135,23 @@ void dir6502RW(const uint8_t vDir) {
 }
 
 /// <summary>
+/// 
+/// </summary>
+/// <param name="freq"></param>
+void set6502Clockfrequency(const uint32_t freq) {
+  gClockFrequency = freq;
+}
+
+/// <summary>
 /// set 6502 PHI2 clock signal
 /// </summary>
 /// <param name="freq"></param>
-void set6502Clock(const uint32_t target_freq) {
+void set6502Clock() {
+//  if (gClockState == eON) {
+//    Serial1.println("*E: set6502Clock: clock is already running");
+//    return;
+//  }
+
   const uint32_t pwm_clk = 125000000L;
 
   gpio_set_function(p6502PHI2, GPIO_FUNC_PWM); // PWM output
@@ -146,9 +160,7 @@ void set6502Clock(const uint32_t target_freq) {
   uint channel = pwm_gpio_to_channel(p6502PHI2);
 
   // PWM toggles once per cycle => need 1/2x the desired frequency
-  uint32_t pwm_freq = target_freq / 2;
-
-  gClockFrequency = target_freq;
+  uint32_t pwm_freq = gClockFrequency / 2;
 
   float divider = (float)pwm_clk / (float)pwm_freq / 65536.0f;
   if (divider < 1.0f) divider = 1.0f;
@@ -163,14 +175,6 @@ void set6502Clock(const uint32_t target_freq) {
   pwm_set_enabled(slice_num, true);
 
   gClockState = eON;
-}
-
-/// <summary>
-/// initialise the clock running
-/// </summary>
-void init6502Clock() {
-  if (gClockState != eON)
-    set6502Clock(DEFAULT_6502_CLOCK);
 }
 
 //// <summary>
@@ -193,11 +197,16 @@ static void ss6502ClockStep() {
 static bool advance6502clock() {
   uint8_t lTry = 0;
 
+  if (gClockState == eON) {
+    Serial1.println("*E: advance6502clock: clock is running");
+    return false;
+  }
+
   while ((get6502RW() == mWRITE) && (lTry++ < 8)) {   // continue till in read cycle
     ss6502ClockStep();                                // step
   }
   if (lTry >= 8) {
-    Serial1.println("*E: advance6502clock: STOPPED but in unknown clock state");
+    Serial1.println("*E: advance6502clock: clock STOPPED in unknown state");
     return false;
   }
   return true;
@@ -208,7 +217,7 @@ static bool advance6502clock() {
 /// </summary>
 /// <param name="vToRead"></param>
 /// <returns></returns>
-static bool halt6502clock(const bool vToRead) {
+bool halt6502clock(const bool vToRead) {
   if (gClockState == eOFF) {
     return true;
   }
@@ -305,6 +314,11 @@ bool set6502State(const uint8_t vSysState) {
     return true;
 
   switch (vSysState) {
+  case sSTARTUP:
+    Serial1.println("*E: set6502State: do not select!!\n");
+    return false;
+    break;
+
   case sBOOT:  // system in boot mode
     RESETPin::low();                    // reset
     halt6502clock(true);                // PHI2 = high
@@ -316,7 +330,7 @@ bool set6502State(const uint8_t vSysState) {
 
   case sRESET:  // cpu helt reset
     RESETPin::low();
-    init6502Clock();
+    set6502Clock();
     RDYPin::low();
     BEPin::high();
     dir6502RW(mINPUT);
@@ -334,7 +348,7 @@ bool set6502State(const uint8_t vSysState) {
   case sRUNNING: // cpu running free
     dir6502RW(mINPUT);
     BEPin::high();
-    init6502Clock();
+    set6502Clock();
     RDYPin::high();
     RESETPin::high();
     setControlMode(mCPU);
@@ -386,8 +400,6 @@ void show6502State() {
 /// initialise the 6502 cpu
 /// </summary>
 void init6502() {
-  gSysState = 99;
-
   set6502State(sBOOT);
 
   show6502State();
@@ -427,4 +439,6 @@ void setup6502() {
   gpio_set_dir(p6502PHI2, GPIO_OUT);  // Set as output
   PHI2Pin::high();
   gClockState = eOFF;
+
+  gSysState = 0;                      // dummy state
 }

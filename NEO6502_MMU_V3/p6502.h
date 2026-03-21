@@ -38,7 +38,8 @@ enum clockState {
 
 enum sysState {
 //                    CTRL   STATE   PHI2   BUS   DIR
-  sBOOT = 0,       // RPI    RESET   OFF    DIS   IN
+  sSTARTUP = 0,
+  sBOOT    ,       // RPI    RESET   OFF    DIS   IN
   sRESET,          // CPU    RESET   ON     ENA   IN
   sHALTED,         // CPU    HALTED  OFF    ENA   IN
   sRUNNING,        // CPU    RUN     ON     ENA   IN
@@ -46,15 +47,17 @@ enum sysState {
   sRPI             // RPI    HALTED  OFF    DIS   OUT
 };
 
-#define eKEEP   99
-
 void set6502RW(const uint8_t);
 
 uint8_t get6502RW();
 
 uint8_t getClockState();
 
-void set6502Clock(const uint32_t);
+void set6502Clockfrequency(const uint32_t);
+
+void set6502Clock();
+
+bool halt6502clock(const bool);
 
 void singleCycle6502(const uint8_t, const bool);
 
