@@ -16,6 +16,9 @@ Lesser General Public License for more details.
 
 #define USE_VALIDATION 1
 
-constexpr uint32_t DEFAULT_6502_CLOCK = (8 * 1000000L); // 1 MHZ;
+// Fixed RP2350 clock (adjust if you change it)
+constexpr uint32_t CPU_CLOCK_HZ = 240000000u;
+
+constexpr uint32_t DEFAULT_6502_CLOCK = (1 * 1000000L); // 1 MHZ;
 
 constexpr uint32_t RAM_SIZE = (512 * 1024 * 1024);      // RAM size;

@@ -29,7 +29,7 @@ Lesser General Public License for more details.
 #include "neobus.h"
 #include "disasm6502.h"
 
-#include "memory_config_v2.h"
+#include "memory_config.h"
 
 #include "boot.h"
 #include "vdu.h"
@@ -274,7 +274,6 @@ static void cmdCommandCallback(cmd* c) {
 static void cmdSysConfigCallback(cmd* c) {
   Command cmd(c);
 
-  set6502State(sBOOT);
   bootSystemWithMenu();
 }
 
@@ -302,9 +301,9 @@ static void cmdHelpCallback(cmd* c) {
  sc <cycles>           single cycle\n\
  ss <steps>            single step\n\
  i/rq                  generate IRQ\n\
- d/ump <from> <to>     dump memory\n\
- dis <from> <lines>    disasm memory\n\
- m/em <address> <data> modify memory address(es)\n\
+ m/em <from> <to>      dump memory\n\
+ d/is <from> <lines>   disasm memory\n\
+ > <address> <data>    modify memory address(es)\n\
  st/at                 status of cpus/bus\n\
  syscfg                system configuration\n\
  t/erm                 terminal mode\n\
@@ -336,11 +335,11 @@ void initMonitor() {
   Serial1.printf("\nMIC ICM (%s) %s\n> ", BIOS_CPU, MON_VERSION);
 
   // Create the commands with callback function
-  gCmd = gCli.addCmd("dis", cmdDisAsmCallback);
+  gCmd = gCli.addCmd("d/is", cmdDisAsmCallback);
   gCmd.addPositionalArgument("from");
   gCmd.addPositionalArgument("lines", "1");
 
-  gCmd = gCli.addCmd("d/ump", cmdDumpCallback);
+  gCmd = gCli.addCmd("m/em", cmdDumpCallback);
   gCmd.addPositionalArgument("from");
   gCmd.addPositionalArgument("to", "0");
 
@@ -350,7 +349,7 @@ void initMonitor() {
 
   gCmd = gCli.addCmd("i/rq", cmdIRQCallback);
 
-  gCmd = gCli.addBoundlessCommand("m/em", cmdMemCallback);
+  gCmd = gCli.addBoundlessCommand(">", cmdMemCallback);
 
   gCmd = gCli.addCmd("mmu", cmdMMUCallback);
   gCmd.addPositionalArgument("context", "0");

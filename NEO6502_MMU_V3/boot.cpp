@@ -13,6 +13,7 @@ Lesser General Public License for more details.
 #include "boot.h"
 #include "sys_config.h"
 #include "mmu.h"
+#include "p6502.h"
 #include "rom.h"
 
 // ----------------------------------------
@@ -87,12 +88,12 @@ static int waitForUserSelection(unsigned long timeoutMs) {
       if (selection >= 0 && selection < visibleCount)
         return visibleConfigs[selection];
 
-      Serial1.println("Invalid selection.");
+      Serial1.println("*E: Invalid selection.");
       showConfigMenu();
     }
   }
 
-  Serial1.println("Timeout. Booting default.");
+  Serial1.println("*I: Timeout. Booting default.");
   return systemConfig.defaultConfig;
 }
 
@@ -110,6 +111,10 @@ bool activateConfiguration(int cfgIndex) {
   if (!configs[cfgIndex].defined)
     return false;
 
+  set6502State(sBOOT);
+
+
+
   for (uint8_t i = 0; i < configs[cfgIndex].count; i++) {
 
     uint8_t cartIndex = configs[cfgIndex].entries[i].cartIndex;
@@ -118,7 +123,7 @@ bool activateConfiguration(int cfgIndex) {
     char fullPath[64];
     snprintf(fullPath, sizeof(fullPath), "/system/%s", cartridges[cartIndex].file);
 
-    Serial1.printf("*D: Loading ROM %s into context %d\n", fullPath, ctx);
+    Serial1.printf("*I: Loading ROM %s into CTX %d\n", fullPath, ctx);
     
     // read image of ROM file into memory
     data = readBinaryFile(fullPath);
@@ -157,7 +162,7 @@ void bootSystemWithMenu() {
   Serial1.printf("*I: Loading configuration: %s\n",
     configs[cfgIndex].name);
 
-  if (!activateConfiguration(cfgIndex)) {
+  if (! activateConfiguration(cfgIndex)) {
 
     Serial1.println("*E: Activation failed. Using fallback.");
 

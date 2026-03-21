@@ -144,6 +144,7 @@ void setup() {
 
   initVDU();           // get display running
   initGDUInterface();  // init gdu command interface
+
   introDisplay();      // show intro
 
   printFile("intro.txt");
@@ -161,14 +162,14 @@ void setup() {
   configureMMUFromActiveModel();
 
   dumpMMUPageMapsCompact();
-  dumpMMUPhysicalUsage();       // dump physical page usage for debug
+  dumpMMUPhysicalUsage();       // dump physical page usage
 
   initializeSystemConfig();     // init system configuration from /system.ini
 
   writeMMUContext(memoryConfig.boot_context); // set default MMU context for booting
   Serial1.printf("*I: default context: CTX %1X\n", memoryConfig.boot_context);
 
-  fillMemory(0x00);             // clear memory 65k
+//  fillMemory(0x00);             // clear memory 64k of current context
 
   bootSystemWithMenu();         // load/boot system with menu to select configuration.
 

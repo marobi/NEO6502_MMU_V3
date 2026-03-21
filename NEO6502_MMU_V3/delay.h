@@ -2,9 +2,7 @@
 
 #include <stdint.h>
 #include "pico/platform.h"   // for busy_wait_at_least_cycles()
-
-// Fixed system clock (adjust if you change it)
-constexpr uint32_t CPU_CLOCK_HZ = 240000000u;
+#include "config.h"
 
 // --- compile-time conversion ---
 constexpr uint32_t nsToCyclesConst(uint32_t ns) {

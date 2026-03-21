@@ -179,11 +179,11 @@ void init6502Clock() {
 static void ss6502ClockStep() {
   PHI2Pin::low();
 
-  delayNs<75>();
+  delayNs<125>();
 
   PHI2Pin::high();
 
-  delayNs<75>();
+  delayNs<125>();
 }
 
 /// <summary>
@@ -209,17 +209,18 @@ static bool advance6502clock() {
 /// <param name="vToRead"></param>
 /// <returns></returns>
 static bool halt6502clock(const bool vToRead) {
-  if (gClockState == eOFF) 
+  if (gClockState == eOFF) {
     return true;
+  }
 
   uint slice_num = pwm_gpio_to_slice_num(p6502PHI2);
 
   pwm_set_enabled(slice_num, false);  // stop PWM
 
-  delayNs<75>();
+  delayNs<125>();
 
   gpio_set_function(p6502PHI2, GPIO_FUNC_SIO);          // GPIO output
-  PHI2Pin::high();                                       // force high
+  PHI2Pin::high();                                      // force high
   gpio_set_dir(p6502PHI2, GPIO_OUT);
 
   gClockState = eOFF;
@@ -251,7 +252,7 @@ void singleCycle6502(const uint8_t vSteps, const bool vDisplay) {
     if (vDisplay) {
       Serial1.printf("s%02d:\t%04X: %02X %1d\n", s, readCPUBusAddress(), read6502Data(), get6502RW());
     }
-    delayMicroseconds(1);
+    delayNs<500>();
   }
 
   set6502State(lState);  // restore state
@@ -306,7 +307,7 @@ bool set6502State(const uint8_t vSysState) {
   switch (vSysState) {
   case sBOOT:  // system in boot mode
     RESETPin::low();                    // reset
-    halt6502clock(false);        // PHI2 = high
+    halt6502clock(true);                // PHI2 = high
     RDYPin::low();
     BEPin::low();
     dir6502RW(mOUTPUT);
@@ -423,6 +424,7 @@ void setup6502() {
   IRQPin::high();                     // no IRQ
 
   gpio_init(p6502PHI2);               // Always init
-  gpio_set_function(p6502PHI2, GPIO_FUNC_PWM); // PWM output
+  gpio_set_dir(p6502PHI2, GPIO_OUT);  // Set as output
+  PHI2Pin::high();
   gClockState = eOFF;
 }
