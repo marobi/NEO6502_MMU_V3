@@ -23,7 +23,7 @@ The platform combines a classic 8-bit processor with a modern microcontroller.
 
 * Implements the Memory Management Unit
 * Provides system services and supervision
-* Generates video output
+* Generates video output (HDMI)
 * Loads ROM cartridges from flash storage
 * Handles I/O requests from the CPU
 
@@ -45,6 +45,7 @@ Key characteristics:
 * Dynamic page mapping controlled by the MMU
 * Fixed communication region between the CPU and RP2350
 * Support for cartridge overlays and BIOS regions
+* Layouts and content configured through INI-files
 
 The paging mechanism allows large memory configurations while keeping the CPU interface simple and deterministic.
 
