@@ -52,18 +52,13 @@ The paging mechanism allows large memory configurations while keeping the CPU in
 
 # I/O Page Mechanism
 
-Communication between the CPU and the RP2350 is implemented using a **dedicated I/O memory page**.
+Communication between the CPU and the RP2350 is implemented using a **dedicated I/O memory page**
 
-Hardware logic detects accesses to this page by combining:
-
-* the **PHI2 clock**
-* the **address decode signal**
-
-When an access occurs the RP2350 receives an interrupt and services the request.
+When an write-access occurs the RP2350 receives an interrupt and services the request.
 
 This mechanism allows the RP2350 to implement system services such as:
 
-* device access
+* I/O
 * configuration commands
 * memory management operations
 * communication registers
@@ -94,6 +89,7 @@ This makes it possible to switch system configurations without rebuilding firmwa
 The firmware implements the supervisory functionality of the system, including:
 
 * MMU paging control
+* Memory layout's 
 * bus ownership management
 * CPU reset and startup sequencing
 * I/O page interrupt handling
