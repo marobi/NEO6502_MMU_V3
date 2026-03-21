@@ -268,6 +268,7 @@ static void cmdCommandCallback(cmd* c) {
   Command cmd(c);
 
   gInterface++;
+  Serial1.println("Enter terminal");
 }
 
 static void cmdSysConfigCallback(cmd* c) {
@@ -393,7 +394,7 @@ static void returnToICM() {
   gInputIndex = 0;
   gInputBuffer[0] = '\0';
 
-  Serial1.print("> ");                     // new prompt for CLI
+  Serial1.print("> ");                   // new prompt for CLI
 }
 
 /// <summary>

@@ -64,7 +64,7 @@
     <ClCompile Include="input.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="memory_config_v2.cpp">
+    <ClCompile Include="memory_config.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -132,7 +132,7 @@
     <ClInclude Include="fifo.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="memory_config_v2.h">
+    <ClInclude Include="memory_config.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -145,7 +145,7 @@ void bootSystemWithMenu() {
 
   int cfgIndex = waitForUserSelection(5000);
 
-  Serial1.printf("*I: Activating configuration: %s\n",
+  Serial1.printf("*I: Loading configuration: %s\n",
     configs[cfgIndex].name);
 
   if (!activateConfiguration(cfgIndex)) {

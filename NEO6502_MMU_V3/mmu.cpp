@@ -210,7 +210,7 @@ bool writeMMUPage(const uint8_t vContext, const uint8_t vIndex, const uint8_t vP
 /// dump the Pages of Context
 /// </summary>
 /// <param name="vContext"></param>
-void dumpMMUContext(const uint8_t vContext) {
+void dumpMMUContextCompact(const uint8_t vContext) {
   Serial1.printf("C %02X:", vContext);
 
   for (uint8_t lPage = 0; lPage < NUM_CONTEXT_PAGES; lPage++) {

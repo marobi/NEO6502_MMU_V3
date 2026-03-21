@@ -39,7 +39,7 @@ uint8_t readMMUPage(const uint8_t, const uint8_t);
 
 bool writeMMUPage(const uint8_t, const uint8_t, const uint8_t);
 
-void dumpMMUContext(const uint8_t);
+void dumpMMUContextCompact(const uint8_t);
 
 bool initMMU();
 

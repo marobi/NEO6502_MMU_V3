@@ -33,9 +33,7 @@ Lesser General Public License for more details.
 
 #include "rom.h"
 
-//#include "memory_config.h"
-#include "memory_config_v2.h"
-
+#include "memory_config.h"
 #include "sys_config.h"
 #include "boot.h"
 
@@ -162,16 +160,17 @@ void setup() {
   initializeMemoryConfig();
   configureMMUFromActiveModel();
 
-  dumpMMUPhysicalUsage();       // dump physical page usage for debug
   dumpMMUPageMapsCompact();
+  dumpMMUPhysicalUsage();       // dump physical page usage for debug
 
   initializeSystemConfig();     // init system configuration from /system.ini
 
-  writeMMUContext(DEFAULT_CONTEXT); // set default MMU context for booting
+  writeMMUContext(memoryConfig.boot_context); // set default MMU context for booting
+  Serial1.printf("*I: default context: CTX %1X\n", memoryConfig.boot_context);
 
-  fillMemory(0x00);             // only when CPU not in control
+  fillMemory(0x00);             // clear memory 65k
 
-  bootSystemWithMenu();         // boot system with menu to select configuration.
+  bootSystemWithMenu();         // load/boot system with menu to select configuration.
 
   initCmdInterface();
 
