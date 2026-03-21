@@ -121,10 +121,7 @@ void writeMMUContext(const uint8_t vContext) {
 
   MMUARegHLatchPin::low(); // arm latching
 
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
+  delayNs<60>();
 
   MMUARegHLatchPin::high(); // latch
 
@@ -150,7 +147,7 @@ uint8_t readMMUPage(const uint8_t vContext, const uint8_t vIndex) {
 
   MMUDRegOEPin::low();         // enable MMU DBuffer
 
-  DELAY_FACTOR_SHORT();
+  delayNs<50>();
 
   uint8_t lPage = readNEOBus();
 
@@ -181,11 +178,11 @@ bool writeMMUPage(const uint8_t vContext, const uint8_t vIndex, const uint8_t vP
 
   PRWPin::low();               // write action
 
-  DELAY_FACTOR_SHORT();
+  delayNs<50>();
 
   PRWPin::high();             // read (commit write)
 
-  DELAY_FACTOR_SHORT();
+  delayNs<20>();
 
   MMUDRegOEPin::high();       // disable DBuffer
 

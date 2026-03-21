@@ -17,7 +17,7 @@ Lesser General Public License for more details.
 #include "p6502.h"
 
 /// <summary>
-/// setup CPU interface
+/// 
 /// </summary>
 void setupCPU() {
   gpio_init(pCPUARegLLatch);                // Always init pins first
@@ -45,6 +45,10 @@ void setupCPU() {
   CPUDBufOEPin::high();                     // no OE
 }
 
+/// <summary>
+/// 
+/// </summary>
+/// <returns></returns>
 uint16_t readCPUBusAddress() {
   CPUABufHOEPin::low();                     // enable high byte
 
@@ -98,8 +102,7 @@ void writeCPUAddressH(const uint8_t vAddress) {
   writeNEOBus(vAddress);   // write hight byte of address on NEObus
   CPUARegHLatchPin::low();  // arm latch
 
-  DELAY_FACTOR_SHORT();     // settle
-  DELAY_FACTOR_SHORT();
+  delayNs<60>();
 
   CPUARegHLatchPin::high(); // latch in AREG
 
@@ -115,7 +118,7 @@ static void writeCPUAddressL(const uint8_t vAddress) {
   writeNEOBus(vAddress);   // write hight byte of address on NEObus
   CPUARegLLatchPin::low(); // arm latch
 
-  DELAY_FACTOR_SHORT();     // settle
+  delayNs<60>();
 
   CPUARegLLatchPin::high(); // latch in AREG
 
@@ -153,7 +156,7 @@ uint8_t read6502Data() {
   MRWPin::high(); // to be sure
   CPUDBufOEPin::low();  // read from databus
 
-  DELAY_FACTOR_SHORT(); // settle
+  delayNs<50>();
 
   uint8_t ldata = readNEOBus();  // read data
 
@@ -206,7 +209,7 @@ void write6502Memory(const uint16_t vAddress, const uint8_t vData) {
     set6502RW(mWRITE);          // set RW to write
     CPUDBufOEPin::low();        // enable databus
 
-    DELAY_FACTOR_SHORT();
+    delayNs<60>();
 
     set6502RW(mREAD);           // set RW to read for next cycle
     MRWPin::high();             // end write cycle

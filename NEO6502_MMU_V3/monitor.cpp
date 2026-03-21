@@ -206,7 +206,7 @@ static void cmdMemCallback(cmd* c) {
 static void cmdStatusCallback(cmd* c) {
   Serial1.printf("Status\n");
   show6502State();
-  Serial1.printf("*I: MMU: %02X\n", readMMUContext());
+  Serial1.printf("*I: CTX: %02X\n", readMMUContext());
 }
 
 /// <summary>

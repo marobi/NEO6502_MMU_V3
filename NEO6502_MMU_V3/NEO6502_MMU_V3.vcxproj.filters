@@ -135,5 +135,8 @@
     <ClInclude Include="memory_config.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="delay.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -14,8 +14,8 @@ Lesser General Public License for more details.
 
 #define VERSION "3.5.283"
 
-#define USE_VALIDATION 0
+#define USE_VALIDATION 1
 
-constexpr uint32_t DEFAULT_6502_CLOCK = (1 * 1000000L); // 1 MHZ;
+constexpr uint32_t DEFAULT_6502_CLOCK = (8 * 1000000L); // 1 MHZ;
 
 constexpr uint32_t RAM_SIZE = (512 * 1024 * 1024);      // RAM size;

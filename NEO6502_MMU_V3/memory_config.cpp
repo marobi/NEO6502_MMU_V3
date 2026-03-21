@@ -1,4 +1,15 @@
-// memory_config.cpp
+/*
+This software is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public
+License as published by the Free Software Foundation; either
+version 2.1 of the License, or (at your option) any later version.
+
+This software is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
+
+*/
 #include "memory_config.h"
 #include "mmu.h"
 
@@ -25,9 +36,16 @@ static void clearMemoryIniError() {
   lastMemoryIniError.code = MEMORY_INI_OK;
 }
 
-static bool failMemoryIni(MemoryIniErrorCode code, int line,
-  const char* section, const char* key, const char* value)
-{
+/// <summary>
+/// 
+/// </summary>
+/// <param name="code"></param>
+/// <param name="line"></param>
+/// <param name="section"></param>
+/// <param name="key"></param>
+/// <param name="value"></param>
+/// <returns></returns>
+static bool failMemoryIni(MemoryIniErrorCode code, int line, const char* section, const char* key, const char* value) {
   clearMemoryIniError();
 
   lastMemoryIniError.code = code;
@@ -48,8 +66,12 @@ static bool failMemoryIni(MemoryIniErrorCode code, int line,
   return false;
 }
 
-const char* memoryIniErrorToString(MemoryIniErrorCode code)
-{
+/// <summary>
+/// 
+/// </summary>
+/// <param name="code"></param>
+/// <returns></returns>
+const char* memoryIniErrorToString(MemoryIniErrorCode code) {
   switch (code) {
   case MEMORY_INI_OK:
     return "ok";
@@ -88,8 +110,13 @@ const char* memoryIniErrorToString(MemoryIniErrorCode code)
   }
 }
 
-static bool parseBoolValue(const char* s, bool* out)
-{
+/// <summary>
+/// 
+/// </summary>
+/// <param name="s"></param>
+/// <param name="out"></param>
+/// <returns></returns>
+static bool parseBoolValue(const char* s, bool* out) {
   if (strcmp(s, "true") == 0) {
     *out = true;
     return true;
@@ -103,8 +130,13 @@ static bool parseBoolValue(const char* s, bool* out)
   return false;
 }
 
-static bool parseU8Strict(const char* s, uint8_t* out)
-{
+/// <summary>
+/// 
+/// </summary>
+/// <param name="s"></param>
+/// <param name="out"></param>
+/// <returns></returns>
+static bool parseU8Strict(const char* s, uint8_t* out) {
   char* end;
   long v;
 
@@ -123,13 +155,22 @@ static bool parseU8Strict(const char* s, uint8_t* out)
   return true;
 }
 
-static bool parseContextIdStrict(const char* s, uint8_t* out)
-{
+/// <summary>
+/// 
+/// </summary>
+/// <param name="s"></param>
+/// <param name="out"></param>
+/// <returns></returns>
+static bool parseContextIdStrict(const char* s, uint8_t* out) {
   return parseU8Strict(s, out) && (*out < MAX_MEMORY_CONTEXTS);
 }
 
-static MemoryModel* findModel(const char* name)
-{
+/// <summary>
+/// 
+/// </summary>
+/// <param name="name"></param>
+/// <returns></returns>
+static MemoryModel* findModel(const char* name) {
   uint8_t i;
 
   for (i = 0; i < memoryConfig.model_count; i++) {
@@ -140,8 +181,13 @@ static MemoryModel* findModel(const char* name)
   return 0;
 }
 
-static MemoryLayout* findLayout(const char* model, const char* name)
-{
+/// <summary>
+/// 
+/// </summary>
+/// <param name="model"></param>
+/// <param name="name"></param>
+/// <returns></returns>
+static MemoryLayout* findLayout(const char* model, const char* name) {
   uint8_t i;
 
   for (i = 0; i < memoryConfig.layout_count; i++) {
@@ -153,8 +199,13 @@ static MemoryLayout* findLayout(const char* model, const char* name)
   return 0;
 }
 
-static MemoryContextBinding* findContextBinding(const char* model, uint8_t context)
-{
+/// <summary>
+/// 
+/// </summary>
+/// <param name="model"></param>
+/// <param name="context"></param>
+/// <returns></returns>
+static MemoryContextBinding* findContextBinding(const char* model, uint8_t context) {
   uint8_t i;
 
   for (i = 0; i < memoryConfig.context_count; i++) {
@@ -166,8 +217,13 @@ static MemoryContextBinding* findContextBinding(const char* model, uint8_t conte
   return 0;
 }
 
-static MemoryLayoutRegion* findRegion(MemoryLayout* layout, const char* name)
-{
+/// <summary>
+/// 
+/// </summary>
+/// <param name="layout"></param>
+/// <param name="name"></param>
+/// <returns></returns>
+static MemoryLayoutRegion* findRegion(MemoryLayout* layout, const char* name) {
   uint8_t i;
 
   for (i = 0; i < layout->region_count; i++) {
@@ -178,8 +234,12 @@ static MemoryLayoutRegion* findRegion(MemoryLayout* layout, const char* name)
   return 0;
 }
 
-static bool isValidRegionRange(const MemoryLayoutRegion* reg)
-{
+/// <summary>
+/// 
+/// </summary>
+/// <param name="reg"></param>
+/// <returns></returns>
+static bool isValidRegionRange(const MemoryLayoutRegion* reg) {
   if (reg->pages == 0)
     return false;
 
@@ -192,8 +252,12 @@ static bool isValidRegionRange(const MemoryLayoutRegion* reg)
   return true;
 }
 
-static bool layoutHasOverlaps(const MemoryLayout* layout)
-{
+/// <summary>
+/// 
+/// </summary>
+/// <param name="layout"></param>
+/// <returns></returns>
+static bool layoutHasOverlaps(const MemoryLayout* layout) {
   uint8_t i;
   uint8_t j;
 
@@ -213,6 +277,11 @@ static bool layoutHasOverlaps(const MemoryLayout* layout)
   return false;
 }
 
+/// <summary>
+/// 
+/// </summary>
+/// <param name="layout"></param>
+/// <returns></returns>
 static bool layoutIsComplete(const MemoryLayout* layout)
 {
   uint8_t covered[NUM_CONTEXT_PAGES];
@@ -234,6 +303,10 @@ static bool layoutIsComplete(const MemoryLayout* layout)
   return true;
 }
 
+/// <summary>
+/// 
+/// </summary>
+/// <returns></returns>
 static bool validateConfig() {
   uint8_t i;
   uint8_t j;
@@ -319,6 +392,11 @@ static bool validateConfig() {
   return true;
 }
 
+/// <summary>
+/// 
+/// </summary>
+/// <param name="file"></param>
+/// <returns></returns>
 bool parseMemoryIni(File& file) {
   char line[160];
   char section[64];
@@ -679,6 +757,10 @@ bool parseMemoryIni(File& file) {
   return validateConfig();
 }
 
+/// <summary>
+/// 
+/// </summary>
+/// <returns></returns>
 bool initializeMemoryConfig() {
   File file;
 
@@ -843,6 +925,9 @@ bool configureMMUFromActiveModel() {
   return true;
 }
 
+/// <summary>
+/// 
+/// </summary>
 void dumpMemoryConfig() {
   uint8_t i;
   uint8_t r;
@@ -900,6 +985,9 @@ void dumpMemoryConfig() {
   }
 }
 
+/// <summary>
+/// 
+/// </summary>
 void dumpMMUPhysicalUsage() {
   MemoryModel* model;
   bool used[NUM_TOTAL_PAGES];

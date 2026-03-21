@@ -13,28 +13,11 @@ Lesser General Public License for more details.
 #pragma once
 #include <Arduino.h>
 
+#include "delay.h"
+
 // control mode
 #define mRPI  0
 #define mCPU  1
-
-#define DELAY_FACTOR_SHORT() \
-    asm volatile(            \
-        "nop\n\t"            \
-        "nop\n\t"            \
-        "nop\n\t"            \
-        "nop\n\t"            \
-        "nop\n\t"            \
-        "nop\n\t"            \
-        "nop\n\t"            \
-        "nop\n\t"            \
-        "nop\n\t"            \
-        "nop\n\t"            \
-        "nop\n\t"            \
-        "nop\n\t"            \
-        "nop\n\t"            \
-        "nop\n\t"            \
-        "nop\n\t"            \
-        ::: "memory")
 
 uint8_t getControlMode();
 

@@ -23,35 +23,35 @@ Lesser General Public License for more details.
 /// <summary>
 /// system states
 /// </summary>
-static const char lTxtSystemState[6][7] = {
-  "BOOT ",
+static const char lTxtSystemState[6][6] = {
+  "BOOT",
   "RESET",
-  "HALT ",
-  "RUN  ",
-  "READ ",
-  "RPI  "
+  "HALT",
+  "RUN",
+  "READ",
+  "RPI"
 };
 
 /// <summary>
 /// clockstates
 /// </summary>
-static const char lTxtClockState[3][5] = {
+static const char lTxtClockState[2][4] = {
   "OFF",
-  "ON "
+  "ON"
 };
 
 /// <summary>
 /// RW pi states
 /// </summary>
-static const char lTxtRWState[2][7] = {
+static const char lTxtRWState[2][4] = {
   "OUT",
-  "IN "
+  "IN"
 };
 
 /// <summary>
 /// cpu bus states
 /// </summary>
-static const char lTxtBusState[2][9] = {
+static const char lTxtBusState[2][4] = {
   "DIS",
   "ENA",
 };
@@ -179,21 +179,28 @@ void init6502Clock() {
 static void ss6502ClockStep() {
   PHI2Pin::low();
 
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
+  delayNs<75>();
 
   PHI2Pin::high();
 
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
+  delayNs<75>();
+}
+
+/// <summary>
+/// 
+/// </summary>
+/// <returns></returns>
+static bool advance6502clock() {
+  uint8_t lTry = 0;
+
+  while ((get6502RW() == mWRITE) && (lTry++ < 8)) {   // continue till in read cycle
+    ss6502ClockStep();                                // step
+  }
+  if (lTry >= 8) {
+    Serial1.println("*E: advance6502clock: STOPPED but in unknown clock state");
+    return false;
+  }
+  return true;
 }
 
 /// <summary>
@@ -205,37 +212,20 @@ static bool halt6502clock(const bool vToRead) {
   if (gClockState == eOFF) 
     return true;
 
-  uint8_t lTry = 0;
-
   uint slice_num = pwm_gpio_to_slice_num(p6502PHI2);
 
   pwm_set_enabled(slice_num, false);  // stop PWM
 
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
+  delayNs<75>();
 
   gpio_set_function(p6502PHI2, GPIO_FUNC_SIO);          // GPIO output
-  gpio_init(p6502PHI2);
-  gpio_set_dir(p6502PHI2, GPIO_OUT);
-
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
-  DELAY_FACTOR_SHORT();
-
   PHI2Pin::high();                                       // force high
+  gpio_set_dir(p6502PHI2, GPIO_OUT);
 
   gClockState = eOFF;
 
-  if (vToRead) {  
-    while ((get6502RW() == mWRITE) && (lTry++ < 8)) {   // continue till in read cycle
-      ss6502ClockStep();                                // step
-    }
-    if (lTry >= 8) {
-      Serial1.println("*E: halt6502clock: STOPPED but in unknown clock state");
-      return false;
-    }
-  }
+  if (vToRead)
+    return(advance6502clock());
 
   return true;
 }
@@ -383,7 +373,7 @@ bool set6502State(const uint8_t vSysState) {
 /// show substates of 6502
 /// </summary>
 void show6502State() {
-  Serial1.printf("*I: SYS: %s\tBUS: %s\tCTL: %s\tRW: %s\tCLK: %s\n",
+  Serial1.printf("*I: SYS: %s,  BUS: %s,  CTL: %s,  RW: %s,  CLK: %s\n",
     lTxtSystemState[gSysState],
     lTxtBusState[gBusState],
     lTxtControlState[getControlMode()],
