@@ -101,7 +101,7 @@ void writeCPUAddressH(const uint8_t vAddress) {
   writeNEOBus(vAddress);   // write hight byte of address on NEObus
   CPUARegHLatchPin::low();  // arm latch
 
-  delayNs<70>();
+  delayNs<60>();
 
   CPUARegHLatchPin::high(); // latch in AREG
 
@@ -117,7 +117,7 @@ static void writeCPUAddressL(const uint8_t vAddress) {
   writeNEOBus(vAddress);   // write hight byte of address on NEObus
   CPUARegLLatchPin::low(); // arm latch
 
-  delayNs<70>();
+  delayNs<60>();
 
   CPUARegLLatchPin::high(); // latch in AREG
 
@@ -155,7 +155,7 @@ uint8_t read6502Data() {
   MRWPin::high(); // to be sure
   CPUDBufOEPin::low();  // read from databus
 
-  delayNs<70>();
+  delayNs<60>();
 
   uint8_t ldata = readNEOBus();  // read data
 
@@ -208,7 +208,7 @@ void write6502Memory(const uint16_t vAddress, const uint8_t vData) {
     set6502RW(mWRITE);          // set RW to write
     CPUDBufOEPin::low();        // enable databus
 
-    delayNs<70>();
+    delayNs<60>();
 
     set6502RW(mREAD);           // set RW to read for next cycle
     MRWPin::high();             // end write cycle

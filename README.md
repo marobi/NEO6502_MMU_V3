@@ -126,7 +126,3 @@ The architecture explores a modern approach to classic 8-bit computing:
 The MMU concept allows the supervisory RP2350 infrastructure to remain unchanged while experimenting with different CPUs or system configurations.
 
 ---
-
-# License
-
-See the LICENSE file included in this repository.

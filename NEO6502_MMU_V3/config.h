@@ -12,9 +12,9 @@ Lesser General Public License for more details.
 */
 #pragma once
 
-#define VERSION "3.7.387"
+#define VERSION "3.8.395"
 
-#define USE_VALIDATION 1
+#define USE_VALIDATION 0
 
 constexpr uint32_t MEGA_HZ = 1024u * 1024u;
 

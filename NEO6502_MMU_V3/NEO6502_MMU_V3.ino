@@ -195,7 +195,7 @@ void loop() {
 
   inpExecute();                  // process FIFOs
 
-  taskVDU();                     // vdu task, mainly control of cursor blinking ans smooth scroll
+  taskVDU();                     // vdu task, mainly control of cursor blinking and smooth scroll
 
 //  delay(1);
 }

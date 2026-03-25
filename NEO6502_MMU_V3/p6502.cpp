@@ -251,7 +251,7 @@ void singleCycle6502(const uint8_t vSteps, const bool vDisplay) {
 
   if (vSteps == 0) {
     if (vDisplay) {
-      Serial1.printf("%02d:\t%04X: %02X %1d\n", 0, readCPUBusAddress(), read6502Data(), get6502RW());
+      Serial1.printf("%02d:\t%04X: %02X %1s\n", 0, readCPUBusAddress(), read6502Data(), get6502RW() ? "R" : "W");
     }
     return;
   }
@@ -259,9 +259,9 @@ void singleCycle6502(const uint8_t vSteps, const bool vDisplay) {
     ss6502ClockStep();
 
     if (vDisplay) {
-      Serial1.printf("s%02d:\t%04X: %02X %1d\n", s, readCPUBusAddress(), read6502Data(), get6502RW());
+      Serial1.printf("s%02d:\t%04X: %02X %1s\n", s, readCPUBusAddress(), read6502Data(), get6502RW() ? "R" : "W");
     }
-    delayNs<500>();
+    delayNs<70>();
   }
 
   set6502State(lState);  // restore state

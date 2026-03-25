@@ -46,6 +46,9 @@ struct LedProfile {
 /// Led profiles for each state of the 6502. The order must match the order of the states in p6502.h
 /// </summary>
 static const LedProfile ledProfiles[] = {
+  // sSUP
+  { LED_BLINK, 0, 0, 50, 20 },         // fast blink
+
   // sBOOT
   { LED_BLINK, 0, 0, 50, 20 },         // fast blink
 
