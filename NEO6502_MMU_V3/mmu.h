@@ -25,13 +25,15 @@ extern volatile bool gMMUIOTrigger;
 
 uint32_t getMMUIOCount();
 
-uint8_t readMMUContext();
+uint8_t getMMUContext();
 
-void writeMMUContext(const uint8_t);
+void setMMUContext(const uint8_t);
 
 bool getMMUIO();
 
 bool defMMUContext(const uint8_t, const uint8_t *);
+
+void mapMMUPage(const uint8_t, const uint8_t);
 
 void setupMMU();
 

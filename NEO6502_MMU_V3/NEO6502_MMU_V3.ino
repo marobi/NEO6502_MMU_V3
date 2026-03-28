@@ -40,6 +40,8 @@ Lesser General Public License for more details.
 #include "monitor.h"
 #include "input.h"
 
+#include "scheduler.h"
+
 #include "indicator.h"
 
 /// <summary>
@@ -166,12 +168,12 @@ void setup() {
 
   initializeSystemConfig();     // init system configuration from /system.ini
 
-  writeMMUContext(memoryConfig.boot_context); // set default MMU context for booting
-  Serial1.printf("*I: default context: CTX %1X\n", memoryConfig.boot_context);
-
-//  fillMemory(0x00);             // clear memory 64k of current context
+  fillMemory(0x00);             // clear memory 64k of current context
 
   bootSystemWithMenu();         // load/boot system with menu to select configuration.
+
+  setMMUContext(memoryConfig.boot_context); // set default MMU context for booting
+  Serial1.printf("*I: default context: CTX %1X\n", memoryConfig.boot_context);
 
   initCmdInterface();
 
@@ -180,6 +182,8 @@ void setup() {
   initMonitor();                // init monitor after boot
 
   initIndicator();
+
+  initScheduler();
 }
 
 /// <summary>

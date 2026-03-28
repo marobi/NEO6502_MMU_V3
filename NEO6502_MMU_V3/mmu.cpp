@@ -18,8 +18,10 @@ Lesser General Public License for more details.
 #include "mmu.h"
 #include "neobus.h"
 
-uint8_t gCurrentContext = 0x00;
-uint8_t gDefaultMMU[16] = { 0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0x0C,0x0D,0x0E,0x8F }; // straight 64k space with IO page on: F000 - FFFF
+static int gCurrentContext = -1;
+static int gCurrentIndex = -1;
+
+static uint8_t gDefaultMMU[16] = { 0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07,0x08,0x09,0x0A,0x0B,0x0C,0x8D,0x0E,0x0F }; // straight 64k space with IO page on: D000 - DFFF
 
 volatile uint32_t gMMUIOCount = 0L;
 volatile bool     gMMUIOTrigger = false;
@@ -96,9 +98,12 @@ uint8_t readMMUIndex() {
 /// </summary>
 /// <param name="vIndex"></param>
 void writeMMUIndex(const uint8_t vIndex) {
-//  Serial1.printf("*D: writeMMUIndex: %02X\n", vIndex);
+  if (vIndex != gCurrentIndex) {
+    //  Serial1.printf("*D: writeMMUIndex: %02X\n", vIndex);
 
-  writeCPUAddressH((vIndex & 0x0F) << 4);
+    writeCPUAddressH((vIndex & 0x0F) << 4);
+    gCurrentIndex = vIndex;
+  }
 }
 
 
@@ -106,7 +111,7 @@ void writeMMUIndex(const uint8_t vIndex) {
 /// 
 /// </summary>
 /// <returns></returns>
-uint8_t readMMUContext() {
+uint8_t getMMUContext() {
   return gCurrentContext;
 }
 
@@ -114,20 +119,22 @@ uint8_t readMMUContext() {
 /// latch context register 00..127
 /// </summary>
 /// <param name="vContext"></param>
-void writeMMUContext(const uint8_t vContext) {
-//  Serial1.printf("*D: writeMMUContext: %02X\n", vContext);
+void setMMUContext(const uint8_t vContext) {
+  if (vContext != gCurrentContext) {
+//    Serial1.printf("*D: writeMMUContext: %02X --> %02X\n", gCurrentContext, vContext);
 
-  writeNEOBus(vContext); // write context
+    writeNEOBus(vContext); // write context
 
-  MMUARegHLatchPin::low(); // arm latching
+    MMUARegHLatchPin::low(); // arm latching
 
-  delayNs<70>();
+    delayNs<70>();
 
-  MMUARegHLatchPin::high(); // latch
+    MMUARegHLatchPin::high(); // latch
 
-  resetNEOBus(); // databus to read
+    resetNEOBus(); // databus to read
 
-  gCurrentContext = vContext;
+    gCurrentContext = vContext;
+  }
 }
 
 /// <summary>
@@ -138,7 +145,7 @@ void writeMMUContext(const uint8_t vContext) {
 /// <returns></returns>
 uint8_t readMMUPage(const uint8_t vContext, const uint8_t vIndex) {
 
-  writeMMUContext(vContext);   // set context 00.127
+  setMMUContext(vContext);     // set context 00.127
   writeMMUIndex(vIndex);       // set address 00.15
 
   CPUARegOEPin::low();         // enable output address
@@ -167,7 +174,7 @@ uint8_t readMMUPage(const uint8_t vContext, const uint8_t vIndex) {
 /// <param name="vPage"></param>
 /// <returns></returns>
 bool writeMMUPage(const uint8_t vContext, const uint8_t vIndex, const uint8_t vPage) {
-  writeMMUContext(vContext);   // set context 00.127
+  setMMUContext(vContext);   // set context 00.127
   writeMMUIndex(vIndex);       // set address 00.15
 
   CPUARegOEPin::low();         // enable output address
@@ -235,6 +242,17 @@ bool defMMUContext(const uint8_t vContext, const uint8_t* vMMU) {
 }
 
 /// <summary>
+/// Map a page @index of a context in the default context @ same index
+/// </summary>
+/// <param name="vContext"></param>
+/// <param name="vPage"></param>
+void mapMMUPage(const uint8_t vContext, const uint8_t vIndex) {
+
+  uint8_t lPage = readMMUPage(vContext, vIndex);
+  writeMMUPage(DEFAULT_CONTEXT, vIndex, lPage);
+}
+
+/// <summary>
 /// initialise MMU interrupts
 /// </summary>
 static void initMMUInterrupt() {
@@ -276,7 +294,7 @@ bool initMMU() {
   }
 
   // default context
-  writeMMUContext(DEFAULT_CONTEXT);
+  setMMUContext(DEFAULT_CONTEXT);
 
   if (lErrCount == 0) {
     enableMMUInterrupt(); // interrupt on IO page

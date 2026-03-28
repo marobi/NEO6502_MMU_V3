@@ -23,7 +23,7 @@ Lesser General Public License for more details.
 #define MAX_FILE_LENGTH     32
 #define MAX_CART            16
 #define MAX_CONFIG          8
-#define MAX_PER_CONFIG      8
+#define MAX_PER_CONFIG      16
 
 // --------------------------------------------------
 // Data Structures

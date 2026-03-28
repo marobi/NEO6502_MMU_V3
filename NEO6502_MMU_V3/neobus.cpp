@@ -244,7 +244,7 @@ void snoop_read6502Memory(const uint16_t vAddress, const uint32_t vBytes, uint8_
   set6502State(sRPI);
 
   uint16_t lAd = vAddress;
-  uint8_t* lBuf = (uint8_t*)vBuffer;
+  uint8_t* lBuf = vBuffer;
   for (uint16_t m = 0; m < vBytes; m++) {
     lBuf[m] = read6502Memory(lAd++);
   }

@@ -129,7 +129,7 @@ bool activateConfiguration(int cfgIndex) {
     data = readBinaryFile(fullPath);
     if (data) {
       // Activate context before loading
-      writeMMUContext(ctx);
+      setMMUContext(ctx);
 
       // load ROM
       if (!loadROMCartridge(data)) {

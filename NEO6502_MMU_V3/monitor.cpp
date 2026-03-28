@@ -35,6 +35,8 @@ Lesser General Public License for more details.
 #include "vdu.h"
 #include "input.h"
 
+#include "scheduler.h"
+
 // Create CLI Object
 static SimpleCLI gCli;
 // Commands
@@ -206,7 +208,7 @@ static void cmdMemCallback(cmd* c) {
 static void cmdStatusCallback(cmd* c) {
   Serial1.printf("Status\n");
   show6502State();
-  Serial1.printf("*I: CTX: %02X\n", readMMUContext());
+  Serial1.printf("*I: CTX: %02X\n", getMMUContext());
 }
 
 /// <summary>
@@ -215,6 +217,8 @@ static void cmdStatusCallback(cmd* c) {
 /// <param name="c"></param>
 static void cmdIRQCallback(cmd* c) {
   Serial1.printf("IRQ\n");
+
+  gen6502IRQ();
 }
 
 /// <summary>
@@ -232,10 +236,25 @@ static void cmdMMUCallback(cmd* c) {
   uint8_t lState = get6502State();
   set6502State(sRPI);
   
-  writeMMUContext(lContext);  // set the context
+  setMMUContext(lContext);  // set the context
   dumpMMUPageMap(lContext);   // dump context
   
   set6502State(lState);
+}
+
+/// <summary>
+/// 
+/// </summary>
+/// <param name="c"></param>
+static void cmdSwitchCallback(cmd* c) {
+  Command cmd(c);
+  String arg1 = cmd.getArgument("context").getValue();
+  String arg2 = cmd.getArgument("force").getValue();
+
+  uint8_t lContext = x2i(arg1.c_str()) & 0x7F;  // 128
+
+  bool force = (arg2 == "n") ? false : true;
+  schedSwitchcontext(lContext, force);
 }
 
 /// <summary>
@@ -247,7 +266,7 @@ static void cmdPageCallback(cmd* c) {
 
   String arg1 = cmd.getArgument("index").getValue();
   String arg2 = cmd.getArgument("page").getValue();
-  uint8_t lContext = readMMUContext();
+  uint8_t lContext = getMMUContext();
   uint8_t lIndex = x2i(arg1.c_str()) & 0xFF;
   uint8_t lPage = x2i(arg2.c_str()) & 0xFF;
 
@@ -312,18 +331,19 @@ static void cmdHelpCallback(cmd* c) {
   Serial1.print("\nMICmon help:\n\
  > <address> <data>    modify memory address(es)\n\
  clock <freq MHz>      set 6502 clock frequency\n\
+ ctx  <context>        set mmu context\n\
  d/is <from> <lines>   disasm memory\n\
  g/o                   go\n\
  help                  help\n\
  i/rq                  generate IRQ\n\
  m/em <from> <to>      dump memory\n\
- mmu  <context>        set mmu context\n\
  page <index> <page>   set mmu page\n\
- r/eset                reset\n\
+ res/et                reset\n\
  s/top                 stop\n\
  sc <cycles>           single cycle\n\
  ss <steps>            single step\n\
  st/at                 status of cpus/bus\n\
+ swi/tch <context>     switch to context\n\
  syscfg                system configuration\n\
  t/erm                 terminal mode\n\
  zero                  zero memory\n\
@@ -359,18 +379,18 @@ void initMonitor() {
   gCmd.addPositionalArgument("lines", "1");
 
   gCmd = gCli.addCmd("m/em", cmdDumpCallback);
-  gCmd.addPositionalArgument("from");
+  gCmd.addPositionalArgument("from", "0");
   gCmd.addPositionalArgument("to", "0");
 
   gCmd = gCli.addCmd("g/o", cmdGoCallback);
 
   gCmd = gCli.addCmd("h/elp", cmdHelpCallback);
 
-  gCmd = gCli.addCmd("i/rq", cmdIRQCallback);
+  gCmd = gCli.addCmd("irq", cmdIRQCallback);
 
   gCmd = gCli.addBoundlessCommand(">", cmdMemCallback);
 
-  gCmd = gCli.addCmd("mmu", cmdMMUCallback);
+  gCmd = gCli.addCmd("ctx", cmdMMUCallback);
   gCmd.addPositionalArgument("context", "0");
 
   gCmd = gCli.addCmd("r/eset", cmdResetCallback);
@@ -383,7 +403,11 @@ void initMonitor() {
 
   gCmd = gCli.addCmd("s/top", cmdStopCallback);
 
-  gCmd = gCli.addCmd("st/at", cmdStatusCallback);
+  gCmd = gCli.addCmd("stat", cmdStatusCallback);
+
+  gCmd = gCli.addCmd("swi/tch", cmdSwitchCallback);
+  gCmd.addPositionalArgument("context", "0");
+  gCmd.addPositionalArgument("force", "n");
 
   gCmd = gCli.addCmd("syscfg", cmdSysConfigCallback);
 
