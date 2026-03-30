@@ -1,5 +1,7 @@
 #pragma once
 
-#define MAX_CMD_GROUPS (16)
+#define CP_GROUP_VDU   1
+#define CP_GROUP_GDU   2
+#define CP_GROUP_SND   3
 
-void initCmdProcessor();
+void initCProcessor();

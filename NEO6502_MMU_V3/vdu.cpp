@@ -943,6 +943,7 @@ void vduPrintf(char const* fmt, ...) {
 static void helloDisplay() {
   setTColor(YELLOW);
 
+  vduPrintStr("                                                    \n");
   vduPrintStr(" N  N          66  555   00   22\n");
   vduPrintStr(" N  N         6    5    0  0 2  2\n");
   vduPrintStr(" NN N         6    5    0  0    2\n");

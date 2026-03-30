@@ -292,16 +292,6 @@ void singleStep6502(const bool vDisplay) {
   set6502State(lState);  // restore state
 }
 
-/// <summary>
-/// 
-/// </summary>
-void gen6502IRQ() {
-  IRQPin::low();
-  delayMicroseconds(8);   // TODO: or something
-  IRQPin::high();
-}
-
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// <summary>

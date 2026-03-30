@@ -22,8 +22,6 @@ Lesser General Public License for more details.
 #define CMD_SLOT_STAT    3        // status to 6502
 #define CMD_SLOT_SYNC    4        // sync with 6502 (context switching)
 
-#define CMD_PARAM_BASE   0xCF80
-
 /// <summary>
 /// init cmd slots: set to 0x00
 /// </summary>
@@ -132,14 +130,4 @@ uint8_t getCommand6502() {
 /// </summary>
 void ackCommand6502() {
   writeCmdSlot(CMD_SLOT_CMD, 0x00);
-}
-
-/// <summary>
-/// Read command params: read command params from 6502 memory
-/// </summary>
-/// <returns></returns>
-bool readCommandParams(uint8_t vNumParams, uint8_t vParamlist[]) {
-  snoop_read6502Memory(CMD_PARAM_BASE, vNumParams, vParamlist);
-
-  return true;
 }

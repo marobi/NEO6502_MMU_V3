@@ -49,9 +49,6 @@
     <ClCompile Include="gdu.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="gdu_interface.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="sys_config.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -117,7 +114,7 @@
     <ClInclude Include="gdu.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="gdu_interface.h">
+    <ClInclude Include="cmd_interface.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="sys_config.h">

@@ -174,7 +174,7 @@ uint8_t readMMUPage(const uint8_t vContext, const uint8_t vIndex) {
 /// <param name="vPage"></param>
 /// <returns></returns>
 bool writeMMUPage(const uint8_t vContext, const uint8_t vIndex, const uint8_t vPage) {
-  setMMUContext(vContext);   // set context 00.127
+  setMMUContext(vContext);     // set context 00.127
   writeMMUIndex(vIndex);       // set address 00.15
 
   CPUARegOEPin::low();         // enable output address

@@ -63,8 +63,6 @@ void singleCycle6502(const uint8_t, const bool);
 
 void singleStep6502(const bool);
 
-void gen6502IRQ();
-
 uint8_t get6502State();
 
 bool set6502State(const uint8_t);

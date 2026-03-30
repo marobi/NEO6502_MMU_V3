@@ -12,9 +12,12 @@ Lesser General Public License for more details.
 */
 #pragma once
 
-// VDU register definitions
-#define GDU_CMD           0xE000    // CMD register
+#define CI_GROUP_UNK  0
+#define CI_GROUP_VDU  1
+#define CI_GROUP_GDU  2
+#define CI_GROUP_SND  3
 
-#define GDU_REGISTER_BASE 0x0100    // Base of register list
+#define CPU_REGISTER_BASE 0xCF80
+#define MAX_REGISTERS  32
 
-void initGDUInterface();
+void initCPInterface();

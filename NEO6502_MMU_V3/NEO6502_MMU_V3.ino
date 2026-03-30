@@ -145,7 +145,7 @@ void setup() {
     Serial1.println("*I: LittleFS mount OK");
 
   initVDU();           // get display running
-  initGDUInterface();  // init gdu command interface
+  initCmdInterface();  // init CMD command interface
 
   introDisplay();      // show intro
 

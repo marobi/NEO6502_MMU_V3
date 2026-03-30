@@ -212,31 +212,23 @@ static void cmdStatusCallback(cmd* c) {
 }
 
 /// <summary>
-/// IRQ
-/// </summary>
-/// <param name="c"></param>
-static void cmdIRQCallback(cmd* c) {
-  Serial1.printf("IRQ\n");
-
-  gen6502IRQ();
-}
-
-/// <summary>
 /// MMU context change
 /// </summary>
 /// <param name="c"></param>
 static void cmdMMUCallback(cmd* c) {
   Command cmd(c);
-  String arg1 = cmd.getArgument("context").getValue();
+//  String arg1 = cmd.getArgument("context").getValue();
 
-  uint8_t lContext = x2i(arg1.c_str()) & 0x7F;  // 128
+//  uint8_t lContext = x2i(arg1.c_str()) & 0x7F;  // 128
+
+//  if (lContext == 127)
+    uint8_t lContext = getMMUContext();
 
  // Serial1.printf("MMU: %02X\n", lContext);
 
   uint8_t lState = get6502State();
   set6502State(sRPI);
-  
-  setMMUContext(lContext);  // set the context
+
   dumpMMUPageMap(lContext);   // dump context
   
   set6502State(lState);
@@ -331,11 +323,10 @@ static void cmdHelpCallback(cmd* c) {
   Serial1.print("\nMICmon help:\n\
  > <address> <data>    modify memory address(es)\n\
  clock <freq MHz>      set 6502 clock frequency\n\
- ctx  <context>        set mmu context\n\
+ ctx                   show mmu context\n\
  d/is <from> <lines>   disasm memory\n\
  g/o                   go\n\
  help                  help\n\
- i/rq                  generate IRQ\n\
  m/em <from> <to>      dump memory\n\
  page <index> <page>   set mmu page\n\
  res/et                reset\n\
@@ -358,17 +349,13 @@ static void errorCallback(cmd_error* e) {
   CommandError cmdError(e); // Create wrapper object
 
   Serial1.printf("*E: MIC-ICM: %s\n", cmdError.toString());
-
-  if (cmdError.hasCommand()) {
-    Serial1.printf("*E: Did you mean [%s]?\n", cmdError.getCommand().toString());
-  }
 }
 
 /// <summary>
 /// init the monitor commands
 /// </summary>
 void initMonitor() {
-  Serial1.printf("\nMIC-ICM (%s) %s\n> ", BIOS_CPU, MON_VERSION);
+  Serial1.printf("\nMIC-ICM (%s) %s\n%x> ", BIOS_CPU, MON_VERSION, getMMUContext());
 
   // Create the commands with callback function
   gCmd = gCli.addCmd("clock", cmdClockCallback);
@@ -386,12 +373,9 @@ void initMonitor() {
 
   gCmd = gCli.addCmd("h/elp", cmdHelpCallback);
 
-  gCmd = gCli.addCmd("irq", cmdIRQCallback);
-
   gCmd = gCli.addBoundlessCommand(">", cmdMemCallback);
 
   gCmd = gCli.addCmd("ctx", cmdMMUCallback);
-  gCmd.addPositionalArgument("context", "0");
 
   gCmd = gCli.addCmd("r/eset", cmdResetCallback);
 
@@ -436,7 +420,7 @@ static void returnToICM() {
   gInputIndex = 0;
   gInputBuffer[0] = '\0';
 
-  Serial1.print("> ");                   // new prompt for CLI
+  Serial1.printf("%x> ", getMMUContext());                   // new prompt for CLI
 }
 
 /// <summary>
@@ -524,7 +508,7 @@ void taskICMonitor() {
         // Parse the user input into the CLI & execute
         gCli.parse(gInputBuffer);
         if (gInterface == 0)
-          Serial1.print("> ");                   // new prompt
+          Serial1.printf("%x> ", getMMUContext());                   // new prompt
         gInputIndex = 0;                         // new buffer
         gInputBuffer[0] = '\0';
         break;

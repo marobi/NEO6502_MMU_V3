@@ -50,20 +50,22 @@ bool schedSwitchcontext(const uint8_t vContext, const bool vForce) {
   uint8_t buf[1];
 
   Serial1.printf("*I: SWITCH: CTX%1X -> CTX%1X %s\n", getMMUContext(),  vContext, (vForce) ? "RESET" : "RUN");
-
-  DebugPin::low();
-
+  
   buf[0] = 1;
   snoop_write6502Memory(0xD004, 1, buf);
 
-  gen6502IRQ();                                // gen interrupt
+  DebugPin::low();
+  IRQPin::low();                                // gen IRQ
 
   trial = 50;
   do {
-    delayNs<125>();
+    delayNs<250>();
     snoop_read6502Memory(0xD004, 1, buf);
     trial--;
   } while ((buf[0] == 1) && (trial > 0));      // wait for CPU --> 0
+
+  IRQPin::high();                              // reset IRQ
+  DebugPin::high();
 
   if (trial == 0) {
     // failed
@@ -71,8 +73,6 @@ bool schedSwitchcontext(const uint8_t vContext, const bool vForce) {
     return false;
   }
   
-  DebugPin::high();
-
   // now the context switch
   set6502State(sHALTED);                       // halt CPU
 
