@@ -14,7 +14,7 @@ Lesser General Public License for more details.
 
 #include "pins.h"
 
-void setupCPU();
+void setupNEOBus();
 
 uint16_t readCPUBusAddress();
 uint16_t readCPUAddress();
@@ -27,7 +27,11 @@ uint8_t read6502Memory(const uint16_t);
 
 void write6502Memory(const uint16_t, const uint8_t);
 
+uint8_t snoop_read6502MemoryLoc(const uint16_t vAddress);
+
 void snoop_read6502Memory(const uint16_t, const uint32_t, uint8_t*);
+
+void snoop_write6502MemoryLoc(const uint16_t vAddress, uint8_t vData);
 
 void snoop_write6502Memory(const uint16_t, uint32_t, const uint8_t*);
 

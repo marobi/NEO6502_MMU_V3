@@ -15,13 +15,6 @@ Lesser General Public License for more details.
 #include "neobus.h"
 #include "input.h"
 
-#define CMD_SLOT_BASE    0xD000   // sync with memory.ini
-#define CMD_SLOT_OUTCHAR 0        // write to 6502
-#define CMD_SLOT_INCHAR  1        // read from 6502
-#define CMD_SLOT_CMD     2        // cmd from 6502
-#define CMD_SLOT_STAT    3        // status to 6502
-#define CMD_SLOT_SYNC    4        // sync with 6502 (context switching)
-
 /// <summary>
 /// init cmd slots: set to 0x00
 /// </summary>
@@ -29,7 +22,7 @@ void initCmdInterface() {
   uint8_t ldata[5] = { 0x00, 0x00, 0x00, 0x00, 0x00 };
 
   snoop_write6502Memory(CMD_SLOT_BASE, 5, ldata);
-  gMMUIOTrigger = false;
+  ackMMUIO();
 
   inpInit();
 }
@@ -40,8 +33,7 @@ void initCmdInterface() {
 /// <param name="vSlot"></param>
 /// <param name="vData"></param>
 uint8_t readCmdSlot(const uint8_t vSlot) {
-  uint8_t lData;
-  snoop_read6502Memory(CMD_SLOT_BASE + vSlot, 1, &lData);
+  uint8_t lData = snoop_read6502MemoryLoc(CMD_SLOT_BASE + vSlot);
 
   return lData;
 }
@@ -52,8 +44,8 @@ uint8_t readCmdSlot(const uint8_t vSlot) {
 /// <param name="vSlot"></param>
 /// <param name="vData"></param>
 void writeCmdSlot(const uint8_t vSlot, uint8_t vData) {
-  uint8_t lData = vData;
-  snoop_write6502Memory(CMD_SLOT_BASE + vSlot, 1, &lData);
+
+  snoop_write6502MemoryLoc(CMD_SLOT_BASE + vSlot, vData);
 }
 
 // --------------------------------------------------------------
@@ -70,11 +62,11 @@ uint8_t inChar6502() {
 
   inCount++;
 
-  if (gMMUIOTrigger || (! (inCount % 100L))) {        // got mmuInt interrupt or force checking
+  if (triggerMMUIO() || (!(inCount % 100L))) {        // got mmuInt interrupt or force checking
     lChar = readCmdSlot(CMD_SLOT_INCHAR);
     if (lChar != 0x00) {
       writeCmdSlot(CMD_SLOT_INCHAR, 0x00);            // ACK
-      gMMUIOTrigger = false;                          // reset MMU IO trigger
+      ackMMUIO();                                     // reset MMU IO trigger
     }
   }
 
@@ -111,7 +103,7 @@ bool outChar6502(const uint8_t vChar) {
 /// <param name="vChar"></param>
 void  outCharBlocking6502(const uint8_t vChar) {
   while (! outCharAvailable6502()) {
-    delay(5);                        // TODO ulgh
+    delay(50);                        // TODO ulgh
   }
 
   writeCmdSlot(CMD_SLOT_OUTCHAR, vChar);

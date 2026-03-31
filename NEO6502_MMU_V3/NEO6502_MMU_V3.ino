@@ -29,7 +29,7 @@ Lesser General Public License for more details.
 #include "cmd.h"
 #include "vdu.h"
 #include "gdu.h"
-#include "gdu_interface.h"
+#include "cmd_interface.h"
 
 #include "rom.h"
 
@@ -48,7 +48,7 @@ Lesser General Public License for more details.
 /// print the contents of a file from LittleFS to the serial console for debugging purposes.
 /// </summary>
 /// <param name="vFile"></param>
-void printFile(const char* vFile) {
+static void printFile(const char* vFile) {
   Serial1.println("----------");
 
   File f = LittleFS.open(vFile, "r");
@@ -69,7 +69,7 @@ void printFile(const char* vFile) {
 /// <summary>
 /// intro display on gdu to show that the system is up and running, and to test some basic gdu graphics capabilities.
 /// </summary>
-void introDisplay() {
+static void introDisplay() {
   setTColor(69);  // text color light blue
   vduPrintf("\n\nVersion v%s\n\n", VERSION);
 
@@ -115,8 +115,8 @@ void introDisplay() {
 /// </summary>
 void setup() {
   setupControl(); // As early as possible
+  setupNEOBus();
   setupMMU();
-  setupCPU();
   setup6502();
 
   Serial1.begin(115200);
@@ -172,7 +172,6 @@ void setup() {
 
   bootSystemWithMenu();         // load/boot system with menu to select configuration.
 
-  setMMUContext(memoryConfig.boot_context); // set default MMU context for booting
   Serial1.printf("*I: default context: CTX %1X\n", memoryConfig.boot_context);
 
   initCmdInterface();

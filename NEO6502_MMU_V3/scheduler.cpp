@@ -8,7 +8,6 @@ This software is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 Lesser General Public License for more details.
-
 */
 #include "Arduino.h"
 #include "scheduler.h"
@@ -16,6 +15,7 @@ Lesser General Public License for more details.
 #include "neobus.h"
 #include "mmu.h"
 #include "p6502.h"
+#include "cmd.h"
 
 //
 static bool statusContext[8] = {
@@ -33,7 +33,7 @@ static bool statusContext[8] = {
 /// TEMP routine
 /// </summary>
 /// <param name="str"></param>
-static void schedHelp(const char *str) {
+static void schedHelp(const char* str) {
   uint8_t regs[7];
 
   snoop_read6502Memory(0x0228, 7, regs);
@@ -46,58 +46,60 @@ static void schedHelp(const char *str) {
 /// </summary>
 /// <param name="vContext"></param>
 bool schedSwitchcontext(const uint8_t vContext, const bool vForce) {
-  uint8_t trial;
-  uint8_t buf[1];
+  uint16_t trial;
+  uint8_t m;
 
-  Serial1.printf("*I: SWITCH: CTX%1X -> CTX%1X %s\n", getMMUContext(),  vContext, (vForce) ? "RESET" : "RUN");
-  
-  buf[0] = 1;
-  snoop_write6502Memory(0xD004, 1, buf);
+  Serial1.printf("*I: SWITCH: CTX%1X -> CTX%1X %s\n", getMMUContext(), vContext, (vForce) ? "RESET" : "RUN");
 
-  DebugPin::low();
-  IRQPin::low();                                // gen IRQ
+  disableMMUInterrupt();
+
+  writeCmdSlot(CMD_SLOT_SYNC, 0x01);
+
+  IRQPin::low();                             // gen IRQ
+
+  trial = 500;
+  while (!triggerMMUIO() && (trial != 0)) {  // delay for 6502 to respond
+    delayNs<50>();
+    trial--;
+  }
 
   trial = 50;
   do {
-    delayNs<250>();
-    snoop_read6502Memory(0xD004, 1, buf);
-    trial--;
-  } while ((buf[0] == 1) && (trial > 0));      // wait for CPU --> 0
+    m = readCmdSlot(CMD_SLOT_SYNC);
+    if (m == 0x01) {
+      delayNs<50>();
+      trial--;
+    }
+  } while ((m == 0x01) && trial);            // wait for CPU --> 0
 
-  IRQPin::high();                              // reset IRQ
-  DebugPin::high();
+  IRQPin::high();                            // reset IRQ
 
   if (trial == 0) {
     // failed
     Serial1.printf("*E: schedSwitchcontext failed [%02X]\n", vContext);
+    enableMMUInterrupt();                    // reenable MMU interrupts
+    DebugPin::high();
     return false;
   }
-  
+
   // now the context switch
-  set6502State(sHALTED);                       // halt CPU
+  set6502State(sHALTED);                     // halt CPU
 
-  setMMUContext(vContext);                     // switch context
+  setMMUContext(vContext);                   // switch context
 
-  DebugPin::low();
+  if (statusContext[vContext] && (!vForce)) {
+    writeCmdSlot(CMD_SLOT_STAT, 0x01);       // context switch
+  }
+  else {
+    writeCmdSlot(CMD_SLOT_STAT, 0x02);       // reset
+    statusContext[vContext] = true;
+  }
 
-    if (statusContext[vContext] && (! vForce)) {
-      buf[0] = 1;
-      snoop_write6502Memory(0xD003, 1, buf);   // context switch
-//      Serial1.printf("*I: schedSwitchcontext: SWITCH [%02X]\n", vContext);
-    }
-    else {
-      buf[0] = 2;
-      snoop_write6502Memory(0xD003, 1, buf);   // reset
-      statusContext[vContext] = true;
-//      Serial1.printf("*I: schedSwitchcontext: RESET [%02X]\n", vContext);
-    }
+  writeCmdSlot(CMD_SLOT_SYNC, 0x01);         // ==> 1, ACK
 
-    buf[0] = 1;
-    snoop_write6502Memory(0xD004, 1, buf);     // ==> 1, ACK
+  set6502State(sRUNNING);                    // continue CPU
 
-    set6502State(sRUNNING);                    // continue CPU
-
-  DebugPin::high();
+  enableMMUInterrupt();
 
   return true;
 }

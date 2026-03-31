@@ -80,8 +80,7 @@ static int            pendingCursorRow = -1;
 /// </summary>
 /// <param name="rgb"></param>
 /// <returns></returns>
-inline __attribute__((always_inline))
-uint32_t rgb_to_brg(uint32_t rgb) {
+static uint32_t rgb_to_brg(uint32_t rgb) {
   uint32_t r = (rgb >> 16) & 0xFF;
   uint32_t g = (rgb >> 8) & 0xFF;
   uint32_t b = rgb & 0xFF;
@@ -92,7 +91,7 @@ uint32_t rgb_to_brg(uint32_t rgb) {
 /// <summary>
 /// load default palette 
 /// </summary>
-void loadPalette() {
+static void loadPalette() {
   // load default palette
   for (uint16_t c = 0; c < 256; c++) {
     display.setColor(c, rgb_to_brg(default_palette[c]));
@@ -145,7 +144,7 @@ void vduSetSmoothscroll(const bool on) {
 /// helper to init text buffer
 /// </summary>
 /// <param name=""></param>
-void initTextbuffer() {
+static void initTextbuffer() {
   for (int r = 0; r < ROWS; r++) {
     for (int c = 0; c < COLS; c++) {
       gScreen[r][c].ch = ' ';
@@ -178,7 +177,7 @@ void setTColor(const uint8_t vColor) {
 /// </summary>
 /// <param name="col"></param>
 /// <param name="row"></param>
-void vduDrawCell(const uint8_t col, const uint8_t row) {
+static void vduDrawCell(const uint8_t col, const uint8_t row) {
   vdu_cell_t c = gScreen[row][col];
 
   uint16_t x = col * FONT_CELL_WIDTH;
@@ -202,7 +201,7 @@ void vduDrawCell(const uint8_t col, const uint8_t row) {
 /// <summary>
 /// show cursor 
 /// </summary>
-void showCursor() {
+static void showCursor() {
   if (!gCursor.enabled || gCursor.drawn)
     return;
 
@@ -257,7 +256,7 @@ void showCursor() {
 /// <summary>
 /// hide cursor
 /// </summary>
-void hideCursor() {
+static void hideCursor() {
   if (!gCursor.drawn)
     return;
 
@@ -407,7 +406,7 @@ static void scrollStep() {
 /// scroll up screen one line
 /// </summary>
 /// <param name="vLines"></param>
-void cmdScrollUp() {
+static void cmdScrollUp() {
   if (gCursor.drawn) {
     hideCursor();
   }
@@ -495,7 +494,7 @@ void vduRestoreCursor() {
 /// <summary>
 /// 
 /// </summary>
-void cmdNewline() {
+static void cmdNewline() {
   gCursor.col = 0;
 
   if (++gCursor.row >= ROWS) {
@@ -532,7 +531,7 @@ uint8_t vduReadc(const uint16_t x, const uint16_t y) {
 /// </summary>
 /// <param name="col"></param>
 /// <param name="row"></param>
-void vduDisplayClearcell(const int col, const int row) {
+static void vduDisplayClearcell(const int col, const int row) {
   display.fillRect(
     col * FONT_CELL_WIDTH,
     row * FONT_CELL_HEIGHT,
@@ -546,8 +545,7 @@ void vduDisplayClearcell(const int col, const int row) {
 /// <summary>
 /// vdu delete char at cursor position, rest of line move left, last char on line = space
 /// </summary>
-void vduDisplayDeletechar()
-{
+static void vduDisplayDeletechar() {
   uint8_t* fb = display.getBuffer();
 
   int pixel_x = gCursor.col * FONT_CELL_WIDTH;
@@ -572,8 +570,7 @@ void vduDisplayDeletechar()
 /// vdu insert space at cursor position, rest of line move right, last char on line lost
 /// </summary>
 /// <param name="c"></param>
-void vduDisplayInsertspace()
-{
+static void vduDisplayInsertspace() {
   if (gCursor.col >= COLS - 1)
     return;
 
@@ -601,8 +598,7 @@ void vduDisplayInsertspace()
 /// <summary>
 /// vdu delete char at cursor position, rest of line move left, last char on line lost
 /// </summary>
-inline __attribute__((always_inline))
-void vduDeletec() {
+static void vduDeletec() {
   vdu_cell_t* line = gScreen[gCursor.row];
 
   memmove(
@@ -622,7 +618,7 @@ void vduDeletec() {
 /// vdu insert char at cursor position, rest of line move right, last char on line lost
 /// </summary>
 /// <param name="c"></param>
-void vduInsertc(uint8_t c) {
+static void vduInsertc(uint8_t c) {
   vdu_cell_t* line = gScreen[gCursor.row];
 
   memmove(
@@ -642,7 +638,7 @@ void vduInsertc(uint8_t c) {
 /// vdu display char at cursor position, update text buffer, move cursor right, scroll if needed
 /// </summary>
 /// <param name="c"></param>
-void vduDisplayc(const uint8_t c) {
+static void vduDisplayc(const uint8_t c) {
   if (c >= 0x20) {
     gScreen[gCursor.row][gCursor.col].ch = c;
     gScreen[gCursor.row][gCursor.col].fg = currentColor;

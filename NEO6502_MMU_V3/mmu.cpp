@@ -41,7 +41,7 @@ uint32_t getMMUIOCount() {
 /// </summary>
 /// <returns></returns>
 bool getMMUIO() {
-  return (!gpio_get(pMMUIO));
+  return (gpio_get(pMMUIO));
 }
 
 
@@ -53,6 +53,21 @@ static void intrMMUIO() {
 
   gMMUIOCount++;
   gMMUIOTrigger = true;
+}
+
+/// <summary>
+/// 
+/// </summary>
+void ackMMUIO() {
+  gMMUIOTrigger = false;
+}
+
+/// <summary>
+/// 
+/// </summary>
+/// <returns></returns>
+bool triggerMMUIO() {
+  return gMMUIOTrigger;
 }
 
 /// <summary>
@@ -263,6 +278,7 @@ static void initMMUInterrupt() {
 /// enable MMU interrupts on MMU_IO pin FALLING
 /// </summary>
 void enableMMUInterrupt() {
+  ackMMUIO();
   gpio_acknowledge_irq(pMMUIO, GPIO_IRQ_EDGE_FALL);
   irq_set_enabled(IO_IRQ_BANK0, true);
   gpio_set_irq_enabled(pMMUIO, GPIO_IRQ_EDGE_FALL, true);
@@ -272,10 +288,12 @@ void enableMMUInterrupt() {
 /// disable MMU interrupts on MMU_IO pin FALLING
 /// </summary>
 void disableMMUInterrupt() {
+  ackMMUIO();
   gpio_set_irq_enabled(pMMUIO, GPIO_IRQ_EDGE_FALL, false);
   gpio_acknowledge_irq(pMMUIO, GPIO_IRQ_EDGE_FALL);
   irq_set_enabled(IO_IRQ_BANK0, false);
 }
+
 /// <summary>
 /// fill MMU with 256 contexts of straight 64k RAM space
 /// </summary>

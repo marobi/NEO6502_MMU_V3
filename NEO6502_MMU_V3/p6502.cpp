@@ -66,20 +66,19 @@ static const char lTxtControlState[2][4] = {
 };
 
 // desired frequency in Hz
-static uint32_t gClockFrequency = DEFAULT_6502_CLOCK;
-
-static uint8_t gSysState;       // will be init in setup6502
-static uint8_t gBusState;       // will be init in setup6502
-static uint8_t gDir6502RW = 99;
-static uint8_t gClockState;     // will be init in setup6502
+static uint32_t     gClockFrequency = DEFAULT_6502_CLOCK;
+static sysstate_t   gSysState;       // will be init in setup6502
+static busstate_t   gBusState;       // will be init in setup6502
+static direction_t  gDir6502RW = mUNKNOWN;
+static clockstate_t gClockState;     // will be init in setup6502
 
 /// <summary>
 /// set RW pin state
 /// </summary>
 /// <param name="vHL"></param>
-void set6502RW(const uint8_t vHL) {
+void set6502RW(const rw_t vHL) {
   if (gDir6502RW == mOUTPUT)
-    RWPin::set(vHL);
+    RWPin::set((uint8_t)vHL);
   else
     Serial1.printf("*E: set6502RW: not output [%s]\n", lTxtSystemState[gSysState]);
 }
@@ -88,9 +87,9 @@ void set6502RW(const uint8_t vHL) {
 /// get RW pin state
 /// </summary>
 /// <returns></returns>
-uint8_t get6502RW() {
+rw_t get6502RW() {
   if (gDir6502RW == mINPUT)
-    return gpio_get(p6502RW);
+    return (rw_t)gpio_get(p6502RW);
   else
     Serial1.printf("*E: get6502RW: not input [%s]\n", lTxtSystemState[gSysState]);
 
@@ -98,18 +97,10 @@ uint8_t get6502RW() {
 }
 
 /// <summary>
-/// get PHI2 state
-/// </summary>
-/// <returns></returns>
-uint8_t getClockState() {
-  return gClockState;
-}
-
-/// <summary>
 /// set the direction of 6502 RW bus pin
 /// </summary>
 /// <param name="vDir"></param>
-void dir6502RW(const uint8_t vDir) {
+static void dir6502RW(const direction_t vDir) {
   switch (vDir) {
   case mINPUT:                            // always allowed
     if (gDir6502RW != mINPUT) {
@@ -147,11 +138,6 @@ void set6502Clockfrequency(const uint32_t freq) {
 /// </summary>
 /// <param name="freq"></param>
 void set6502Clock() {
-//  if (gClockState == eON) {
-//    Serial1.println("*E: set6502Clock: clock is already running");
-//    return;
-//  }
-
   const uint32_t pwm_clk = 125000000L;
 
   gpio_set_function(p6502PHI2, GPIO_FUNC_PWM); // PWM output
@@ -246,7 +232,7 @@ bool halt6502clock(const bool vToRead) {
 /// <param name="vSteps"></param>
 /// <param name="vDisplay"></param>
 void singleCycle6502(const uint8_t vSteps, const bool vDisplay) {
-  uint8_t lState = get6502State();
+  sysstate_t lState = get6502State();
   set6502State(sREAD);
 
   if (vSteps == 0) {
@@ -272,7 +258,7 @@ void singleCycle6502(const uint8_t vSteps, const bool vDisplay) {
 /// </summary>
 /// <param name="vDisplay"></param>
 void singleStep6502(const bool vDisplay) {
-  uint8_t lState = get6502State();
+  sysstate_t lState = get6502State();
 
   set6502State(sHALTED);
   set6502State(sREAD);
@@ -298,7 +284,7 @@ void singleStep6502(const bool vDisplay) {
 /// get neo6502_mmu system state
 /// </summary>
 /// <returns></returns>
-uint8_t get6502State() {
+sysstate_t get6502State() {
   return gSysState;
 }
 
@@ -307,7 +293,7 @@ uint8_t get6502State() {
 /// </summary>
 /// <param name="vSysState"></param>
 /// <returns></returns>
-bool set6502State(const uint8_t vSysState) {
+bool set6502State(const sysstate_t vSysState) {
   //Serial1.printf("*D: set6502State: %s --> %s\n", lTxtSystemState[gSysState], lTxtSystemState[vSysState]);
 
   if (vSysState == gSysState) 
@@ -379,8 +365,6 @@ bool set6502State(const uint8_t vSysState) {
 
   gSysState = vSysState;
   
-  delayMicroseconds(1);
-
   return true;
 }
 
@@ -440,5 +424,5 @@ void setup6502() {
   PHI2Pin::high();
   gClockState = eOFF;
 
-  gSysState = 0;                      // dummy state
+  gSysState = sSTARTUP;               // startup state
 }

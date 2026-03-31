@@ -16,12 +16,14 @@ Lesser General Public License for more details.
 #include "delay.h"
 
 // control mode
-#define mRPI  0
-#define mCPU  1
+typedef enum {
+  mRPI = 0,
+  mCPU
+} controlmode_t;
 
-uint8_t getControlMode();
+controlmode_t getControlMode();
 
-void setControlMode(const uint8_t);
+void setControlMode(const controlmode_t);
 
 uint8_t readNEOBus();
 

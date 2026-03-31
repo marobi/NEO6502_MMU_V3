@@ -23,7 +23,7 @@ Lesser General Public License for more details.
 constexpr auto DATA_BUS_MASK = (0xFF0000000000LL); // pin 40..47
 
 // maintains control
-static uint8_t gControlMode = mRPI;
+static controlmode_t gControlMode = mRPI;
 
 // maintains databus direction
 static uint8_t gBusDir = 99;  // invalid :-)
@@ -32,7 +32,7 @@ static uint8_t gBusDir = 99;  // invalid :-)
 /// get mode of control
 /// </summary>
 /// <returns></returns>
-uint8_t getControlMode() {
+controlmode_t getControlMode() {
   return (gControlMode);
 }
 
@@ -40,7 +40,7 @@ uint8_t getControlMode() {
 /// set mode of control
 /// </summary>
 /// <param name="vMode"></param>
-void setControlMode(const uint8_t vMode) {
+void setControlMode(const controlmode_t vMode) {
   gControlMode = vMode;
 }
 

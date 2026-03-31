@@ -12,6 +12,7 @@ Lesser General Public License for more details.
 */
 #include "boot.h"
 #include "sys_config.h"
+#include "memory_config.h"
 #include "mmu.h"
 #include "p6502.h"
 #include "rom.h"
@@ -169,4 +170,6 @@ void bootSystemWithMenu() {
     loadFallbackProfile();
     activateConfiguration(systemConfig.defaultConfig);
   }
+
+  setMMUContext(memoryConfig.boot_context); // set default MMU context for booting
 }

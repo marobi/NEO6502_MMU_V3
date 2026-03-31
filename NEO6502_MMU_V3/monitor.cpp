@@ -49,8 +49,7 @@ static uint8_t gInterface = 0x00;
 /// </summary>
 /// <param name="s"></param>
 /// <returns></returns>
-int x2i(const char* s)
-{
+static int x2i(const char* s) {
   int x = 0;
   for (;;) {
     char c = *s;
@@ -226,7 +225,7 @@ static void cmdMMUCallback(cmd* c) {
 
  // Serial1.printf("MMU: %02X\n", lContext);
 
-  uint8_t lState = get6502State();
+  sysstate_t lState = get6502State();
   set6502State(sRPI);
 
   dumpMMUPageMap(lContext);   // dump context
@@ -262,7 +261,7 @@ static void cmdPageCallback(cmd* c) {
   uint8_t lIndex = x2i(arg1.c_str()) & 0xFF;
   uint8_t lPage = x2i(arg2.c_str()) & 0xFF;
 
-  uint8_t lState = get6502State();
+  sysstate_t lState = get6502State();
   set6502State(sRPI);
   uint8_t lPrevPage = readMMUPage(lContext, lIndex);
   writeMMUPage(lContext, lIndex, lPage);
@@ -291,7 +290,7 @@ static void cmdSysConfigCallback(cmd* c) {
 static void cmdZeroCallback(cmd* c) {
   Command cmd(c);
 
-  uint8_t save_state = get6502State();
+  sysstate_t save_state = get6502State();
 
   set6502State(sBOOT);
   fillMemory(0x00);
@@ -305,14 +304,14 @@ static void cmdClockCallback(cmd* c) {
 
   String arg1 = cmd.getArgument("freq").getValue();
 
-  uint32_t lFreq = atof(arg1.c_str()) * MEGA_HZ;
+  uint32_t lFreq = atof(arg1.c_str()) * MEGA;
 
-  if (lFreq < 0.001 * MEGA_HZ)
+  if (lFreq < 0.001 * MEGA)
     lFreq = DEFAULT_6502_CLOCK;
 
   set6502Clockfrequency(lFreq);
 
-  Serial1.printf("*I: Clock = %4.2f MHz\n", (float)lFreq / MEGA_HZ);
+  Serial1.printf("*I: Clock = %4.2f MHz\n", (float)lFreq / MEGA);
 }
 
 /// <summary>
@@ -385,15 +384,15 @@ void initMonitor() {
   gCmd = gCli.addCmd("ss", cmdSSCallback);
   gCmd.addPositionalArgument("steps", "1");
 
-  gCmd = gCli.addCmd("s/top", cmdStopCallback);
+  gCmd = gCli.addCmd("st/at", cmdStatusCallback);
 
-  gCmd = gCli.addCmd("stat", cmdStatusCallback);
-
-  gCmd = gCli.addCmd("swi/tch", cmdSwitchCallback);
+  gCmd = gCli.addCmd("sw/itch", cmdSwitchCallback);
   gCmd.addPositionalArgument("context", "0");
   gCmd.addPositionalArgument("force", "n");
 
   gCmd = gCli.addCmd("syscfg", cmdSysConfigCallback);
+
+  gCmd = gCli.addCmd("s/top", cmdStopCallback);
 
   gCmd = gCli.addCmd("t/erm", cmdCommandCallback);
 

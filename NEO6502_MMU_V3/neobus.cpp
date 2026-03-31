@@ -18,7 +18,7 @@ Lesser General Public License for more details.
 /// <summary>
 /// 
 /// </summary>
-void setupCPU() {
+void setupNEOBus() {
   gpio_init(pCPUARegLLatch);                // Always init pins first
   gpio_set_dir(pCPUARegLLatch, GPIO_OUT);   // Set as output
   CPUARegLLatchPin::high();                 // no latch
@@ -234,13 +234,29 @@ void write6502Memory(const uint16_t vAddress, const uint8_t vData) {
 }
 
 /// <summary>
+/// 
+/// </summary>
+/// <param name="vAddress"></param>
+/// <returns></returns>
+uint8_t snoop_read6502MemoryLoc(const uint16_t vAddress) {
+  sysstate_t lState = get6502State();
+  set6502State(sRPI);
+
+  uint8_t loc = read6502Memory(vAddress);
+
+  set6502State(lState);  // return to prev state
+
+  return loc;
+}
+
+/// <summary>
 /// Snoop read from memory, halting the possibly running CPU
 /// </summary>
 /// <param name="vAddress"></param>
 /// <param name="vBytes"></param>
 /// <param name="vBuffer"></param>
 void snoop_read6502Memory(const uint16_t vAddress, const uint32_t vBytes, uint8_t* vBuffer) {
-  uint8_t lState = get6502State();
+  sysstate_t lState = get6502State();
   set6502State(sRPI);
 
   uint16_t lAd = vAddress;
@@ -253,13 +269,27 @@ void snoop_read6502Memory(const uint16_t vAddress, const uint32_t vBytes, uint8_
 }
 
 /// <summary>
+/// 
+/// </summary>
+/// <param name="vAddress"></param>
+/// <param name="vData"></param>
+void snoop_write6502MemoryLoc(const uint16_t vAddress, uint8_t vData) {
+  sysstate_t lState = get6502State();
+  set6502State(sRPI);
+
+  write6502Memory(vAddress, vData);
+
+  set6502State(lState);  // return to prev state
+}
+
+/// <summary>
 /// Snoop write to memory, halting the possible running CPU
 /// </summary>
 /// <param name="vAddress"></param>
 /// <param name="vBytes"></param>
 /// <param name="vBuffer"></param>
 void snoop_write6502Memory(const uint16_t vAddress, uint32_t vBytes, const uint8_t* vBuffer) {
-  uint8_t lState = get6502State();
+  sysstate_t lState = get6502State();
   set6502State(sRPI);
 
   uint16_t lAd = vAddress;

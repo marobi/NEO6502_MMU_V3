@@ -12,31 +12,36 @@ Lesser General Public License for more details.
 */
 #pragma once
 
-#define mREAD  1
-#define mWRITE 0
+typedef enum {
+  mWRITE = 0,
+  mREAD
+} rw_t;
 
-#define mINPUT  1
-#define mOUTPUT 0
+typedef enum {
+  mOUTPUT = 0,
+  mINPUT,
+  mUNKNOWN
+} direction_t;
 
 // state of 6502 cpu
-enum cpuState {
+typedef enum {
  eRESET = 0,
  eRUN,
  eHALTED
-};
+} cpustate_t;
 
 // state of 6502 bus control
-enum busState {
+typedef enum {
   eDISABLED = 0,
   eENABLED
-};
+} busstate_t;
 
-enum clockState {
+typedef enum {
   eOFF = 0,
-  eON,
-};
+  eON
+} clockstate_t;
 
-enum sysState {
+typedef enum {
 //                    CTRL   STATE   PHI2   BUS   DIR
   sSTARTUP = 0,
   sBOOT    ,       // RPI    RESET   OFF    DIS   IN
@@ -45,13 +50,11 @@ enum sysState {
   sRUNNING,        // CPU    RUN     ON     ENA   IN
   sREAD,           // RPI    HALTED  OFF    ENA   IN
   sRPI             // RPI    HALTED  OFF    DIS   OUT
-};
+} sysstate_t;
 
-void set6502RW(const uint8_t);
+void set6502RW(const rw_t);
 
-uint8_t get6502RW();
-
-uint8_t getClockState();
+rw_t get6502RW();
 
 void set6502Clockfrequency(const uint32_t);
 
@@ -63,9 +66,9 @@ void singleCycle6502(const uint8_t, const bool);
 
 void singleStep6502(const bool);
 
-uint8_t get6502State();
+sysstate_t get6502State();
 
-bool set6502State(const uint8_t);
+bool set6502State(const sysstate_t);
 
 void show6502State();
 

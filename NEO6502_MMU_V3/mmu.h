@@ -21,7 +21,6 @@ Lesser General Public License for more details.
 #define DEFAULT_CONTEXT    (0)
 
 extern volatile uint32_t gMMUIOCount;
-extern volatile bool gMMUIOTrigger;
 
 uint32_t getMMUIOCount();
 
@@ -34,6 +33,10 @@ bool getMMUIO();
 bool defMMUContext(const uint8_t, const uint8_t *);
 
 void mapMMUPage(const uint8_t, const uint8_t);
+
+void ackMMUIO();
+
+bool triggerMMUIO();
 
 void setupMMU();
 
