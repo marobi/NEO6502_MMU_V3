@@ -13,21 +13,25 @@ Lesser General Public License for more details.
 #pragma once
 
 #include <Arduino.h>
+#include <stdint.h>
+#include <stdbool.h>
 
-// --------------------------------------------------
-// Limits
-// --------------------------------------------------
+#include "LittleFS.h"
 
-#define MAX_LINE_LENGTH     128
-#define MAX_NAME_LENGTH     16
-#define MAX_FILE_LENGTH     32
-#define MAX_CART            16
-#define MAX_CONFIG          8
-#define MAX_PER_CONFIG      16
+#include "mmu.h"
 
-// --------------------------------------------------
-// Data Structures
-// --------------------------------------------------
+#define MAX_NAME_LENGTH   16
+#define MAX_FILE_LENGTH   32
+#define MAX_LINE_LENGTH   160
+
+#define MAX_CART          16
+#define MAX_CONFIG        16
+#define MAX_PER_CONFIG    64
+
+struct ConfigEntry {
+  uint8_t cartIndex;
+  uint8_t context;
+};
 
 struct Cartridge {
   char name[MAX_NAME_LENGTH + 1];
@@ -35,36 +39,26 @@ struct Cartridge {
   bool defined;
 };
 
-struct ConfigEntry {
-  uint8_t cartIndex;
-  uint8_t context;
-};
-
 struct Config {
   char name[MAX_NAME_LENGTH + 1];
-  ConfigEntry entries[MAX_PER_CONFIG];
-  uint8_t count;
   bool defined;
+  uint8_t count;
+  bool contextDefined[NUM_CONTEXTS];
+  ConfigEntry entries[MAX_PER_CONFIG];
 };
 
 struct SystemConfig {
   uint8_t version;
-  int8_t defaultConfig;
+  int defaultConfig;
   char defaultName[MAX_NAME_LENGTH + 1];
 };
 
-// --------------------------------------------------
-// Globals (owned by ini_parser.cpp)
-// --------------------------------------------------
-
-extern Cartridge    cartridges[MAX_CART];
-extern Config       configs[MAX_CONFIG];
+extern Cartridge cartridges[MAX_CART];
+extern Config configs[MAX_CONFIG];
 extern SystemConfig systemConfig;
 
-// --------------------------------------------------
-// Public API
-// --------------------------------------------------
-
+bool parseSystemIni(File& file);
+bool initializeSystemConfig();
 void loadFallbackProfile();
 
-bool initializeSystemConfig();
+void dumpSystemConfig();

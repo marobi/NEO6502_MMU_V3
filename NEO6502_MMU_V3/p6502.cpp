@@ -128,6 +128,14 @@ static void dir6502RW(const direction_t vDir) {
 /// <summary>
 /// 
 /// </summary>
+/// <returns></returns>
+uint32_t get6502ClockFrequency() {
+  return gClockFrequency;
+}
+
+/// <summary>
+/// 
+/// </summary>
 /// <param name="freq"></param>
 void set6502Clockfrequency(const uint32_t freq) {
   gClockFrequency = freq;

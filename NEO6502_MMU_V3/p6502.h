@@ -56,6 +56,8 @@ void set6502RW(const rw_t);
 
 rw_t get6502RW();
 
+uint32_t get6502ClockFrequency();
+
 void set6502Clockfrequency(const uint32_t);
 
 void set6502Clock();

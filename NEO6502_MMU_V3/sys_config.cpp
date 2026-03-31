@@ -8,25 +8,35 @@ This software is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 Lesser General Public License for more details.
-
 */
-#include <LittleFS.h>
-
 #include "sys_config.h"
-#include "mmu.h"
 
 // =====================================================
 // NEO6502 STRICT INI CONFIGURATION SYSTEM
 // Layout:
 //   /system.ini            -> configuration file (root)
 //   /system/<rom>.rom      -> cartridge images
+//
+// Syntax:
+//   [system]
+//   [cartridge <name>]
+//   [config <name>.context <n>]
+//
+// In config context sections:
+//   load = bios
+//   load = bios, ipc, micmon
+//   load = bios
+//   load = ipc, micmon
+//
+// Order is preserved exactly as written.
 // =====================================================
 
 #define SUPPORTED_VERSION   1
 
-/// <summary>
-/// Error codes for INI parsing and validation. Used for error reporting and debugging.
-/// </summary>
+// =====================================================
+// Error handling
+// =====================================================
+
 enum IniErrorCode {
   INI_OK = 0,
   INI_ERR_LINE_TOO_LONG,
@@ -40,7 +50,9 @@ enum IniErrorCode {
   INI_ERR_EMPTY_CONFIG,
   INI_ERR_NO_CONFIG_DEFINED,
   INI_ERR_VERSION_MISMATCH,
-  INI_ERR_DEFAULT_NOT_FOUND
+  INI_ERR_DEFAULT_NOT_FOUND,
+  INI_ERR_INVALID_CONTEXT,
+  INI_ERR_DUPLICATE_CONTEXT_SECTION
 };
 
 struct IniError {
@@ -56,11 +68,6 @@ static bool setIniError(IniErrorCode code, int line) {
   return false;
 }
 
-/// <summary>
-/// Error messages corresponding to IniErrorCode values for debugging purposes.
-/// </summary>
-/// <param name="code"></param>
-/// <returns></returns>
 static const char* iniErrorToString(IniErrorCode code) {
   switch (code) {
   case INI_OK: return "*D: No error";
@@ -76,26 +83,37 @@ static const char* iniErrorToString(IniErrorCode code) {
   case INI_ERR_NO_CONFIG_DEFINED: return "*E: No configuration defined";
   case INI_ERR_VERSION_MISMATCH: return "*E: Unsupported configuration version";
   case INI_ERR_DEFAULT_NOT_FOUND: return "*E: Default configuration not found";
+  case INI_ERR_INVALID_CONTEXT: return "*E: Invalid context";
+  case INI_ERR_DUPLICATE_CONTEXT_SECTION: return "*E: Duplicate config context section";
   default: return "*E: Unknown INI error";
   }
 }
 
 // =====================================================
-// Data Structures
+// Data storage
 // =====================================================
+
 Cartridge cartridges[MAX_CART];
 Config configs[MAX_CONFIG];
 SystemConfig systemConfig;
 
 // =====================================================
-// FALLBACK PROFILE (ROMs still loaded from /system/)
+// Fallback profile
 // =====================================================
+
 static const char* FALLBACK_CART_NAME = "boot";
 static const char* FALLBACK_CART_FILE = "boot.rom";
 
 /// <summary>
-/// reset all tables and system config to default empty state.
+/// little helper
 /// </summary>
+/// <param name="dst"></param>
+/// <param name="src"></param>
+static void copyName(char* dst, const char* src) {
+  strncpy(dst, src, MAX_NAME_LENGTH);
+  dst[MAX_NAME_LENGTH] = 0;
+}
+
 static void resetTables() {
   memset(cartridges, 0, sizeof(cartridges));
   memset(configs, 0, sizeof(configs));
@@ -104,20 +122,17 @@ static void resetTables() {
   memset(systemConfig.defaultName, 0, sizeof(systemConfig.defaultName));
 }
 
-/// <summary>
-/// load a fallback profile with a single cartridge and configuration.
-/// </summary>
 void loadFallbackProfile() {
-
   resetTables();
 
-  strncpy(cartridges[0].name, FALLBACK_CART_NAME, MAX_NAME_LENGTH);
+  copyName(cartridges[0].name, FALLBACK_CART_NAME);
   strncpy(cartridges[0].file, FALLBACK_CART_FILE, MAX_FILE_LENGTH);
   cartridges[0].defined = true;
 
-  strncpy(configs[0].name, "SAFE", MAX_NAME_LENGTH);
+  copyName(configs[0].name, "SAFE");
   configs[0].defined = true;
   configs[0].count = 1;
+  configs[0].contextDefined[DEFAULT_CONTEXT] = true;
   configs[0].entries[0].cartIndex = 0;
   configs[0].entries[0].context = DEFAULT_CONTEXT;
 
@@ -126,148 +141,144 @@ void loadFallbackProfile() {
 }
 
 // =====================================================
-// UTILITIES
+// Utilities
 // =====================================================
 
 static void trim(char* s) {
   char* start = s;
-  while (*start == ' ' || *start == '\t') start++;
-  if (start != s) memmove(s, start, strlen(start) + 1);
+
+  while (*start == ' ' || *start == '\t')
+    start++;
+
+  if (start != s)
+    memmove(s, start, strlen(start) + 1);
 
   char* end = s + strlen(s);
-  while (end > s && (end[-1] == ' ' || end[-1] == '\t' || end[-1] == '\r' || end[-1] == '\n'))
+
+  while (end > s &&
+    (end[-1] == ' ' || end[-1] == '\t' ||
+      end[-1] == '\r' || end[-1] == '\n'))
+  {
     *--end = 0;
+  }
 }
 
 static bool isValidIdentifier(const char* s) {
   size_t len = strlen(s);
-  if (len == 0 || len > MAX_NAME_LENGTH) return false;
-  if (!isalpha((unsigned char)s[0])) return false;
-  for (size_t i = 1; i < len; i++)
+
+  if (len == 0 || len > MAX_NAME_LENGTH)
+    return false;
+
+  if (!isalpha((unsigned char)s[0]))
+    return false;
+
+  for (size_t i = 1; i < len; i++) {
     if (!isalnum((unsigned char)s[i]) && s[i] != '_')
       return false;
+  }
+
   return true;
 }
 
 static int findCartridge(const char* name) {
-  for (int i = 0; i < MAX_CART; i++)
+  for (int i = 0; i < MAX_CART; i++) {
     if (cartridges[i].defined && strcmp(cartridges[i].name, name) == 0)
       return i;
+  }
+
   return -1;
 }
 
 static int findConfig(const char* name) {
-  for (int i = 0; i < MAX_CONFIG; i++)
+  for (int i = 0; i < MAX_CONFIG; i++) {
     if (configs[i].defined && strcmp(configs[i].name, name) == 0)
       return i;
+  }
+
   return -1;
 }
 
-/// <summary>
-/// parse a map list in the format "cart1:ctx1, cart2:ctx2, ..." and populate the given Config structure.
-/// </summary>
-/// <param name="value"></param>
-/// <param name="cfg"></param>
-/// <param name="line"></param>
-/// <returns></returns>
-static bool parseMapList(char* value, Config& cfg, int line) {
+static bool parseContextStrict(const char* s, uint8_t& out) {
+  char* end;
+  long v;
 
-  char* p = value;
+  if (!s || !*s)
+    return false;
 
-  while (*p) {
+  v = strtol(s, &end, 10);
 
-    while (*p == ' ' || *p == '\t')
-      p++;
+  if (*end != 0)
+    return false;
 
-    char name[MAX_NAME_LENGTH + 1];
-    char ctxStr[8];
+  if (v < 0 || v >= NUM_CONTEXTS)
+    return false;
 
-    size_t nameLen = 0;
-    size_t ctxLen = 0;
+  out = (uint8_t)v;
+  return true;
+}
 
-    // Parse cartridge name
-    while (*p && *p != ':' && *p != ',') {
-      if (nameLen >= MAX_NAME_LENGTH)
-        return setIniError(INI_ERR_LIMIT_EXCEEDED, line);
-      name[nameLen++] = *p++;
-    }
+// =====================================================
+// Load list parser
+// Accepts:
+//   load = bios
+//   load = bios, ipc, micmon
+// =====================================================
 
-    name[nameLen] = 0;
+static bool parseLoadList(char* value, Config& cfg, uint8_t ctx, int line) {
+  char* token;
+  char* saveptr = 0;
 
-    if (*p != ':')
+  token = strtok_r(value, ",", &saveptr);
+
+  while (token) {
+    trim(token);
+
+    if (token[0] == 0)
       return setIniError(INI_ERR_SYNTAX, line);
 
-    p++; // skip ':'
-
-    // Parse context number
-    while (*p && *p != ',') {
-      if (ctxLen >= sizeof(ctxStr) - 1)
-        return setIniError(INI_ERR_LIMIT_EXCEEDED, line);
-      ctxStr[ctxLen++] = *p++;
-    }
-
-    ctxStr[ctxLen] = 0;
-
-    trim(name);
-    trim(ctxStr);
-
-    if (!isValidIdentifier(name))
+    if (!isValidIdentifier(token))
       return setIniError(INI_ERR_INVALID_IDENTIFIER, line);
 
-    int cartIdx = findCartridge(name);
+    int cartIdx = findCartridge(token);
     if (cartIdx < 0)
       return setIniError(INI_ERR_UNKNOWN_REFERENCE, line);
-
-    int ctx = atoi(ctxStr);
-
-    if (ctx < 0 || ctx >= NUM_CONTEXTS)
-      return setIniError(INI_ERR_LIMIT_EXCEEDED, line);
-
-    // Prevent duplicate context inside same config
-    //for (uint8_t i = 0; i < cfg.count; i++) {
-    //  if (cfg.entries[i].context == ctx)
-    //    return setIniError(INI_ERR_DUPLICATE_SECTION, line);
-    //}
 
     if (cfg.count >= MAX_PER_CONFIG)
       return setIniError(INI_ERR_LIMIT_EXCEEDED, line);
 
-    cfg.entries[cfg.count].cartIndex = cartIdx;
+    cfg.entries[cfg.count].cartIndex = (uint8_t)cartIdx;
     cfg.entries[cfg.count].context = ctx;
     cfg.count++;
 
-    if (*p == ',')
-      p++;
+    token = strtok_r(0, ",", &saveptr);
   }
-
-  if (cfg.count == 0)
-    return setIniError(INI_ERR_EMPTY_CONFIG, line);
 
   return true;
 }
 
-/// <summary>
-/// the parser for the system.ini file. 
-/// It reads the file line by line, maintains state for the current section, 
-/// and populates the cartridges, configs, and systemConfig structures. 
-/// It also performs validation and error reporting with detailed error codes and line numbers.
-/// </summary>
-/// <param name="file"></param>
-/// <returns></returns>
-bool parseSystemIni(File& file) {
+// =====================================================
+// Main parser
+// =====================================================
 
+bool parseSystemIni(File& file) {
   resetTables();
   lastIniError = { INI_OK, 0 };
 
   char line[MAX_LINE_LENGTH];
   int lineNumber = 0;
 
-  enum { NONE, SYSTEM, CARTRIDGE, CONFIG } state = NONE;
+  enum {
+    NONE,
+    SYSTEM,
+    CARTRIDGE,
+    CONFIG_CONTEXT
+  } state = NONE;
+
   int currentCart = -1;
   int currentConfig = -1;
+  uint8_t currentContext = 0;
 
   while (file.available()) {
-
     size_t len = file.readBytesUntil('\n', line, MAX_LINE_LENGTH - 1);
     line[len] = 0;
     lineNumber++;
@@ -276,12 +287,12 @@ bool parseSystemIni(File& file) {
       return setIniError(INI_ERR_LINE_TOO_LONG, lineNumber);
 
     char* comment = strchr(line, ';');
-    if (comment) *comment = 0;
-    // ------------------
+    if (comment)
+      *comment = 0;
 
     trim(line);
 
-    if (line[0] == 0 || line[0] == '#' || line[0] == ';')
+    if (line[0] == 0 || line[0] == '#')
       continue;
 
     if (line[0] == '[') {
@@ -301,41 +312,79 @@ bool parseSystemIni(File& file) {
       if (strncmp(section, "cartridge ", 10) == 0) {
         char* name = section + 10;
         trim(name);
+
         if (!isValidIdentifier(name))
           return setIniError(INI_ERR_INVALID_IDENTIFIER, lineNumber);
+
         if (findCartridge(name) >= 0)
           return setIniError(INI_ERR_DUPLICATE_SECTION, lineNumber);
 
         for (int i = 0; i < MAX_CART; i++) {
           if (!cartridges[i].defined) {
-            strncpy(cartridges[i].name, name, MAX_NAME_LENGTH);
+            copyName(cartridges[i].name, name);
             cartridges[i].defined = true;
             currentCart = i;
             state = CARTRIDGE;
             break;
           }
         }
+
+        if (state != CARTRIDGE)
+          return setIniError(INI_ERR_LIMIT_EXCEEDED, lineNumber);
+
         continue;
       }
 
       if (strncmp(section, "config ", 7) == 0) {
-        char* name = section + 7;
+        char temp[MAX_LINE_LENGTH];
+        char* name;
+        char* ctxPart;
+        uint8_t ctx;
+
+        strncpy(temp, section + 7, sizeof(temp) - 1);
+        temp[sizeof(temp) - 1] = 0;
+        trim(temp);
+
+        ctxPart = strstr(temp, ".context ");
+        if (!ctxPart)
+          return setIniError(INI_ERR_SYNTAX, lineNumber);
+
+        *ctxPart = 0;
+        name = temp;
+        ctxPart += 9;
+
         trim(name);
+        trim(ctxPart);
+
         if (!isValidIdentifier(name))
           return setIniError(INI_ERR_INVALID_IDENTIFIER, lineNumber);
-        if (findConfig(name) >= 0)
-          return setIniError(INI_ERR_DUPLICATE_SECTION, lineNumber);
 
-        for (int i = 0; i < MAX_CONFIG; i++) {
-          if (!configs[i].defined) {
-            strncpy(configs[i].name, name, MAX_NAME_LENGTH);
-            configs[i].defined = true;
-            configs[i].count = 0;
-            currentConfig = i;
-            state = CONFIG;
-            break;
+        if (!parseContextStrict(ctxPart, ctx))
+          return setIniError(INI_ERR_INVALID_CONTEXT, lineNumber);
+
+        currentConfig = findConfig(name);
+        if (currentConfig < 0) {
+          for (int i = 0; i < MAX_CONFIG; i++) {
+            if (!configs[i].defined) {
+              copyName(configs[i].name, name);
+              configs[i].defined = true;
+              configs[i].count = 0;
+              memset(configs[i].contextDefined, 0, sizeof(configs[i].contextDefined));
+              currentConfig = i;
+              break;
+            }
           }
+
+          if (currentConfig < 0)
+            return setIniError(INI_ERR_LIMIT_EXCEEDED, lineNumber);
         }
+
+        if (configs[currentConfig].contextDefined[ctx])
+          return setIniError(INI_ERR_DUPLICATE_CONTEXT_SECTION, lineNumber);
+
+        configs[currentConfig].contextDefined[ctx] = true;
+        currentContext = ctx;
+        state = CONFIG_CONTEXT;
         continue;
       }
 
@@ -353,38 +402,47 @@ bool parseSystemIni(File& file) {
     trim(value);
 
     if (state == SYSTEM) {
-      if (strcmp(key, "version") == 0)
+      if (strcmp(key, "version") == 0) {
         systemConfig.version = atoi(value);
+      }
       else if (strcmp(key, "default") == 0) {
         if (!isValidIdentifier(value))
           return setIniError(INI_ERR_INVALID_IDENTIFIER, lineNumber);
-        strncpy(systemConfig.defaultName, value, MAX_NAME_LENGTH);
+
+        copyName(systemConfig.defaultName, value);
       }
-      else
+      else {
         return setIniError(INI_ERR_SYNTAX, lineNumber);
+      }
     }
     else if (state == CARTRIDGE) {
       if (strcmp(key, "file") == 0) {
         if (strlen(value) > MAX_FILE_LENGTH)
           return setIniError(INI_ERR_LIMIT_EXCEEDED, lineNumber);
+
         strncpy(cartridges[currentCart].file, value, MAX_FILE_LENGTH);
       }
-      else
+      else {
         return setIniError(INI_ERR_SYNTAX, lineNumber);
+      }
     }
-    else if (state == CONFIG) {
-      if (strcmp(key, "map") == 0) {
-        if (!parseMapList(value, configs[currentConfig], lineNumber))
+    else if (state == CONFIG_CONTEXT) {
+      if (strcmp(key, "load") == 0) {
+        if (!parseLoadList(value, configs[currentConfig], currentContext, lineNumber))
           return false;
       }
-      else
+      else {
         return setIniError(INI_ERR_SYNTAX, lineNumber);
+      }
     }
-    else
+    else {
       return setIniError(INI_ERR_SYNTAX, lineNumber);
+    }
   }
 
-  // ---------------- POST VALIDATION ----------------
+  // =====================================================
+  // Post validation
+  // =====================================================
 
   if (systemConfig.version != SUPPORTED_VERSION)
     return setIniError(INI_ERR_VERSION_MISMATCH, lineNumber);
@@ -398,6 +456,7 @@ bool parseSystemIni(File& file) {
 
       char fullPath[64];
       snprintf(fullPath, sizeof(fullPath), "/system/%s", cartridges[i].file);
+
       if (!LittleFS.exists(fullPath))
         return setIniError(INI_ERR_FILE_NOT_FOUND, 0);
     }
@@ -406,6 +465,7 @@ bool parseSystemIni(File& file) {
   for (int i = 0; i < MAX_CONFIG; i++) {
     if (configs[i].defined) {
       hasConfig = true;
+
       if (configs[i].count == 0)
         return setIniError(INI_ERR_EMPTY_CONFIG, 0);
     }
@@ -416,16 +476,19 @@ bool parseSystemIni(File& file) {
 
   if (systemConfig.defaultName[0] != 0) {
     int resolved = findConfig(systemConfig.defaultName);
+
     if (resolved < 0)
       return setIniError(INI_ERR_DEFAULT_NOT_FOUND, 0);
+
     systemConfig.defaultConfig = resolved;
   }
   else {
-    for (int i = 0; i < MAX_CONFIG; i++)
+    for (int i = 0; i < MAX_CONFIG; i++) {
       if (configs[i].defined) {
         systemConfig.defaultConfig = i;
         break;
       }
+    }
   }
 
   if (systemConfig.defaultConfig < 0)
@@ -434,12 +497,11 @@ bool parseSystemIni(File& file) {
   return true;
 }
 
-/// <summary>
-/// initialise the system configuration by reading and parsing the /system.ini file from LittleFS.
-/// </summary>
-/// <returns></returns>
-bool initializeSystemConfig() {
+// =====================================================
+// Initialization
+// =====================================================
 
+bool initializeSystemConfig() {
   resetTables();
 
   File file = LittleFS.open("/system.ini", "r");
@@ -451,7 +513,6 @@ bool initializeSystemConfig() {
   }
 
   if (!parseSystemIni(file)) {
-
     Serial1.printf("*E: INI error: %s (code=%d, line=%d)\n",
       iniErrorToString(lastIniError.code),
       lastIniError.code,
@@ -463,8 +524,82 @@ bool initializeSystemConfig() {
     loadFallbackProfile();
     return false;
   }
-  Serial1.println("\n*I: System config loaded");
 
   file.close();
+  Serial1.println("\n*I: System config loaded");
   return true;
+}
+
+/// <summary>
+/// 
+/// </summary>
+void dumpSystemConfig() {
+  int i;
+  int j;
+
+  Serial1.println("--------------------------------------------------");
+  Serial1.println("SYSTEM CONFIG");
+  Serial1.println("--------------------------------------------------");
+
+  Serial1.printf("Version        : %d\n", systemConfig.version);
+  Serial1.printf("Default config : %s\n",
+    systemConfig.defaultName[0] ? systemConfig.defaultName : "<first>");
+//  Serial1.printf("Resolved index : %d\n", systemConfig.defaultConfig);
+  Serial1.println();
+
+  Serial1.println("CARTRIDGES");
+  Serial1.println("--------------------------------------------------");
+
+  for (i = 0; i < MAX_CART; i++) {
+    if (!cartridges[i].defined)
+      continue;
+
+    Serial1.printf("[%02d] name=%s file=%s\n",
+      i,
+      cartridges[i].name,
+      cartridges[i].file);
+  }
+
+  Serial1.println();
+  Serial1.println("CONFIGS");
+  Serial1.println("--------------------------------------------------");
+
+  for (i = 0; i < MAX_CONFIG; i++) {
+    Config* cfg;
+
+    if (!configs[i].defined)
+      continue;
+
+    cfg = &configs[i];
+
+    Serial1.printf("Config [%02d] %s\n", i, cfg->name);
+//    Serial1.printf("  Entry count : %d\n", cfg->count);
+
+    for (j = 0; j < NUM_CONTEXTS; j++) {
+      int k;
+      bool printedHeader = false;
+
+      for (k = 0; k < cfg->count; k++) {
+        int cartIdx;
+
+        if (cfg->entries[k].context != j)
+          continue;
+
+        if (!printedHeader) {
+          Serial1.printf("  Context %d\n", j);
+          printedHeader = true;
+        }
+
+        cartIdx = cfg->entries[k].cartIndex;
+
+        Serial1.printf("    %02d: %s\n",
+          k,
+          cartridges[cartIdx].name);
+      }
+    }
+
+    Serial1.println();
+  }
+
+  Serial1.println("--------------------------------------------------");
 }

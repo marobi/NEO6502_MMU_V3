@@ -50,12 +50,12 @@ bool loadROMCartridge(const uint8_t* vCartridge) {
   defROM* hdr = (defROM*)vCartridge;
 
   if ((hdr->SOH != 0x5A) || (hdr->EOH != 0xA5)) {
-    Serial1.println("*E: loadROM: Invalid ROM header");
+    Serial1.println("*E: loadROMCartridge: Invalid ROM header");
     return false;
   }
 
   if (hdr->VERSION_MAJOR != 0x01) {
-    Serial1.println("*E: loadROM: Invalid ROM version");
+    Serial1.println("*E: loadROMCartridge: Invalid ROM version");
     return false;
   }
 
@@ -73,16 +73,16 @@ bool loadROMCartridge(const uint8_t* vCartridge) {
   csum += hdr->IRQ_H;
 
   if (csum != hdr->CSUM) {
-    Serial1.println("*E: loadROM: Invalid checksum");
+    Serial1.println("*E: loadROMCartridge: Invalid checksum");
     return false;
   }
 
   startAddress = (uint16_t)hdr->STARTADDRESS_H * 256 + hdr->STARTADDRESS_L;
   romSize = (uint16_t)hdr->SIZE_H * 256 + hdr->SIZE_L;
-  Serial1.printf("*D: loadROM: ROM\t%04X: [%04X]\n", startAddress, romSize);
+//  Serial1.printf("*D: loadROMCartridge: ROM\t%04X: [%04X]\n", startAddress, romSize);
 
   if (!loadBinary(startAddress, romSize, vCartridge + sizeof(defROM))) {
-    Serial1.println("*E: loadROM: Failed to load ROM into memory");
+    Serial1.println("*E: loadROMCartridge: Failed to load ROM into memory");
     return false;
   }
 
@@ -91,19 +91,19 @@ bool loadROMCartridge(const uint8_t* vCartridge) {
     // set NMI
     write6502Memory(0xFFFA, hdr->NMI_L);
     write6502Memory(0xFFFB, hdr->NMI_H);
-    Serial1.printf("*I: loadROM: NMIVEC: 0x%02x%02x\n", hdr->NMI_H, hdr->NMI_L);
+//    Serial1.printf("*I: loadROMCartridge: NMIVEC: 0x%02x%02x\n", hdr->NMI_H, hdr->NMI_L);
   }
   if ((hdr->TYPE & 0x02) != 0) {
     // set RESET
     write6502Memory(0xFFFC, hdr->RESET_L);
     write6502Memory(0xFFFD, hdr->RESET_H);
-    Serial1.printf("*I: loadROM: RSTVEC: 0x%02x%02x\n", hdr->RESET_H, hdr->RESET_L);
+//    Serial1.printf("*I: loadROMCartridge: RSTVEC: 0x%02x%02x\n", hdr->RESET_H, hdr->RESET_L);
   }
   if ((hdr->TYPE & 0x04) != 0) {
     // set IRQ
     write6502Memory(0xFFFE, hdr->IRQ_L);
     write6502Memory(0xFFFF, hdr->IRQ_H);
-    Serial1.printf("*I: loadROM: IRQVEC: 0x%02x%02x\n", hdr->IRQ_H, hdr->IRQ_L);
+//    Serial1.printf("*I: loadROMCartridge: IRQVEC: 0x%02x%02x\n", hdr->IRQ_H, hdr->IRQ_L);
   }
 
   return true;
@@ -123,14 +123,14 @@ uint8_t* readBinaryFile(const char* path) {
   size_t fileSize = file.size();
   if (fileSize < 16) {
     file.close();
-    Serial1.printf("*E: %s too small\n", path);
+    Serial1.printf("*E: readBinaryFile: %s too small\n", path);
     return nullptr;
   }
 
   uint8_t* buffer = (uint8_t*)malloc(fileSize);
   if (!buffer) {
     file.close();
-    Serial1.printf("*E: %s cannot allocate\n", path);
+    Serial1.printf("*E: readBinaryFile: %s cannot allocate\n", path);
     return nullptr;
   }
 
@@ -141,7 +141,7 @@ uint8_t* readBinaryFile(const char* path) {
     if (n == 0) {
       free(buffer);
       file.close();
-      Serial1.printf("*E: %s read error\n", path);
+      Serial1.printf("*E: readBinaryFile: %s read error\n", path);
       return nullptr;
     }
     totalRead += n;

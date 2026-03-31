@@ -67,48 +67,6 @@ static void printFile(const char* vFile) {
 }
 
 /// <summary>
-/// intro display on gdu to show that the system is up and running, and to test some basic gdu graphics capabilities.
-/// </summary>
-static void introDisplay() {
-  setTColor(69);  // text color light blue
-  vduPrintf("\n\nVersion v%s\n\n", VERSION);
-
-  gduSetReg(R6, DEFAULT_MODE);  gduSetCmd(CMD_VDU);    // gdu mode
-
-  setTColor(RED); // text color red
-
-  gduSetReg(R7, FUCHSIA); gduSetCmd(CMD_GCOLOR);
-  gduSetCmdx(CMD_CIRC, 3, 100, 100, 100);
-
-  gduSetReg(R7, AQUA); gduSetCmd(CMD_GCOLOR);
-  gduSetReg(R6, 1);  gduSetCmd(CMD_MODE);  // fill mode
-  gduSetCmdx(CMD_RECTR, 5, 100, 100, 100, 40, 8);
-
-  gduSetReg(R7, BLACK); gduSetCmd(CMD_GCOLOR);
-  gduSetReg(R6, 0); gduSetCmd(CMD_MODE);   // non-fill mode
-  gduSetCmdx(CMD_RECTR, 5, 100, 100, 100, 40, 8);
-  gduSetCmdx(CMD_RECTR, 5, 102, 102, 96, 36, 8);
-  gduSetCmdx(CMD_RECTR, 5, 104, 104, 92, 32, 8);
-  gduSetCmdx(CMD_RECTR, 5, 106, 106, 88, 28, 8);
-  gduSetReg(R6, 1);  gduSetCmd(CMD_MODE);  // fill mode
-  gduSetReg(R7, YELLOW); gduSetCmd(CMD_GCOLOR);
-  gduSetCmdx(CMD_RECTR, 5, 108, 108, 84, 24, 8);
-
-  gduSetReg(R6, 0); gduSetCmd(CMD_MODE);   // non-fill mode
-  gduSetReg(R7, BLACK); gduSetCmd(CMD_GCOLOR);
-  gduSetCmdx(CMD_RECTR, 5, 108, 108, 84, 24, 8);
-
-  gduSetReg(R7, RED); gduSetCmd(CMD_GCOLOR);
-  gduSetCmdx(CMD_LINE, 4, 100, 100, WIDTH - 10, HEIGHT - 10);
-
-  vduPrintStr("Hello world ...\n");
-
-  setTColor(DEFAULT_COLOR);
-
-  dumpGDURegisterSet();
-}
-
-/// <summary>
 /// setup the system, including initializing the 6502 CPU, MMU, gdu, and other components. 
 /// Also mounts the LittleFS filesystem and displays an intro screen on the gdu. 
 /// Finally, it boots the system with a menu to select the configuration to boot with.
@@ -157,8 +115,8 @@ void setup() {
   
   // report clock freqs.
   uint32_t freq = clock_get_hz(clk_sys);
-  Serial1.printf("*I: Core frequency: %0d MHz\n", freq / MHZ);
-  Serial1.printf("*I: 6502 frequency: %0.1f MHz\n", (float)DEFAULT_6502_CLOCK / MHZ);
+  Serial1.printf("*I: Core frequency: %4d MHz\n", freq / MHZ);
+  Serial1.printf("*I: 6502 frequency: %2.1f MHz\n", (float)DEFAULT_6502_CLOCK / MHZ);
 
   initializeMemoryConfig();
   configureMMUFromActiveModel();
@@ -168,11 +126,13 @@ void setup() {
 
   initializeSystemConfig();     // init system configuration from /system.ini
 
+  dumpSystemConfig();
+
   fillMemory(0x00);             // clear memory 64k of current context
 
   bootSystemWithMenu();         // load/boot system with menu to select configuration.
 
-  Serial1.printf("*I: default context: CTX %1X\n", memoryConfig.boot_context);
+  Serial1.printf("*D: default context: CTX %1X\n", memoryConfig.boot_context);
 
   initCmdInterface();
 
@@ -199,6 +159,4 @@ void loop() {
   inpExecute();                  // process FIFOs
 
   taskVDU();                     // vdu task, mainly control of cursor blinking and smooth scroll
-
-//  delay(1);
 }

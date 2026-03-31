@@ -92,3 +92,5 @@ void gduSetReg(const uint8_t, const uint16_t);
 void gduSetCmd(const uint8_t);
 
 void gduSetCmdx(const uint8_t, const uint8_t, ...);
+
+void introDisplay();

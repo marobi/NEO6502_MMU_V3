@@ -10,7 +10,6 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 Lesser General Public License for more details.
 
 */
-
 #include <arduino.h>
 #include "config.h"
 #include "ram.h"
@@ -27,12 +26,12 @@ void dump16(const uint16_t vAddress) {
 
   Serial1.printf("%04X:", vAddress);
   for (uint8_t m = 0; m < 8; m++) {
-    snoop_read6502Memory(vAddress + m, 1, &dat);
+    dat = snoop_read6502MemoryLoc(vAddress + m);
     Serial1.printf(" %02X", dat);
   }
   Serial1.printf(" ");
   for (uint8_t m = 8; m < 16; m++) {
-    snoop_read6502Memory(vAddress + m, 1, &dat);
+    dat = snoop_read6502MemoryLoc(vAddress + m);
     Serial1.printf(" %02X", dat);
   }
 

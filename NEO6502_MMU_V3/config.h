@@ -16,13 +16,11 @@ Lesser General Public License for more details.
 
 #define USE_VALIDATION 0
 
-constexpr uint32_t MEGA = 1024ul * 1024ul;
-
 // -------------------------------------------------------------------------------------
 
 // Fixed RP2350 clock (adjust if you change it)
-constexpr uint32_t SYS_CLOCK_HZ = 240 * MEGA;
+constexpr uint32_t SYS_CLOCK_HZ = 240 * MHZ;
 
-constexpr uint32_t DEFAULT_6502_CLOCK = (4 * MEGA);  // 4 MHZ;
+constexpr uint32_t DEFAULT_6502_CLOCK = (4 * MHZ);   // 4 MHZ;
 
 constexpr uint32_t RAM_SIZE = (512ul * 1024ul);      // RAM size;

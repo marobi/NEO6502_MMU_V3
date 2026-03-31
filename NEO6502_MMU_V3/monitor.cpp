@@ -216,20 +216,20 @@ static void cmdStatusCallback(cmd* c) {
 /// <param name="c"></param>
 static void cmdMMUCallback(cmd* c) {
   Command cmd(c);
-//  String arg1 = cmd.getArgument("context").getValue();
+  //  String arg1 = cmd.getArgument("context").getValue();
 
-//  uint8_t lContext = x2i(arg1.c_str()) & 0x7F;  // 128
+  //  uint8_t lContext = x2i(arg1.c_str()) & 0x7F;  // 128
 
-//  if (lContext == 127)
-    uint8_t lContext = getMMUContext();
+  //  if (lContext == 127)
+  uint8_t lContext = getMMUContext();
 
- // Serial1.printf("MMU: %02X\n", lContext);
+  // Serial1.printf("MMU: %02X\n", lContext);
 
   sysstate_t lState = get6502State();
   set6502State(sRPI);
 
   dumpMMUPageMap(lContext);   // dump context
-  
+
   set6502State(lState);
 }
 
@@ -281,12 +281,20 @@ static void cmdCommandCallback(cmd* c) {
   Serial1.println("Entering terminal ...");
 }
 
+/// <summary>
+/// 
+/// </summary>
+/// <param name="c"></param>
 static void cmdSysConfigCallback(cmd* c) {
   Command cmd(c);
 
   bootSystemWithMenu();
 }
 
+/// <summary>
+/// 
+/// </summary>
+/// <param name="c"></param>
 static void cmdZeroCallback(cmd* c) {
   Command cmd(c);
 
@@ -299,19 +307,21 @@ static void cmdZeroCallback(cmd* c) {
   Serial1.println("Memory zeroed");
 }
 
+/// <summary>
+/// 
+/// </summary>
+/// <param name="c"></param>
 static void cmdClockCallback(cmd* c) {
   Command cmd(c);
 
   String arg1 = cmd.getArgument("freq").getValue();
 
-  uint32_t lFreq = atof(arg1.c_str()) * MEGA;
+  uint32_t lFreq = atof(arg1.c_str()) * MHZ;
 
-  if (lFreq < 0.001 * MEGA)
-    lFreq = DEFAULT_6502_CLOCK;
+  if (lFreq > 0.001)
+    set6502Clockfrequency(lFreq);
 
-  set6502Clockfrequency(lFreq);
-
-  Serial1.printf("*I: Clock = %4.2f MHz\n", (float)lFreq / MEGA);
+  Serial1.printf("*I: Clock = %2.1f MHz\n", (float)get6502ClockFrequency() / MHZ);
 }
 
 /// <summary>
@@ -358,7 +368,7 @@ void initMonitor() {
 
   // Create the commands with callback function
   gCmd = gCli.addCmd("clock", cmdClockCallback);
-  gCmd.addPositionalArgument("freq");
+  gCmd.addPositionalArgument("freq", "0");
 
   gCmd = gCli.addCmd("d/is", cmdDisAsmCallback);
   gCmd.addPositionalArgument("from");
@@ -409,17 +419,17 @@ void initMonitor() {
 ////////////////////////////////////////////////////////////////////////////
 
 static uint8_t gInputIndex = 0;
-static char gInputBuffer[40] = "\0";
+static char    gInputBuffer[40] = "\0";
 
 /// <summary>
 /// return to ICM mode, resetting the input buffer and index, and printing a new prompt for the CLI
 /// </summary>
 static void returnToICM() {
-  gInterface = 0x00;                      // return to ICM
+  gInterface = 0x00;                  // return to ICM
   gInputIndex = 0;
   gInputBuffer[0] = '\0';
 
-  Serial1.printf("%x> ", getMMUContext());                   // new prompt for CLI
+  Serial1.printf("%x> ", getMMUContext()); // new prompt for CLI
 }
 
 /// <summary>
@@ -428,7 +438,7 @@ static void returnToICM() {
 /// <param name="c"></param>
 static void normalInput(uint8_t c) {
   switch (c) {
-  case ctrl('Z'):                         // ^Z
+  case ctrl('Z'):                          // ^Z
     returnToICM();
     break;
 
@@ -441,12 +451,12 @@ static void normalInput(uint8_t c) {
 
       if (getAsScreenMode()) {
         vduGetCurrentScreenline(lBuffer);
-//        Serial1.printf("*D: normalInput: [%s]\n\n", lBuffer);
+        //        Serial1.printf("*D: normalInput: [%s]\n\n", lBuffer);
 
         vduRestoreCursor();
 
         while (*lPtr) {
-          if (! writeCPUQ(*lPtr++)){
+          if (!writeCPUQ(*lPtr++)) {
             returnToICM();
             break;
           }
@@ -456,16 +466,16 @@ static void normalInput(uint8_t c) {
       }
     }
     else {
-//      Serial1.printf("*D: ICM->VDU: [%02X]\n", c);
+      //      Serial1.printf("*D: ICM->VDU: [%02X]\n", c);
       writeVDUQ(c);
     }
 
-    if (! getAsScreenMode()) {              // normal mode
+    if (!getAsScreenMode()) {              // normal mode
       if (!writeCPUQ(c)) {
         returnToICM();
       }
     }
-   
+
     break;
   }
 }
