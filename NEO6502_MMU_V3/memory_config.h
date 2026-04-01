@@ -55,12 +55,12 @@ struct MemoryIniError {
 };
 
 struct MemoryModel {
-  char name[MAX_MEMORY_NAME];
+  char name[MAX_MEMORY_NAME + 1];
   uint8_t contexts;
 };
 
 struct MemoryLayoutRegion {
-  char name[MAX_MEMORY_NAME];
+  char name[MAX_MEMORY_NAME + 1];
   uint8_t start;
   uint8_t pages;
   bool shared;
@@ -69,21 +69,21 @@ struct MemoryLayoutRegion {
 };
 
 struct MemoryLayout {
-  char model[MAX_MEMORY_NAME];
-  char name[MAX_MEMORY_NAME];
+  char model[MAX_MEMORY_NAME + 1];
+  char name[MAX_MEMORY_NAME + 1];
   uint8_t region_count;
   MemoryLayoutRegion regions[MAX_MEMORY_REGIONS];
 };
 
 struct MemoryContextBinding {
-  char model[MAX_MEMORY_NAME];
+  char model[MAX_MEMORY_NAME + 1];
   uint8_t context;
-  char layout[MAX_MEMORY_NAME];
+  char layout[MAX_MEMORY_NAME + 1];
 };
 
 struct MemoryConfig {
   uint8_t version;
-  char active_model[MAX_MEMORY_NAME];
+  char active_model[MAX_MEMORY_NAME + 1];
   uint8_t boot_context;
 
   uint8_t model_count;

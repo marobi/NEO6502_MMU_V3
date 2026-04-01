@@ -8,8 +8,8 @@ This software is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 Lesser General Public License for more details.
-
 */
+
 #include "memory_config.h"
 #include "mmu.h"
 
@@ -19,8 +19,8 @@ MemoryIniError lastMemoryIniError;
 static uint8_t phys_map[MAX_MEMORY_CONTEXTS][NUM_CONTEXT_PAGES];
 
 struct SharedPage {
-  char model[MAX_MEMORY_NAME];
-  char region[MAX_MEMORY_NAME];
+  char model[MAX_MEMORY_NAME + 1];
+  char region[MAX_MEMORY_NAME + 1];
   uint8_t offset;
   uint8_t phys;
 };
@@ -28,50 +28,60 @@ struct SharedPage {
 static SharedPage shared_pages[NUM_TOTAL_PAGES];
 static uint8_t shared_page_count = 0;
 
-/// <summary>
-/// 
-/// </summary>
-static void clearMemoryIniError() {
+static void copyTrunc(char* dst, size_t dstSize, const char* src)
+{
+  size_t len;
+
+  if (!dst || dstSize == 0)
+    return;
+
+  if (!src) {
+    dst[0] = 0;
+    return;
+  }
+
+  len = strlen(src);
+
+  if (len >= dstSize)
+    len = dstSize - 1;
+
+  if (len > 0)
+    memcpy(dst, src, len);
+
+  dst[len] = 0;
+}
+
+static void clearMemoryIniError()
+{
   memset(&lastMemoryIniError, 0, sizeof(lastMemoryIniError));
   lastMemoryIniError.code = MEMORY_INI_OK;
 }
 
-/// <summary>
-/// 
-/// </summary>
-/// <param name="code"></param>
-/// <param name="line"></param>
-/// <param name="section"></param>
-/// <param name="key"></param>
-/// <param name="value"></param>
-/// <returns></returns>
-static bool failMemoryIni(MemoryIniErrorCode code, int line, const char* section, const char* key, const char* value) {
+static bool failMemoryIni(MemoryIniErrorCode code, int line,
+  const char* section, const char* key, const char* value)
+{
   clearMemoryIniError();
 
   lastMemoryIniError.code = code;
   lastMemoryIniError.line = line;
 
   if (section)
-    strncpy(lastMemoryIniError.section, section,
-      sizeof(lastMemoryIniError.section) - 1);
+    copyTrunc(lastMemoryIniError.section,
+      sizeof(lastMemoryIniError.section), section);
 
   if (key)
-    strncpy(lastMemoryIniError.key, key,
-      sizeof(lastMemoryIniError.key) - 1);
+    copyTrunc(lastMemoryIniError.key,
+      sizeof(lastMemoryIniError.key), key);
 
   if (value)
-    strncpy(lastMemoryIniError.value, value,
-      sizeof(lastMemoryIniError.value) - 1);
+    copyTrunc(lastMemoryIniError.value,
+      sizeof(lastMemoryIniError.value), value);
 
   return false;
 }
 
-/// <summary>
-/// 
-/// </summary>
-/// <param name="code"></param>
-/// <returns></returns>
-const char* memoryIniErrorToString(MemoryIniErrorCode code) {
+const char* memoryIniErrorToString(MemoryIniErrorCode code)
+{
   switch (code) {
   case MEMORY_INI_OK:
     return "ok";
@@ -110,13 +120,8 @@ const char* memoryIniErrorToString(MemoryIniErrorCode code) {
   }
 }
 
-/// <summary>
-/// 
-/// </summary>
-/// <param name="s"></param>
-/// <param name="out"></param>
-/// <returns></returns>
-static bool parseBoolValue(const char* s, bool* out) {
+static bool parseBoolValue(const char* s, bool* out)
+{
   if (strcmp(s, "true") == 0) {
     *out = true;
     return true;
@@ -130,13 +135,8 @@ static bool parseBoolValue(const char* s, bool* out) {
   return false;
 }
 
-/// <summary>
-/// 
-/// </summary>
-/// <param name="s"></param>
-/// <param name="out"></param>
-/// <returns></returns>
-static bool parseU8Strict(const char* s, uint8_t* out) {
+static bool parseU8Strict(const char* s, uint8_t* out)
+{
   char* end;
   long v;
 
@@ -155,22 +155,13 @@ static bool parseU8Strict(const char* s, uint8_t* out) {
   return true;
 }
 
-/// <summary>
-/// 
-/// </summary>
-/// <param name="s"></param>
-/// <param name="out"></param>
-/// <returns></returns>
-static bool parseContextIdStrict(const char* s, uint8_t* out) {
+static bool parseContextIdStrict(const char* s, uint8_t* out)
+{
   return parseU8Strict(s, out) && (*out < MAX_MEMORY_CONTEXTS);
 }
 
-/// <summary>
-/// 
-/// </summary>
-/// <param name="name"></param>
-/// <returns></returns>
-static MemoryModel* findModel(const char* name) {
+static MemoryModel* findModel(const char* name)
+{
   uint8_t i;
 
   for (i = 0; i < memoryConfig.model_count; i++) {
@@ -181,13 +172,8 @@ static MemoryModel* findModel(const char* name) {
   return 0;
 }
 
-/// <summary>
-/// 
-/// </summary>
-/// <param name="model"></param>
-/// <param name="name"></param>
-/// <returns></returns>
-static MemoryLayout* findLayout(const char* model, const char* name) {
+static MemoryLayout* findLayout(const char* model, const char* name)
+{
   uint8_t i;
 
   for (i = 0; i < memoryConfig.layout_count; i++) {
@@ -199,13 +185,8 @@ static MemoryLayout* findLayout(const char* model, const char* name) {
   return 0;
 }
 
-/// <summary>
-/// 
-/// </summary>
-/// <param name="model"></param>
-/// <param name="context"></param>
-/// <returns></returns>
-static MemoryContextBinding* findContextBinding(const char* model, uint8_t context) {
+static MemoryContextBinding* findContextBinding(const char* model, uint8_t context)
+{
   uint8_t i;
 
   for (i = 0; i < memoryConfig.context_count; i++) {
@@ -217,13 +198,8 @@ static MemoryContextBinding* findContextBinding(const char* model, uint8_t conte
   return 0;
 }
 
-/// <summary>
-/// 
-/// </summary>
-/// <param name="layout"></param>
-/// <param name="name"></param>
-/// <returns></returns>
-static MemoryLayoutRegion* findRegion(MemoryLayout* layout, const char* name) {
+static MemoryLayoutRegion* findRegion(MemoryLayout* layout, const char* name)
+{
   uint8_t i;
 
   for (i = 0; i < layout->region_count; i++) {
@@ -234,12 +210,8 @@ static MemoryLayoutRegion* findRegion(MemoryLayout* layout, const char* name) {
   return 0;
 }
 
-/// <summary>
-/// 
-/// </summary>
-/// <param name="reg"></param>
-/// <returns></returns>
-static bool isValidRegionRange(const MemoryLayoutRegion* reg) {
+static bool isValidRegionRange(const MemoryLayoutRegion* reg)
+{
   if (reg->pages == 0)
     return false;
 
@@ -252,12 +224,8 @@ static bool isValidRegionRange(const MemoryLayoutRegion* reg) {
   return true;
 }
 
-/// <summary>
-/// 
-/// </summary>
-/// <param name="layout"></param>
-/// <returns></returns>
-static bool layoutHasOverlaps(const MemoryLayout* layout) {
+static bool layoutHasOverlaps(const MemoryLayout* layout)
+{
   uint8_t i;
   uint8_t j;
 
@@ -277,11 +245,6 @@ static bool layoutHasOverlaps(const MemoryLayout* layout) {
   return false;
 }
 
-/// <summary>
-/// 
-/// </summary>
-/// <param name="layout"></param>
-/// <returns></returns>
 static bool layoutIsComplete(const MemoryLayout* layout)
 {
   uint8_t covered[NUM_CONTEXT_PAGES];
@@ -303,11 +266,8 @@ static bool layoutIsComplete(const MemoryLayout* layout)
   return true;
 }
 
-/// <summary>
-/// 
-/// </summary>
-/// <returns></returns>
-static bool validateConfig() {
+static bool validateConfig()
+{
   uint8_t i;
   uint8_t j;
   MemoryModel* active;
@@ -392,12 +352,8 @@ static bool validateConfig() {
   return true;
 }
 
-/// <summary>
-/// 
-/// </summary>
-/// <param name="file"></param>
-/// <returns></returns>
-bool parseMemoryIni(File& file) {
+bool parseMemoryIni(File& file)
+{
   char line[160];
   char section[64];
   int lineNo = 0;
@@ -429,8 +385,7 @@ bool parseMemoryIni(File& file) {
         return failMemoryIni(MEMORY_INI_SYNTAX, lineNo, 0, 0, line);
 
       *end = 0;
-      strncpy(section, line + 1, sizeof(section) - 1);
-      section[sizeof(section) - 1] = 0;
+      copyTrunc(section, sizeof(section), line + 1);
 
       currentLayout = 0;
       currentRegion = 0;
@@ -439,10 +394,9 @@ bool parseMemoryIni(File& file) {
         continue;
 
       if (strncmp(section, "model.", 6) == 0) {
-        char name[32];
+        char name[MAX_MEMORY_NAME + 1];
 
-        strncpy(name, section + 6, sizeof(name) - 1);
-        name[sizeof(name) - 1] = 0;
+        copyTrunc(name, sizeof(name), section + 6);
 
         if (findModel(name)) {
           return failMemoryIni(MEMORY_INI_DUPLICATE_MODEL, lineNo,
@@ -456,8 +410,8 @@ bool parseMemoryIni(File& file) {
 
         memset(&memoryConfig.models[memoryConfig.model_count], 0,
           sizeof(memoryConfig.models[memoryConfig.model_count]));
-        strncpy(memoryConfig.models[memoryConfig.model_count].name, name,
-          sizeof(memoryConfig.models[memoryConfig.model_count].name) - 1);
+        copyTrunc(memoryConfig.models[memoryConfig.model_count].name,
+          sizeof(memoryConfig.models[memoryConfig.model_count].name), name);
         memoryConfig.model_count++;
         continue;
       }
@@ -468,12 +422,11 @@ bool parseMemoryIni(File& file) {
         char* saveptr = 0;
         char* parts[5];
         int count = 0;
-        char modelName[32];
-        char layoutName[32];
-        char regionName[32];
+        char modelName[MAX_MEMORY_NAME + 1];
+        char layoutName[MAX_MEMORY_NAME + 1];
+        char regionName[MAX_MEMORY_NAME + 1];
 
-        memset(temp, 0, sizeof(temp));
-        strncpy(temp, section, sizeof(temp) - 1);
+        copyTrunc(temp, sizeof(temp), section);
 
         tok = strtok_r(temp, ".", &saveptr);
         while (tok && count < 5) {
@@ -492,14 +445,9 @@ bool parseMemoryIni(File& file) {
             section, 0, 0);
         }
 
-        strncpy(modelName, parts[1], sizeof(modelName) - 1);
-        modelName[sizeof(modelName) - 1] = 0;
-
-        strncpy(layoutName, parts[2], sizeof(layoutName) - 1);
-        layoutName[sizeof(layoutName) - 1] = 0;
-
-        strncpy(regionName, parts[4], sizeof(regionName) - 1);
-        regionName[sizeof(regionName) - 1] = 0;
+        copyTrunc(modelName, sizeof(modelName), parts[1]);
+        copyTrunc(layoutName, sizeof(layoutName), parts[2]);
+        copyTrunc(regionName, sizeof(regionName), parts[4]);
 
         currentLayout = findLayout(modelName, layoutName);
         if (!currentLayout) {
@@ -510,10 +458,8 @@ bool parseMemoryIni(File& file) {
 
           currentLayout = &memoryConfig.layouts[memoryConfig.layout_count++];
           memset(currentLayout, 0, sizeof(*currentLayout));
-          strncpy(currentLayout->model, modelName,
-            sizeof(currentLayout->model) - 1);
-          strncpy(currentLayout->name, layoutName,
-            sizeof(currentLayout->name) - 1);
+          copyTrunc(currentLayout->model, sizeof(currentLayout->model), modelName);
+          copyTrunc(currentLayout->name, sizeof(currentLayout->name), layoutName);
         }
 
         if (findRegion(currentLayout, regionName)) {
@@ -528,8 +474,7 @@ bool parseMemoryIni(File& file) {
 
         currentRegion = &currentLayout->regions[currentLayout->region_count++];
         memset(currentRegion, 0, sizeof(*currentRegion));
-        strncpy(currentRegion->name, regionName,
-          sizeof(currentRegion->name) - 1);
+        copyTrunc(currentRegion->name, sizeof(currentRegion->name), regionName);
         continue;
       }
 
@@ -541,8 +486,7 @@ bool parseMemoryIni(File& file) {
         int count = 0;
         uint8_t ctx;
 
-        memset(temp, 0, sizeof(temp));
-        strncpy(temp, section, sizeof(temp) - 1);
+        copyTrunc(temp, sizeof(temp), section);
 
         tok = strtok_r(temp, ".", &saveptr);
         while (tok && count < 3) {
@@ -572,8 +516,8 @@ bool parseMemoryIni(File& file) {
 
         memset(&memoryConfig.contexts[memoryConfig.context_count], 0,
           sizeof(memoryConfig.contexts[memoryConfig.context_count]));
-        strncpy(memoryConfig.contexts[memoryConfig.context_count].model,
-          parts[1], sizeof(memoryConfig.contexts[memoryConfig.context_count].model) - 1);
+        copyTrunc(memoryConfig.contexts[memoryConfig.context_count].model,
+          sizeof(memoryConfig.contexts[memoryConfig.context_count].model), parts[1]);
         memoryConfig.contexts[memoryConfig.context_count].context = ctx;
         memoryConfig.context_count++;
         continue;
@@ -618,23 +562,23 @@ bool parseMemoryIni(File& file) {
       }
 
       if (strcmp(section, "system") == 0) {
-        uint8_t temp;
+        uint8_t tempValue;
 
         if (strcmp(key, "config_version") == 0) {
-          if (!parseU8Strict(val, &temp))
+          if (!parseU8Strict(val, &tempValue))
             return failMemoryIni(MEMORY_INI_INVALID_VALUE, lineNo, section, key, val);
 
-          memoryConfig.version = temp;
+          memoryConfig.version = tempValue;
         }
         else if (strcmp(key, "active_model") == 0) {
-          strncpy(memoryConfig.active_model, val,
-            sizeof(memoryConfig.active_model) - 1);
+          copyTrunc(memoryConfig.active_model,
+            sizeof(memoryConfig.active_model), val);
         }
         else if (strcmp(key, "boot_context") == 0) {
-          if (!parseContextIdStrict(val, &temp))
+          if (!parseContextIdStrict(val, &tempValue))
             return failMemoryIni(MEMORY_INI_INVALID_CONTEXT, lineNo, section, key, val);
 
-          memoryConfig.boot_context = temp;
+          memoryConfig.boot_context = tempValue;
         }
         else {
           return failMemoryIni(MEMORY_INI_UNKNOWN_KEY, lineNo,
@@ -642,11 +586,10 @@ bool parseMemoryIni(File& file) {
         }
       }
       else if (strncmp(section, "model.", 6) == 0) {
-        char modelName[32];
+        char modelName[MAX_MEMORY_NAME + 1];
         MemoryModel* model;
 
-        strncpy(modelName, section + 6, sizeof(modelName) - 1);
-        modelName[sizeof(modelName) - 1] = 0;
+        copyTrunc(modelName, sizeof(modelName), section + 6);
         model = findModel(modelName);
 
         if (!model) {
@@ -655,12 +598,12 @@ bool parseMemoryIni(File& file) {
         }
 
         if (strcmp(key, "contexts") == 0) {
-          uint8_t temp;
+          uint8_t tempValue;
 
-          if (!parseU8Strict(val, &temp))
+          if (!parseU8Strict(val, &tempValue))
             return failMemoryIni(MEMORY_INI_INVALID_VALUE, lineNo, section, key, val);
 
-          model->contexts = temp;
+          model->contexts = tempValue;
         }
         else {
           return failMemoryIni(MEMORY_INI_UNKNOWN_KEY, lineNo,
@@ -669,20 +612,20 @@ bool parseMemoryIni(File& file) {
       }
       else if (currentRegion) {
         if (strcmp(key, "start") == 0) {
-          uint8_t temp;
+          uint8_t tempValue;
 
-          if (!parseU8Strict(val, &temp))
+          if (!parseU8Strict(val, &tempValue))
             return failMemoryIni(MEMORY_INI_INVALID_VALUE, lineNo, section, key, val);
 
-          currentRegion->start = temp;
+          currentRegion->start = tempValue;
         }
         else if (strcmp(key, "pages") == 0) {
-          uint8_t temp;
+          uint8_t tempValue;
 
-          if (!parseU8Strict(val, &temp))
+          if (!parseU8Strict(val, &tempValue))
             return failMemoryIni(MEMORY_INI_INVALID_VALUE, lineNo, section, key, val);
 
-          currentRegion->pages = temp;
+          currentRegion->pages = tempValue;
         }
         else if (strcmp(key, "shared") == 0) {
           if (!parseBoolValue(val, &currentRegion->shared))
@@ -714,8 +657,7 @@ bool parseMemoryIni(File& file) {
         uint8_t ctx;
         MemoryContextBinding* binding;
 
-        memset(temp, 0, sizeof(temp));
-        strncpy(temp, section, sizeof(temp) - 1);
+        copyTrunc(temp, sizeof(temp), section);
 
         tok = strtok_r(temp, ".", &saveptr);
         while (tok && count < 3) {
@@ -740,7 +682,7 @@ bool parseMemoryIni(File& file) {
         }
 
         if (strcmp(key, "layout") == 0) {
-          strncpy(binding->layout, val, sizeof(binding->layout) - 1);
+          copyTrunc(binding->layout, sizeof(binding->layout), val);
         }
         else {
           return failMemoryIni(MEMORY_INI_UNKNOWN_KEY, lineNo,
@@ -757,11 +699,8 @@ bool parseMemoryIni(File& file) {
   return validateConfig();
 }
 
-/// <summary>
-/// 
-/// </summary>
-/// <returns></returns>
-bool initializeMemoryConfig() {
+bool initializeMemoryConfig()
+{
   File file;
 
   memset(&memoryConfig, 0, sizeof(memoryConfig));
@@ -806,7 +745,8 @@ bool initializeMemoryConfig() {
   return true;
 }
 
-static MemoryLayout* resolveLayoutForContext(MemoryModel* model, uint8_t ctx) {
+static MemoryLayout* resolveLayoutForContext(MemoryModel* model, uint8_t ctx)
+{
   MemoryContextBinding* binding = findContextBinding(model->name, ctx);
 
   if (!binding)
@@ -831,10 +771,10 @@ static uint8_t getSharedPhysical(const char* model, const char* region,
     return 0xFF;
 
   memset(&shared_pages[shared_page_count], 0, sizeof(shared_pages[shared_page_count]));
-  strncpy(shared_pages[shared_page_count].model, model,
-    sizeof(shared_pages[shared_page_count].model) - 1);
-  strncpy(shared_pages[shared_page_count].region, region,
-    sizeof(shared_pages[shared_page_count].region) - 1);
+  copyTrunc(shared_pages[shared_page_count].model,
+    sizeof(shared_pages[shared_page_count].model), model);
+  copyTrunc(shared_pages[shared_page_count].region,
+    sizeof(shared_pages[shared_page_count].region), region);
   shared_pages[shared_page_count].offset = offset;
   shared_pages[shared_page_count].phys = *nextPhysical;
 
@@ -842,7 +782,8 @@ static uint8_t getSharedPhysical(const char* model, const char* region,
   return (*nextPhysical)++;
 }
 
-bool configureMMUFromActiveModel() {
+bool configureMMUFromActiveModel()
+{
   MemoryModel* model;
   uint8_t nextPhysical = 0;
   uint8_t ctx;
@@ -925,10 +866,8 @@ bool configureMMUFromActiveModel() {
   return true;
 }
 
-/// <summary>
-/// 
-/// </summary>
-void dumpMemoryConfig() {
+void dumpMemoryConfig()
+{
   uint8_t i;
   uint8_t r;
 
@@ -965,7 +904,6 @@ void dumpMemoryConfig() {
       Serial1.println(region->name);
 
       Serial1.printf("    Start     : %02X\n", region->start);
-
       Serial1.printf("    Pages     : %d\n", region->pages);
 
       Serial1.print("    Type      : ");
@@ -985,10 +923,8 @@ void dumpMemoryConfig() {
   }
 }
 
-/// <summary>
-/// 
-/// </summary>
-void dumpMMUPhysicalUsage() {
+void dumpMMUPhysicalUsage()
+{
   MemoryModel* model;
   bool used[NUM_TOTAL_PAGES];
   uint8_t maxPhys = 0;
@@ -1027,17 +963,14 @@ void dumpMMUPhysicalUsage() {
   Serial1.println("--------------------------------------------------");
 
   Serial1.printf("Highest page used : %02X\n", maxPhys);
-
-  Serial1.printf("Total pages used  : %d / %d ( %d%% )\n", totalUsed, NUM_TOTAL_PAGES, (totalUsed * 100) / NUM_TOTAL_PAGES);
+  Serial1.printf("Total pages used  : %d / %d ( %d%% )\n",
+    totalUsed, NUM_TOTAL_PAGES, (totalUsed * 100) / NUM_TOTAL_PAGES);
 
   Serial1.println("--------------------------------------------------");
 }
 
-/// <summary>
-/// 
-/// </summary>
-/// <param name="context"></param>
-void dumpMMUPageMap(uint8_t context) {
+void dumpMMUPageMap(uint8_t context)
+{
   uint8_t page;
 
   if (context >= MAX_MEMORY_CONTEXTS) {
@@ -1065,11 +998,8 @@ void dumpMMUPageMap(uint8_t context) {
   Serial1.println("--------------------------------------------------");
 }
 
-/// <summary>
-/// 
-/// </summary>
-/// <param name="context"></param>
-void dumpMMUContext(uint8_t context) {
+void dumpMMUContext(uint8_t context)
+{
   uint8_t page;
 
   if (context >= MAX_MEMORY_CONTEXTS)
@@ -1096,10 +1026,8 @@ void dumpMMUContext(uint8_t context) {
   Serial1.println();
 }
 
-/// <summary>
-/// 
-/// </summary>
-void dumpMMUPageMapsCompact() {
+void dumpMMUPageMapsCompact()
+{
   MemoryModel* model;
   uint8_t ctx;
 

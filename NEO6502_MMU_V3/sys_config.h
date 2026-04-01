@@ -10,13 +10,15 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 Lesser General Public License for more details.
 
 */
+// sys_config.h
+// sys_config.h
 #pragma once
 
 #include <Arduino.h>
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "LittleFS.h"
+#include <LittleFS.h>
 
 #include "mmu.h"
 
@@ -41,7 +43,9 @@ struct Cartridge {
 
 struct Config {
   char name[MAX_NAME_LENGTH + 1];
+  char memory[MAX_NAME_LENGTH + 1];
   bool defined;
+  bool memoryDefined;
   uint8_t count;
   bool contextDefined[NUM_CONTEXTS];
   ConfigEntry entries[MAX_PER_CONFIG];
@@ -60,5 +64,4 @@ extern SystemConfig systemConfig;
 bool parseSystemIni(File& file);
 bool initializeSystemConfig();
 void loadFallbackProfile();
-
 void dumpSystemConfig();
