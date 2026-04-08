@@ -37,8 +37,10 @@ Lesser General Public License for more details.
 #include "sys_config.h"
 #include "boot.h"
 
+
 #include "monitor.h"
 #include "input.h"
+#include "mailbox.h"
 
 #include "scheduler.h"
 
@@ -118,31 +120,34 @@ void setup() {
   Serial1.printf("*I: Core frequency: %4d MHz\n", freq / MHZ);
   Serial1.printf("*I: 6502 frequency: %2.1f MHz\n", (float)DEFAULT_6502_CLOCK / MHZ);
 
-  initializeMemoryConfig();
-  configureMMUFromActiveModel();
+  initializeMemoryConfig();     // load /memory.ini
+  configureMMUFromActiveModel();  // configure MMU
 
-  dumpMMUPageMapsCompact();
+  dumpMMUPageMapsCompact();     // show MMU config results
   dumpMMUPhysicalUsage();       // dump physical page usage
 
   initializeSystemConfig();     // init system configuration from /system.ini
 
-  dumpSystemConfig();
+//  dumpSystemConfig();
 
-  fillMemory(0x00);             // clear memory 64k of current context
+//  fillMemory(0x00);             // clear memory 64k of current context
 
   bootSystemWithMenu();         // load/boot system with menu to select configuration.
 
-  Serial1.printf("*D: default context: CTX %1X\n", memoryConfig.boot_context);
+  Serial1.printf("*D: default context: CTX%1X\n", memoryConfig.boot_context);
 
-  initCmdInterface();
+  neo6502_mailbox_init();
+  Serial1.println("D:mailbox initialized");
 
-  set6502State(sRESET);
+  initCmdInterface();           // init command interface
+
+  set6502State(sRESET);         // reset CPU
 
   initMonitor();                // init monitor after boot
 
-  initIndicator();
+  initIndicator();              // setup board led indicator
 
-  initScheduler();
+  initScheduler();              // init context switching
 }
 
 /// <summary>
@@ -159,4 +164,6 @@ void loop() {
   inpExecute();                  // process FIFOs
 
   taskVDU();                     // vdu task, mainly control of cursor blinking and smooth scroll
+
+  neo6502_mailbox_poll();
 }

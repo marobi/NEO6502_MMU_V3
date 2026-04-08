@@ -1005,7 +1005,7 @@ void dumpMMUContext(uint8_t context)
   if (context >= MAX_MEMORY_CONTEXTS)
     return;
 
-  Serial1.printf("CTX %X : ", context);
+  Serial1.printf("CTX%1X : ", context);
 
   for (page = 0; page < NUM_CONTEXT_PAGES; page++) {
     uint8_t phys = readMMUPage(context, page);

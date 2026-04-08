@@ -14,4 +14,6 @@ Lesser General Public License for more details.
 
 bool schedSwitchcontext(const uint8_t vContext, const bool vRun);
 
+bool schedNextcontext();
+
 void initScheduler();

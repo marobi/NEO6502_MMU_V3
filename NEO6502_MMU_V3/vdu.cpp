@@ -13,6 +13,7 @@ Lesser General Public License for more details.
 #include "config.h"
 #include "palette.h"
 #include "vdu.h"
+#include "scheduler.h"
 
 // NEO6502_MMU settings: resolution 320x240 by 256 colors, single buffer
 DVHSTXPinout pinConfig = { 14, 18, 16, 12 };
@@ -755,6 +756,13 @@ void cmdClearScreen()
   setCursor(true);
 }
 
+/// <summary>
+/// 
+/// </summary>
+static void cmdContext() {
+  schedNextcontext();
+}
+
 //-----------------------------------------------------------------------------------------
 
 /// <summary>
@@ -787,7 +795,7 @@ static const vdu_cmd_t ctrlTable[32] = {
     cmdSmoothScroll, // ^U
     NULL,            // ^V
     NULL,            // ^W
-    NULL,            // ^X
+    cmdContext,      // ^X
     NULL,            // ^Y
     NULL             // ^Z  (return to monitor)
 };
@@ -908,6 +916,18 @@ void vduPrintStr(const char* str) {
 }
 
 /// <summary>
+/// 
+/// </summary>
+/// <param name="vBuffer"></param>
+/// <param name="vLength"></param>
+uint16_t vduPrintBuf(const uint8_t* vBuffer, const uint16_t vLength) {
+  for (uint16_t c = 0; c < vLength; c++)
+    vduPutc(vBuffer[c]);
+
+  return vLength;
+}
+
+/// <summary>
 /// output to screen ala printf
 /// </summary>
 /// <param name="fmt"></param>
@@ -939,7 +959,7 @@ void vduPrintf(char const* fmt, ...) {
 static void helloDisplay() {
   setTColor(YELLOW);
 
-  vduPrintStr("                                                    \n");
+  vduPrintStr("\n");
   vduPrintStr(" N  N          66  555   00   22\n");
   vduPrintStr(" N  N         6    5    0  0 2  2\n");
   vduPrintStr(" NN N         6    5    0  0    2\n");

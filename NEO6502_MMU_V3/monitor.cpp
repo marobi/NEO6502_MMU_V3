@@ -358,6 +358,13 @@ static void errorCallback(cmd_error* e) {
   CommandError cmdError(e); // Create wrapper object
 
   Serial1.printf("*E: MIC-ICM: %s\n", cmdError.toString());
+
+  // Print command usage
+  if (cmdError.hasCommand()) {
+    Serial1.print("Did you mean \"");
+    Serial1.print(cmdError.getCommand().toString());
+    Serial1.println("\"?");
+  }
 }
 
 /// <summary>

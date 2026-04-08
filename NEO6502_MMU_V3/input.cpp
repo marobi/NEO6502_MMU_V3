@@ -15,7 +15,7 @@ Lesser General Public License for more details.
 #include "vdu.h"
 #include "cmd.h"
 
-FIFO<uint8_t,64>   cpu_tx_fifo;          // FIFO to write to CPU
+FIFO<uint8_t, 64>   cpu_tx_fifo;         // FIFO to write to CPU
 
 FIFO<uint8_t, 128> vdu_tx_fifo;          // FIFO to write to VDU/user output
 
@@ -40,7 +40,7 @@ bool writeCPUQ(const uint8_t c) {
     return true;
   }
   else {
-//    Serial1.println("*E: inpWriteCPUQ: FIFO full");
+    //    Serial1.println("*E: inpWriteCPUQ: FIFO full");
     return false;
   }
 }
@@ -54,7 +54,7 @@ bool writeVDUQ(const uint8_t c) {
     return true;
   }
   else {
-//    Serial1.println("*E: inpWriteVDUQ: FIFO full");
+    //    Serial1.println("*E: inpWriteVDUQ: FIFO full");
     return false;
   }
 }
@@ -69,7 +69,7 @@ static void processCPUoutQ() {
     if (outCharAvailable6502()) {  // check if cpu is ready to receive char
       if (cpu_tx_fifo.pop(data)) { // get data from cpu fifo
         outChar6502(data);         // send to cpu
-//        Serial1.printf("*D: processCPUoutQ: [%02x]\n", data);
+        //        Serial1.printf("*D: processCPUoutQ: [%02x]\n", data);
       }
     }
   }
@@ -81,10 +81,10 @@ static void processCPUoutQ() {
 static void processVDUoutQ() {
   uint8_t data = 0;
 
-  while (! vdu_tx_fifo.isEmpty()) {  // process all pending vdu data
+  while (!vdu_tx_fifo.isEmpty()) {  // process all pending vdu data
     vdu_tx_fifo.pop(data);           // get data from fifo
     vduPutc(data);                   // send to VDU
-//    Serial1.printf("*D: processVDUoutQ: [%02x]\n", data);
+    //    Serial1.printf("*D: processVDUoutQ: [%02x]\n", data);
   }
 }
 
@@ -96,7 +96,7 @@ static void processCPUinQ() {
     uint8_t data = inChar6502();
     if (data != 0) {
       writeVDUQ(data);
-//      Serial1.printf("*D: processCPUinQ: [%02x]\n", data);
+      //      Serial1.printf("*D: processCPUinQ: [%02x]\n", data);
     }
   }
 }

@@ -105,6 +105,22 @@ bool schedSwitchcontext(const uint8_t vContext, const bool vForce) {
 }
 
 /// <summary>
+/// 
+/// </summary>
+/// <returns></returns>
+bool schedNextcontext() {
+  uint8_t lCurrent = getMMUContext();
+
+  lCurrent++;
+  if (!statusContext[lCurrent]) {
+    lCurrent = 0;
+  }
+
+  schedSwitchcontext(lCurrent, false);
+  return true;
+}
+
+/// <summary>
 ///
 /// </summary>
 void initScheduler() {

@@ -103,6 +103,7 @@ void cmdClearScreen();
 
 void vduPutc(const uint8_t);
 void vduPrintStr(const char*);
+uint16_t vduPrintBuf(const uint8_t*, const uint16_t);
 void vduPrintf(char const* fmt, ...);
 
 uint8_t vduReadc(const uint16_t, const uint16_t);
