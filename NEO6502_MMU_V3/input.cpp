@@ -46,17 +46,26 @@ bool writeCPUQ(const uint8_t c) {
 }
 
 /// <summary>
-/// process FIFO KB -> CPU TX
+/// 
 /// </summary>
-bool writeVDUQ(const uint8_t c) {
-  if (!vdu_tx_fifo.isFull()) {
+/// <returns></returns>
+uint8_t readCPUQ() {
+  uint8_t c;
+
+  if (! cpu_tx_fifo.isEmpty()) {
+    cpu_tx_fifo.pop(c);
+    return c;
+  }
+  return 0;
+}
+
+/// <summary>
+/// process FIFO -> VDU
+/// </summary>
+bool writeVDUQ(const uint8_t c) {  
+  if (c != 0x00)
     vdu_tx_fifo.push(c);
-    return true;
-  }
-  else {
-    //    Serial1.println("*E: inpWriteVDUQ: FIFO full");
-    return false;
-  }
+  return true;
 }
 
 /// <summary>
@@ -105,7 +114,7 @@ static void processCPUinQ() {
 /// 
 /// </summary>
 void inpExecute() {
-  processCPUoutQ();
-  processCPUinQ();
+//  processCPUoutQ();
+//  processCPUinQ();
   processVDUoutQ();
 }

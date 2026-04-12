@@ -12,7 +12,12 @@ Lesser General Public License for more details.
 #pragma once
 #include "fifo.h"
 
+extern FIFO<uint8_t, 64>   cpu_tx_fifo;         // FIFO to write to CPU
+
+extern FIFO<uint8_t, 128>  vdu_tx_fifo;         // FIFO to write to VDU/user output
+
 bool writeCPUQ(const uint8_t c);
+uint8_t readCPUQ();
 bool writeVDUQ(const uint8_t c);
 
 void inpInit();

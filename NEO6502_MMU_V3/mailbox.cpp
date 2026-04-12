@@ -55,8 +55,6 @@
 #define RP_CMD_NONE         0x00
 #define RP_CMD_CON_WRITE    0x10
 #define RP_CMD_CON_READ     0x11
-#define RP_CMD_BLK_READ     0x20
-#define RP_CMD_BLK_WRITE    0x21
 
 // ------------------------------------------------------------
 // Error codes aligned with 6502 side
@@ -154,34 +152,20 @@ static bool rp_is_valid_range(uint16_t addr, uint16_t len) {
 /// <summary>
 /// 
 /// </summary>
-static char tmpText[4][RP_CONSOLE_CHUNK_SIZE] = {
-  "This is a test\n",
-  "Hello world\n",
-  "Neo6502-MMU test\n",
-  "Bye bye\n"
-};
-
-
-/// <summary>
-/// 
-/// </summary>
 /// <param name="data"></param>
 /// <param name="vLength"></param>
 /// <returns></returns>
-static uint16_t rp_input_bytes(char data[], uint16_t vLength)
-{
-  static uint8_t bp = 0;
+static uint16_t rp_input_bytes(char data[], const uint16_t vLength) {
   uint16_t len;
-  uint16_t i;
 
-  len = strlen(tmpText[bp]);
-  if (len > vLength)
-    len = vLength;
+  for (len = 0; len < vLength; len++) {
+    uint8_t c = readCPUQ();
+    if (c == 0) {
+      break;
+    }
+    data[len] = c;
+  }
 
-  for (i = 0; i < len; i++)
-    data[i] = tmpText[bp][i];
-
-  bp = (bp + 1) % 4;
   return len;
 }
 
@@ -191,12 +175,10 @@ static uint16_t rp_input_bytes(char data[], uint16_t vLength)
 /// <param name="data"></param>
 /// <param name="len"></param>
 /// <returns></returns>
-static bool rp_output_bytes(const uint8_t* data, uint16_t len) {
-  uint16_t l = 0;
-
-//  written = Serial1.write(data, len);
-  while (l < len)
-    writeVDUQ(data[l++]);
+static bool rp_output_bytes(const uint8_t* buffer, uint16_t len) {
+  for (uint16_t l = 0; l < len; l++) {
+    writeVDUQ(buffer[l]);
+  }
   return (true);
 }
 
@@ -207,22 +189,7 @@ static bool rp_output_bytes(const uint8_t* data, uint16_t len) {
 /// <param name="arg0"></param>
 /// <param name="arg1"></param>
 static void rp_debug_request(uint8_t cmd, uint16_t arg0, uint16_t arg1) {
-  Serial1.print(F("[rp] cmd=0x"));
-  if (cmd < 0x10)
-    Serial1.print('0');
-  Serial1.print(cmd, HEX);
-
-  Serial1.print(F(" arg0=0x"));
-  if (arg0 < 0x1000) Serial1.print('0');
-  if (arg0 < 0x0100) Serial1.print('0');
-  if (arg0 < 0x0010) Serial1.print('0');
-  Serial1.print(arg0, HEX);
-
-  Serial1.print(F(" arg1=0x"));
-  if (arg1 < 0x1000) Serial1.print('0');
-  if (arg1 < 0x0100) Serial1.print('0');
-  if (arg1 < 0x0010) Serial1.print('0');
-  Serial1.println(arg1, HEX);
+  Serial1.printf("[rp] cmd=0x%02X arg0=0x%04X arg1=0x%02X [%d %d]\n", cmd, arg0, arg1, gCommandCount, gErrorCount);
 }
 
 // ------------------------------------------------------------
@@ -239,7 +206,7 @@ static void rp_handle_console_write(void) {
   src = rp_read16(RP_ARG0L);
   len = rp_read16(RP_ARG1L);
 
-  rp_debug_request(RP_CMD_CON_WRITE, src, len);
+//  rp_debug_request(RP_CMD_CON_WRITE, src, len);
 
   if (!rp_is_valid_range(src, len)) {
     rp_set_error(EINVAL, 0);
@@ -262,13 +229,13 @@ static void rp_handle_console_write(void) {
 
     snoop_read6502Memory(current, chunk, buf);
 
-    if (!rp_output_bytes(buf, chunk)) {
+    if (! rp_output_bytes(buf, chunk)) {
       rp_set_error(EIO, (uint16_t)(len - remaining));
       return;
     }
 
-    current = (uint16_t)(current + chunk);
-    remaining = (uint16_t)(remaining - chunk);
+    current = current + chunk;
+    remaining = remaining - chunk;
   }
 
   gWriteCount++;
@@ -288,8 +255,6 @@ static void rp_handle_console_read(void) {
   dst = rp_read16(RP_ARG0L);
   len = rp_read16(RP_ARG1L);
 
-  rp_debug_request(RP_CMD_CON_READ, dst, len);
-
   if (!rp_is_valid_range(dst, len)) {
     rp_set_error(EINVAL, 0);
     return;
@@ -303,24 +268,11 @@ static void rp_handle_console_read(void) {
   if (len > RP_CONSOLE_CHUNK_SIZE)
     len = RP_CONSOLE_CHUNK_SIZE;
 
-#if 0
-  while (!Serial1.available());
-
-  while ((count < len) && Serial1.available()) {
-    int c;
-
-    c = Serial1.read();
-    if (c < 0)
-      break;
-
-    buf[count++] = (uint8_t)c;
-  }
-#endif
-  count = rp_input_bytes((char *)buf, RP_CONSOLE_CHUNK_SIZE);
+  count = rp_input_bytes((char *)buf, len);
 
   if (count != 0) {
     snoop_write6502Memory(dst, count, buf);
-//    Serial1.printf("rp_handle_console_read: cnt=%d\n", count);
+//    rp_debug_request(RP_CMD_CON_READ, dst, count);
   }
 
   rp_set_done(count);
@@ -336,6 +288,10 @@ static void rp_handle_unknown_command(uint8_t cmd) {
   rp_set_error(EINVAL, 0);
 }
 
+/// <summary>
+/// 
+/// </summary>
+/// <param name=""></param>
 static void rp_handle_command(void) {
   uint8_t cmd;
 
@@ -343,8 +299,7 @@ static void rp_handle_command(void) {
 
   cmd = snoop_read6502MemoryLoc(RP_CMD);
 
-  switch (cmd)
-  {
+  switch (cmd) {
   case RP_CMD_CON_WRITE:
     rp_handle_console_write();
     break;
@@ -357,19 +312,21 @@ static void rp_handle_command(void) {
     rp_handle_unknown_command(cmd);
     break;
   }
+
+  snoop_write6502MemoryLoc(RP_DOORBELL, RP_CMD_NONE);
 }
 
 // ------------------------------------------------------------
 // Poll function
 // ------------------------------------------------------------
 void neo6502_mailbox_poll() {
-  uint8_t status;
+  uint8_t bell;
 
   gPollCount++;
 
-  status = snoop_read6502MemoryLoc(RP_STATUS);
+  bell = snoop_read6502MemoryLoc(RP_DOORBELL);
 
-  if (status != RP_BUSY)
+  if (bell == RP_CMD_NONE)
     return;
 
   rp_handle_command();
@@ -405,7 +362,8 @@ void rp_print_diag() {
 // Initialization
 // ------------------------------------------------------------
 void neo6502_mailbox_init() {
-//  snoop_write6502MemoryLoc(RP_CMD, RP_CMD_NONE);
+  snoop_write6502MemoryLoc(RP_DOORBELL, RP_CMD_NONE);
+  snoop_write6502MemoryLoc(RP_CMD, RP_CMD_NONE);
 //  snoop_write6502MemoryLoc(RP_ARG0L, 0);
 //  snoop_write6502MemoryLoc(RP_ARG0H, 0);
 //  snoop_write6502MemoryLoc(RP_ARG1L, 0);
@@ -415,7 +373,7 @@ void neo6502_mailbox_init() {
 //  snoop_write6502MemoryLoc(RP_ERR, 0);
 //  snoop_write6502MemoryLoc(RP_FLAGS, 0);
 //  snoop_write6502MemoryLoc(RP_STATE, 0);
-//  rp_write16(RP_RES0L, 0);
+  rp_write16(RP_RES0L, 0);
 
-//  snoop_write6502MemoryLoc(RP_STATUS, RP_IDLE);
+  snoop_write6502MemoryLoc(RP_STATUS, RP_IDLE);
 }

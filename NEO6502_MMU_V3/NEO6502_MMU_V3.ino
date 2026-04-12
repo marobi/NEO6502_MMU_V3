@@ -137,7 +137,7 @@ void setup() {
   Serial1.printf("*D: default context: CTX%1X\n", memoryConfig.boot_context);
 
   neo6502_mailbox_init();
-  Serial1.println("D:mailbox initialized");
+  Serial1.println("*D: mailbox initialized");
 
   initCmdInterface();           // init command interface
 
