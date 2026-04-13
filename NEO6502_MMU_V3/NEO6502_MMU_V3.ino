@@ -79,6 +79,7 @@ void setup() {
   setupMMU();
   setup6502();
 
+  //Serial.begin(115200);
   Serial1.begin(115200);
   delay(2500);
 
@@ -136,7 +137,7 @@ void setup() {
 
   Serial1.printf("*D: default context: CTX%1X\n", memoryConfig.boot_context);
 
-  neo6502_mailbox_init();
+  initMailbox();
   Serial1.println("*D: mailbox initialized");
 
   initCmdInterface();           // init command interface
@@ -163,7 +164,7 @@ void loop() {
 
   inpExecute();                  // process FIFOs
 
-  taskVDU();                     // vdu task, mainly control of cursor blinking and smooth scroll
+  taskMailbox();
 
-  neo6502_mailbox_poll();
+  taskVDU();                     // vdu task, mainly control of cursor blinking and smooth scroll
 }

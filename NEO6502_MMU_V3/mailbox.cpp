@@ -74,10 +74,24 @@
 #define RP_CONSOLE_CHUNK_SIZE   256
 
 // ------------------------------------------------------------
+// FSM
+// ------------------------------------------------------------
+enum mbStates_t {
+  mbINIT = 0,
+  mbIDLE,
+  mbWRITE,
+  mbREAD,
+  mbDONE
+};
+
+static mbStates_t mailbox_state = mbINIT;
+
+// ------------------------------------------------------------
 // Diagnostics
 // ------------------------------------------------------------
 static uint32_t gPollCount = 0;
 static uint32_t gCommandCount = 0;
+static uint32_t gReadCount = 0;
 static uint32_t gWriteCount = 0;
 static uint32_t gErrorCount = 0;
 static uint32_t gUnknownCmdCount = 0;
@@ -112,7 +126,9 @@ static void rp_write16(uint16_t addr, uint16_t value) {
 static void rp_set_done(uint16_t result) {
   rp_write16(RP_RES0L, result);
   snoop_write6502MemoryLoc(RP_ERR, E_OK);
+
   snoop_write6502MemoryLoc(RP_STATUS, RP_DONE);
+  snoop_write6502MemoryLoc(RP_DOORBELL, RP_CMD_NONE);   // reset doorbell
 }
 
 /// <summary>
@@ -123,30 +139,10 @@ static void rp_set_done(uint16_t result) {
 static void rp_set_error(uint8_t err, uint16_t partial) {
   rp_write16(RP_RES0L, partial);
   snoop_write6502MemoryLoc(RP_ERR, err);
+
   snoop_write6502MemoryLoc(RP_STATUS, RP_ERROR);
+  snoop_write6502MemoryLoc(RP_DOORBELL, RP_CMD_NONE);   // reset doorbell
   gErrorCount++;
-}
-
-/// <summary>
-/// 
-/// </summary>
-/// <param name="addr"></param>
-/// <param name="len"></param>
-/// <returns></returns>
-static bool rp_is_valid_range(uint16_t addr, uint16_t len) {
-  uint32_t start;
-  uint32_t end;
-
-  if (len == 0)
-    return true;
-
-  start = (uint32_t)addr;
-  end = start + (uint32_t)len - 1UL;
-
-  if (end > 0xFFFFUL)
-    return false;
-
-  return true;
 }
 
 /// <summary>
@@ -155,14 +151,20 @@ static bool rp_is_valid_range(uint16_t addr, uint16_t len) {
 /// <param name="data"></param>
 /// <param name="vLength"></param>
 /// <returns></returns>
-static uint16_t rp_input_bytes(char data[], const uint16_t vLength) {
+static uint16_t rp_input_bytes(uint8_t data[], const uint16_t vLength) {
   uint16_t len;
 
   for (len = 0; len < vLength; len++) {
     uint8_t c = readCPUQ();
     if (c == 0) {
+      data[len] = 0x00;
       break;
     }
+    if (c == '\n') {   // until/inclusive CR
+      data[len] = 0x00;
+      break;
+    }
+
     data[len] = c;
   }
 
@@ -175,11 +177,10 @@ static uint16_t rp_input_bytes(char data[], const uint16_t vLength) {
 /// <param name="data"></param>
 /// <param name="len"></param>
 /// <returns></returns>
-static bool rp_output_bytes(const uint8_t* buffer, uint16_t len) {
+static void rp_output_bytes(const uint8_t* buffer, const uint16_t len) {
   for (uint16_t l = 0; l < len; l++) {
     writeVDUQ(buffer[l]);
   }
-  return (true);
 }
 
 /// <summary>
@@ -192,90 +193,46 @@ static void rp_debug_request(uint8_t cmd, uint16_t arg0, uint16_t arg1) {
   Serial1.printf("[rp] cmd=0x%02X arg0=0x%04X arg1=0x%02X [%d %d]\n", cmd, arg0, arg1, gCommandCount, gErrorCount);
 }
 
+
 // ------------------------------------------------------------
 // Command handlers
 // ------------------------------------------------------------
-static void rp_handle_console_write(void) {
-  uint16_t src;
-  uint16_t len;
-  uint16_t remaining;
-  uint16_t current;
-  uint16_t chunk;
-  static uint8_t buf[RP_CONSOLE_CHUNK_SIZE];
+static bool rp_handle_console_write_setup(uint16_t* src, uint16_t* len) {
+  *src = rp_read16(RP_ARG0L);
+  *len = rp_read16(RP_ARG1L);
 
-  src = rp_read16(RP_ARG0L);
-  len = rp_read16(RP_ARG1L);
+//  rp_debug_request(RP_CMD_CON_WRITE, *src, *len);
 
-//  rp_debug_request(RP_CMD_CON_WRITE, src, len);
-
-  if (!rp_is_valid_range(src, len)) {
-    rp_set_error(EINVAL, 0);
-    return;
-  }
-
-  if (len == 0) {
+  if (*len == 0) {          // nothing to write into
     rp_set_done(0);
-    return;
+
+    return false;
   }
 
-  remaining = len;
-  current = src;
-
-  while (remaining != 0) {
-    if (remaining > RP_CONSOLE_CHUNK_SIZE)
-      chunk = RP_CONSOLE_CHUNK_SIZE;
-    else
-      chunk = remaining;
-
-    snoop_read6502Memory(current, chunk, buf);
-
-    if (! rp_output_bytes(buf, chunk)) {
-      rp_set_error(EIO, (uint16_t)(len - remaining));
-      return;
-    }
-
-    current = current + chunk;
-    remaining = remaining - chunk;
-  }
-
-  gWriteCount++;
-  rp_set_done(len);
+  return true;
 }
 
 /// <summary>
 /// 
 /// </summary>
 /// <param name=""></param>
-static void rp_handle_console_read(void) {
-  uint16_t dst;
-  uint16_t len;
-  uint16_t count = 0;
-  static uint8_t buf[RP_CONSOLE_CHUNK_SIZE];
+/// <returns></returns>
+static bool rp_handle_console_read_setup(uint16_t* dst, uint16_t* len) {
+  *dst = rp_read16(RP_ARG0L);
+  *len = rp_read16(RP_ARG1L);
 
-  dst = rp_read16(RP_ARG0L);
-  len = rp_read16(RP_ARG1L);
+//  rp_debug_request(RP_CMD_CON_READ, *dst, *len);
 
-  if (!rp_is_valid_range(dst, len)) {
-    rp_set_error(EINVAL, 0);
-    return;
-  }
-
-  if (len == 0) {
+  if (*len == 0) {         // nothing to read into
     rp_set_done(0);
-    return;
+
+    return false;
   }
 
-  if (len > RP_CONSOLE_CHUNK_SIZE)
-    len = RP_CONSOLE_CHUNK_SIZE;
+  if (*len > RP_CONSOLE_CHUNK_SIZE)
+    *len = RP_CONSOLE_CHUNK_SIZE;
 
-  count = rp_input_bytes((char *)buf, len);
-
-  if (count != 0) {
-    snoop_write6502Memory(dst, count, buf);
-//    rp_debug_request(RP_CMD_CON_READ, dst, count);
-  }
-
-  rp_set_done(count);
+  return true;
 }
 
 /// <summary>
@@ -283,53 +240,113 @@ static void rp_handle_console_read(void) {
 /// </summary>
 /// <param name="cmd"></param>
 static void rp_handle_unknown_command(uint8_t cmd) {
-  (void)cmd;
   gUnknownCmdCount++;
+
   rp_set_error(EINVAL, 0);
 }
 
 /// <summary>
 /// 
 /// </summary>
-/// <param name=""></param>
-static void rp_handle_command(void) {
+void taskMailbox() {
+  uint8_t bell;
   uint8_t cmd;
+  static uint16_t target;
+  static uint16_t len;
+  static uint16_t count;
+  static uint16_t current;
+  static uint16_t chunk;
+  static uint16_t remaining;
+  static uint8_t  buffer[RP_CONSOLE_CHUNK_SIZE];
 
-  gCommandCount++;
-
-  cmd = snoop_read6502MemoryLoc(RP_CMD);
-
-  switch (cmd) {
-  case RP_CMD_CON_WRITE:
-    rp_handle_console_write();
+  // FSM
+  switch (mailbox_state) {
+  case mbINIT:
+    mailbox_state = mbIDLE;
     break;
 
-  case RP_CMD_CON_READ:
-    rp_handle_console_read();
+  case mbIDLE:
+    gPollCount++;
+
+    bell = snoop_read6502MemoryLoc(RP_DOORBELL);
+
+    if (bell != RP_CMD_NONE) {               // kling!
+      gCommandCount++;
+
+      cmd = snoop_read6502MemoryLoc(RP_CMD);
+      switch (cmd) {
+      case RP_CMD_CON_WRITE:
+        if (rp_handle_console_write_setup(&target, &len)) {
+          remaining = len;
+          current = target;
+          mailbox_state = mbWRITE;
+        }
+        else
+          mailbox_state = mbDONE;
+        break;
+
+      case RP_CMD_CON_READ:
+        if (rp_handle_console_read_setup(&target, &len))
+          mailbox_state = mbREAD;
+        else
+          mailbox_state = mbDONE;
+        break;
+
+      default:
+        rp_handle_unknown_command(cmd);
+        break;
+      }
+    }
+
     break;
 
-  default:
-    rp_handle_unknown_command(cmd);
+  case mbWRITE:
+    if (remaining != 0) {
+      if (remaining > RP_CONSOLE_CHUNK_SIZE)
+        chunk = RP_CONSOLE_CHUNK_SIZE;
+      else
+        chunk = remaining;
+
+      snoop_read6502Memory(current, chunk, buffer);
+
+      rp_output_bytes(buffer, chunk);
+
+      current += chunk;
+      remaining -= chunk;
+
+      gWriteCount++;
+    }
+    else {
+      rp_set_done(len);
+
+      mailbox_state = mbDONE;
+    }
+
+    break;
+
+  case mbREAD:
+    gReadCount++;
+
+    count = rp_input_bytes(buffer, len);
+
+    if (count != 0) {
+      snoop_write6502Memory(target, count, buffer);
+
+      rp_set_done(count);
+
+      mailbox_state = mbDONE;
+    }
+
+    break;
+
+  case mbDONE:
+    mailbox_state = mbIDLE;
+    break;
+
+  default:                    // never reached
+    mailbox_state = mbIDLE;
     break;
   }
-
-  snoop_write6502MemoryLoc(RP_DOORBELL, RP_CMD_NONE);
-}
-
-// ------------------------------------------------------------
-// Poll function
-// ------------------------------------------------------------
-void neo6502_mailbox_poll() {
-  uint8_t bell;
-
-  gPollCount++;
-
-  bell = snoop_read6502MemoryLoc(RP_DOORBELL);
-
-  if (bell == RP_CMD_NONE)
-    return;
-
-  rp_handle_command();
 }
 
 // ------------------------------------------------------------
@@ -361,18 +378,18 @@ void rp_print_diag() {
 // ------------------------------------------------------------
 // Initialization
 // ------------------------------------------------------------
-void neo6502_mailbox_init() {
+void initMailbox() {
   snoop_write6502MemoryLoc(RP_DOORBELL, RP_CMD_NONE);
   snoop_write6502MemoryLoc(RP_CMD, RP_CMD_NONE);
-//  snoop_write6502MemoryLoc(RP_ARG0L, 0);
-//  snoop_write6502MemoryLoc(RP_ARG0H, 0);
-//  snoop_write6502MemoryLoc(RP_ARG1L, 0);
-//  snoop_write6502MemoryLoc(RP_ARG1H, 0);
-//  snoop_write6502MemoryLoc(RP_ARG2L, 0);
-//  snoop_write6502MemoryLoc(RP_ARG2H, 0);
-//  snoop_write6502MemoryLoc(RP_ERR, 0);
-//  snoop_write6502MemoryLoc(RP_FLAGS, 0);
-//  snoop_write6502MemoryLoc(RP_STATE, 0);
+  //  snoop_write6502MemoryLoc(RP_ARG0L, 0);
+  //  snoop_write6502MemoryLoc(RP_ARG0H, 0);
+  //  snoop_write6502MemoryLoc(RP_ARG1L, 0);
+  //  snoop_write6502MemoryLoc(RP_ARG1H, 0);
+  //  snoop_write6502MemoryLoc(RP_ARG2L, 0);
+  //  snoop_write6502MemoryLoc(RP_ARG2H, 0);
+  //  snoop_write6502MemoryLoc(RP_ERR, 0);
+  //  snoop_write6502MemoryLoc(RP_FLAGS, 0);
+  //  snoop_write6502MemoryLoc(RP_STATE, 0);
   rp_write16(RP_RES0L, 0);
 
   snoop_write6502MemoryLoc(RP_STATUS, RP_IDLE);
