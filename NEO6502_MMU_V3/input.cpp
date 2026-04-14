@@ -9,25 +9,14 @@ but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 Lesser General Public License for more details.
 */
-
 #include "Arduino.h"
 #include "input.h"
 #include "vdu.h"
 #include "cmd.h"
 
-FIFO<uint8_t, 64>   cpu_tx_fifo;         // FIFO to write to CPU
+FIFO<uint8_t, 128> cpu_tx_fifo;         // FIFO to write to CPU
 
 FIFO<uint8_t, 128> vdu_tx_fifo;          // FIFO to write to VDU/user output
-
-/// <summary>
-/// inpInit initializes the input system by clearing all the FIFOs used for communication
-/// This ensures that any residual data from previous operations is removed, 
-/// providing a clean state for the system to start processing new inputs and outputs.
-/// </summary>
-void inpInit() {
-  cpu_tx_fifo.clear();
-  vdu_tx_fifo.clear();
-}
 
 /// <summary>
 /// 
@@ -35,7 +24,7 @@ void inpInit() {
 /// <param name="c"></param>
 /// <returns></returns>
 bool writeCPUQ(const uint8_t c) {
-  if (!cpu_tx_fifo.isFull()) {
+  if (! cpu_tx_fifo.isFull()) {
     cpu_tx_fifo.push(c);
     return true;
   }
@@ -50,7 +39,7 @@ bool writeCPUQ(const uint8_t c) {
 /// </summary>
 /// <returns></returns>
 uint8_t readCPUQ() {
-  uint8_t c;
+  uint8_t c = 0;
 
   if (! cpu_tx_fifo.isEmpty()) {
     cpu_tx_fifo.pop(c);
@@ -68,6 +57,7 @@ bool writeVDUQ(const uint8_t c) {
   return true;
 }
 
+#if 0
 /// <summary>
 /// process FIFO CPU 
 /// </summary>
@@ -83,6 +73,7 @@ static void processCPUoutQ() {
     }
   }
 }
+#endif
 
 /// <summary>
 /// process FIFO VDU 
@@ -97,6 +88,8 @@ static void processVDUoutQ() {
   }
 }
 
+
+#if 0
 /// <summary>
 /// read from CPU, output to VDU
 /// </summary>
@@ -108,6 +101,17 @@ static void processCPUinQ() {
       //      Serial1.printf("*D: processCPUinQ: [%02x]\n", data);
     }
   }
+}
+#endif
+
+/// <summary>
+/// inpInit initializes the input system by clearing all the FIFOs used for communication
+/// This ensures that any residual data from previous operations is removed, 
+/// providing a clean state for the system to start processing new inputs and outputs.
+/// </summary>
+void inpInit() {
+  cpu_tx_fifo.clear();
+  vdu_tx_fifo.clear();
 }
 
 /// <summary>

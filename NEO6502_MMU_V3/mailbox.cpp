@@ -20,7 +20,7 @@
 // ------------------------------------------------------------
 // Fixed request/result block in 6502 RAM
 // ------------------------------------------------------------
-#define RP_REQ_BASE     0x02C0
+#define RP_REQ_BASE     0x80C0
 
 #define RP_CMD          (RP_REQ_BASE + 0)
 #define RP_ARG0L        (RP_REQ_BASE + 1)
@@ -156,16 +156,9 @@ static uint16_t rp_input_bytes(uint8_t data[], const uint16_t vLength) {
 
   for (len = 0; len < vLength; len++) {
     uint8_t c = readCPUQ();
-    if (c == 0) {
-      data[len] = 0x00;
-      break;
-    }
-    if (c == '\n') {   // until/inclusive CR
-      data[len] = 0x00;
-      break;
-    }
-
     data[len] = c;
+    if (c == 0)
+      break;
   }
 
   return len;
