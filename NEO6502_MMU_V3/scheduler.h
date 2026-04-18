@@ -12,8 +12,6 @@ Lesser General Public License for more details.
 */
 #pragma once
 
-bool schedSwitchcontext(const uint8_t vContext, const bool vRun);
-
-bool schedNextcontext();
+void taskScheduler();
 
 void initScheduler();

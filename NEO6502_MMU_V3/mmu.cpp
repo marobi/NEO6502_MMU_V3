@@ -90,6 +90,8 @@ void setupMMU()
   gpio_init(pMMUIO);               // Always init pins first
   gpio_set_dir(pMMUIO, GPIO_IN);   // Set as output
   gpio_pull_up(pMMUIO);            // Enable pull-up resistor
+
+  ackMMUIO();
 }
 
 /// <summary>
@@ -268,13 +270,6 @@ void mapMMUPage(const uint8_t vContext, const uint8_t vIndex) {
 }
 
 /// <summary>
-/// initialise MMU interrupts
-/// </summary>
-static void initMMUInterrupt() {
-  irq_set_exclusive_handler(IO_IRQ_BANK0, intrMMUIO);
-}
-
-/// <summary>
 /// enable MMU interrupts on MMU_IO pin FALLING
 /// </summary>
 void enableMMUInterrupt() {
@@ -295,6 +290,15 @@ void disableMMUInterrupt() {
 }
 
 /// <summary>
+/// initialise MMU interrupts
+/// </summary>
+static void initMMUInterrupt() {
+  irq_set_exclusive_handler(IO_IRQ_BANK0, intrMMUIO);
+
+  disableMMUInterrupt();
+}
+
+/// <summary>
 /// fill MMU with 256 contexts of straight 64k RAM space
 /// </summary>
 /// <returns>bool</returns>
@@ -303,7 +307,6 @@ bool initMMU() {
   uint16_t lErrCount = 0L;
 
   initMMUInterrupt();
-  disableMMUInterrupt();
 
   // for all contexts set the pages
   for (lContext = 0; lContext < NUM_CONTEXTS; lContext++) {

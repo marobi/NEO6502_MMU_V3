@@ -13,26 +13,22 @@ Lesser General Public License for more details.
 #pragma once
 
 #define CMD_SLOT_BASE    0xD000   // sync with memory.ini
-#define CMD_SLOT_OUTCHAR 0        // write to 6502
-#define CMD_SLOT_INCHAR  1        // read from 6502
+//#define CMD_SLOT_OUTCHAR 0        // write to 6502      (obsolete)
+//#define CMD_SLOT_INCHAR  1        // read from 6502     (obsolete)
 #define CMD_SLOT_CMD     2        // cmd from 6502
-#define CMD_SLOT_STAT    3        // status to 6502
-#define CMD_SLOT_SYNC    4        // sync with 6502 (context switching)
+#define CMD_SLOT_PARAM   3        // param from 6502
 
-void initCmdInterface();
+/// <summary>
+/// 
+/// </summary>
+enum eCMD6502 {
+  CMD6502_NONE = 0,
+  CMD6502_ACK_IRQ,
+  CMD6502_CONTEXT_SWITCH
+};
 
-uint8_t readCmdSlot(const uint8_t vSlot);
+void    initCmdInterface();
 
-void writeCmdSlot(const uint8_t vSlot, uint8_t vData);
+bool    getCommand6502(eCMD6502 &vCmd, uint8_t &vParam);
 
-uint8_t inChar6502();
-
-bool outChar6502(const uint8_t vChar);
-
-bool outCharAvailable6502();
-
-void outCharBlocking6502(const uint8_t vChar);
-
-uint8_t getCommand6502();
-
-void ackCommand6502();
+void    ackCommand6502();

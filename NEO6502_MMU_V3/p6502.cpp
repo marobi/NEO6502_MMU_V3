@@ -18,6 +18,7 @@ Lesser General Public License for more details.
 #include "control.h"
 #include "neobus.h"
 #include "p6502.h"
+#include "mmu.h"
 #include "pins.h"
 
 /// <summary>
@@ -329,6 +330,8 @@ bool set6502State(const sysstate_t vSysState) {
     BEPin::high();
     dir6502RW(mINPUT);
     setControlMode(mCPU);
+
+    setMMUContext(DEFAULT_CONTEXT);
     break;
 
   case sHALTED: // cpu stopped

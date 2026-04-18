@@ -142,13 +142,13 @@ void setup() {
 
   initCmdInterface();           // init command interface
 
+  initScheduler();              // init context switching
+
   set6502State(sRESET);         // reset CPU
 
   initMonitor();                // init monitor after boot
 
   initIndicator();              // setup board led indicator
-
-  initScheduler();              // init context switching
 }
 
 /// <summary>
@@ -162,9 +162,11 @@ void loop() {
 
   taskICMonitor();               // ICM
 
-  inpExecute();                  // process FIFOs
+  taskInput();                  // process FIFOs
 
   taskMailbox();
+
+  taskScheduler();
 
   taskVDU();                     // vdu task, mainly control of cursor blinking and smooth scroll
 }

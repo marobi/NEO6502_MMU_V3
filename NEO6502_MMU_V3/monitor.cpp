@@ -79,7 +79,6 @@ static void cmdResetCallback(cmd* c) {
   Command cmd(c); // Create wrapper object
 
   set6502State(sRESET);
-  inpInit();
   initCmdInterface();
   Serial1.println("CPU Reset");
 }
@@ -223,7 +222,7 @@ static void cmdMMUCallback(cmd* c) {
   //  if (lContext == 127)
   uint8_t lContext = getMMUContext();
 
-  // Serial1.printf("MMU: %02X\n", lContext);
+  Serial1.printf("MMU: %02X\n", lContext);
 
   sysstate_t lState = get6502State();
   set6502State(sRPI);
@@ -231,21 +230,6 @@ static void cmdMMUCallback(cmd* c) {
   dumpMMUPageMap(lContext);   // dump context
 
   set6502State(lState);
-}
-
-/// <summary>
-/// 
-/// </summary>
-/// <param name="c"></param>
-static void cmdSwitchCallback(cmd* c) {
-  Command cmd(c);
-  String arg1 = cmd.getArgument("context").getValue();
-  String arg2 = cmd.getArgument("force").getValue();
-
-  uint8_t lContext = x2i(arg1.c_str()) & 0x7F;  // 128
-
-  bool force = (arg2 == "n") ? false : true;
-  schedSwitchcontext(lContext, force);
 }
 
 /// <summary>
@@ -325,6 +309,19 @@ static void cmdClockCallback(cmd* c) {
 }
 
 /// <summary>
+/// 
+/// </summary>
+/// <param name="c"></param>
+static void cmdIRQCallback(cmd* c) {
+  Command cmd(c);
+
+  Serial1.println("IRQ ...");
+  IRQPin::low();                // raise IRQ
+  DebugPin::low();
+}
+
+
+/// <summary>
 /// help overview of commands
 /// </summary>
 /// <param name="c"></param>
@@ -336,6 +333,7 @@ static void cmdHelpCallback(cmd* c) {
  d/is <from> <lines>   disasm memory\n\
  g/o                   go\n\
  help                  help\n\
+ irq                   IRQ\n\
  m/em <from> <to>      dump memory\n\
  page <index> <page>   set mmu page\n\
  res/et                reset\n\
@@ -343,7 +341,6 @@ static void cmdHelpCallback(cmd* c) {
  sc <cycles>           single cycle\n\
  ss <steps>            single step\n\
  st/at                 status of cpus/bus\n\
- swi/tch <context>     switch to context\n\
  syscfg                system configuration\n\
  t/erm                 terminal mode\n\
  zero                  zero memory\n\
@@ -377,21 +374,23 @@ void initMonitor() {
   gCmd = gCli.addCmd("clock", cmdClockCallback);
   gCmd.addPositionalArgument("freq", "0");
 
+  gCmd = gCli.addCmd("ctx", cmdMMUCallback);
+
   gCmd = gCli.addCmd("d/is", cmdDisAsmCallback);
   gCmd.addPositionalArgument("from");
   gCmd.addPositionalArgument("lines", "1");
-
-  gCmd = gCli.addCmd("m/em", cmdDumpCallback);
-  gCmd.addPositionalArgument("from", "0");
-  gCmd.addPositionalArgument("to", "0");
 
   gCmd = gCli.addCmd("g/o", cmdGoCallback);
 
   gCmd = gCli.addCmd("h/elp", cmdHelpCallback);
 
+  gCmd = gCli.addCmd("irq", cmdIRQCallback);
+
   gCmd = gCli.addBoundlessCommand(">", cmdMemCallback);
 
-  gCmd = gCli.addCmd("ctx", cmdMMUCallback);
+  gCmd = gCli.addCmd("m/em", cmdDumpCallback);
+  gCmd.addPositionalArgument("from", "0");
+  gCmd.addPositionalArgument("to", "0");
 
   gCmd = gCli.addCmd("r/eset", cmdResetCallback);
 
@@ -402,10 +401,6 @@ void initMonitor() {
   gCmd.addPositionalArgument("steps", "1");
 
   gCmd = gCli.addCmd("st/at", cmdStatusCallback);
-
-  gCmd = gCli.addCmd("sw/itch", cmdSwitchCallback);
-  gCmd.addPositionalArgument("context", "0");
-  gCmd.addPositionalArgument("force", "n");
 
   gCmd = gCli.addCmd("syscfg", cmdSysConfigCallback);
 

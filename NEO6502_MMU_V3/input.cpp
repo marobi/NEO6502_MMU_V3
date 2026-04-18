@@ -109,7 +109,7 @@ static void processCPUinQ() {
 /// This ensures that any residual data from previous operations is removed, 
 /// providing a clean state for the system to start processing new inputs and outputs.
 /// </summary>
-void inpInit() {
+void initInput() {
   cpu_tx_fifo.clear();
   vdu_tx_fifo.clear();
 }
@@ -117,7 +117,7 @@ void inpInit() {
 /// <summary>
 /// 
 /// </summary>
-void inpExecute() {
+void taskInput() {
 //  processCPUoutQ();
 //  processCPUinQ();
   processVDUoutQ();

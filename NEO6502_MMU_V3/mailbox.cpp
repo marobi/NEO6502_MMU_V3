@@ -16,29 +16,29 @@
 #include "mailbox.h"
 #include "input.h"
 #include "neobus.h"
+#include "mmu.h"
 
 // ------------------------------------------------------------
 // Fixed request/result block in 6502 RAM
 // ------------------------------------------------------------
 #define RP_REQ_BASE     0x80C0
 
-#define RP_CMD          (RP_REQ_BASE + 0)
-#define RP_ARG0L        (RP_REQ_BASE + 1)
-#define RP_ARG0H        (RP_REQ_BASE + 2)
-#define RP_ARG1L        (RP_REQ_BASE + 3)
-#define RP_ARG1H        (RP_REQ_BASE + 4)
-#define RP_ARG2L        (RP_REQ_BASE + 5)
-#define RP_ARG2H        (RP_REQ_BASE + 6)
-#define RP_RES0L        (RP_REQ_BASE + 7)
-#define RP_RES0H        (RP_REQ_BASE + 8)
-#define RP_ERR          (RP_REQ_BASE + 9)
-#define RP_FLAGS        (RP_REQ_BASE + 10)
-#define RP_STATE        (RP_REQ_BASE + 11)
+#define RP_ARG0L        (RP_REQ_BASE + 0)
+#define RP_ARG0H        (RP_REQ_BASE + 1)
+#define RP_ARG1L        (RP_REQ_BASE + 2)
+#define RP_ARG1H        (RP_REQ_BASE + 3)
+#define RP_ARG2L        (RP_REQ_BASE + 4)
+#define RP_ARG2H        (RP_REQ_BASE + 5)
+#define RP_RES0L        (RP_REQ_BASE + 6)
+#define RP_RES0H        (RP_REQ_BASE + 7)
+#define RP_ERR          (RP_REQ_BASE + 8)
+#define RP_FLAGS        (RP_REQ_BASE + 9)
+#define RP_STATE        (RP_REQ_BASE + 10)
 
 // ------------------------------------------------------------
 // Doorbell + status in MMU I/O page
 // ------------------------------------------------------------
-#define RP_DOORBELL     0xD010
+#define RP_DOORBELL     0xD010          // sync with memory.ini
 #define RP_STATUS       0xD011
 
 // ------------------------------------------------------------
@@ -76,7 +76,7 @@
 // ------------------------------------------------------------
 // FSM
 // ------------------------------------------------------------
-enum mbStates_t {
+enum mailbox_state_t {
   mbINIT = 0,
   mbIDLE,
   mbWRITE,
@@ -84,7 +84,7 @@ enum mbStates_t {
   mbDONE
 };
 
-static mbStates_t mailbox_state = mbINIT;
+static mailbox_state_t mailbox_state = mbINIT;
 
 // ------------------------------------------------------------
 // Diagnostics
@@ -190,13 +190,13 @@ static void rp_debug_request(uint8_t cmd, uint16_t arg0, uint16_t arg1) {
 // ------------------------------------------------------------
 // Command handlers
 // ------------------------------------------------------------
-static bool rp_handle_console_write_setup(uint16_t* src, uint16_t* len) {
-  *src = rp_read16(RP_ARG0L);
-  *len = rp_read16(RP_ARG1L);
+static bool rp_handle_console_write_setup(uint16_t& src, uint16_t& len) {
+  src = rp_read16(RP_ARG0L);
+  len = rp_read16(RP_ARG1L);
 
-//  rp_debug_request(RP_CMD_CON_WRITE, *src, *len);
+//  rp_debug_request(RP_CMD_CON_WRITE, src, len);
 
-  if (*len == 0) {          // nothing to write into
+  if (len == 0) {          // nothing to write into
     rp_set_done(0);
 
     return false;
@@ -210,20 +210,20 @@ static bool rp_handle_console_write_setup(uint16_t* src, uint16_t* len) {
 /// </summary>
 /// <param name=""></param>
 /// <returns></returns>
-static bool rp_handle_console_read_setup(uint16_t* dst, uint16_t* len) {
-  *dst = rp_read16(RP_ARG0L);
-  *len = rp_read16(RP_ARG1L);
+static bool rp_handle_console_read_setup(uint16_t& dst, uint16_t& len) {
+  dst = rp_read16(RP_ARG0L);
+  len = rp_read16(RP_ARG1L);
 
-//  rp_debug_request(RP_CMD_CON_READ, *dst, *len);
+//  rp_debug_request(RP_CMD_CON_READ, dst, len);
 
-  if (*len == 0) {         // nothing to read into
+  if (len == 0) {         // nothing to read into
     rp_set_done(0);
 
     return false;
   }
 
-  if (*len > RP_CONSOLE_CHUNK_SIZE)
-    *len = RP_CONSOLE_CHUNK_SIZE;
+  if (len > RP_CONSOLE_CHUNK_SIZE)
+    len = RP_CONSOLE_CHUNK_SIZE;
 
   return true;
 }
@@ -238,11 +238,14 @@ static void rp_handle_unknown_command(uint8_t cmd) {
   rp_set_error(EINVAL, 0);
 }
 
+#if 0
+static mailbox_state_t last_mailbox_state = mbINIT;
+#endif
+
 /// <summary>
 /// 
 /// </summary>
 void taskMailbox() {
-  uint8_t bell;
   uint8_t cmd;
   static uint16_t target;
   static uint16_t len;
@@ -251,6 +254,13 @@ void taskMailbox() {
   static uint16_t chunk;
   static uint16_t remaining;
   static uint8_t  buffer[RP_CONSOLE_CHUNK_SIZE];
+
+#if 0
+  if (last_mailbox_state != mailbox_state) {
+    Serial1.printf("*D: taskMailbox: %d\n", mailbox_state);
+      last_mailbox_state = mailbox_state;
+  }
+#endif
 
   // FSM
   switch (mailbox_state) {
@@ -261,15 +271,16 @@ void taskMailbox() {
   case mbIDLE:
     gPollCount++;
 
-    bell = snoop_read6502MemoryLoc(RP_DOORBELL);
+    cmd = snoop_read6502MemoryLoc(RP_DOORBELL);
 
-    if (bell != RP_CMD_NONE) {               // kling!
+    if (cmd != RP_CMD_NONE) {               // kling!
+      ackMMUIO();
+
       gCommandCount++;
 
-      cmd = snoop_read6502MemoryLoc(RP_CMD);
       switch (cmd) {
       case RP_CMD_CON_WRITE:
-        if (rp_handle_console_write_setup(&target, &len)) {
+        if (rp_handle_console_write_setup(target, len)) {
           remaining = len;
           current = target;
           mailbox_state = mbWRITE;
@@ -279,7 +290,7 @@ void taskMailbox() {
         break;
 
       case RP_CMD_CON_READ:
-        if (rp_handle_console_read_setup(&target, &len))
+        if (rp_handle_console_read_setup(target, len))
           mailbox_state = mbREAD;
         else
           mailbox_state = mbDONE;
@@ -373,16 +384,15 @@ void rp_print_diag() {
 // ------------------------------------------------------------
 void initMailbox() {
   snoop_write6502MemoryLoc(RP_DOORBELL, RP_CMD_NONE);
-  snoop_write6502MemoryLoc(RP_CMD, RP_CMD_NONE);
   //  snoop_write6502MemoryLoc(RP_ARG0L, 0);
   //  snoop_write6502MemoryLoc(RP_ARG0H, 0);
   //  snoop_write6502MemoryLoc(RP_ARG1L, 0);
   //  snoop_write6502MemoryLoc(RP_ARG1H, 0);
   //  snoop_write6502MemoryLoc(RP_ARG2L, 0);
   //  snoop_write6502MemoryLoc(RP_ARG2H, 0);
-  //  snoop_write6502MemoryLoc(RP_ERR, 0);
-  //  snoop_write6502MemoryLoc(RP_FLAGS, 0);
-  //  snoop_write6502MemoryLoc(RP_STATE, 0);
+  snoop_write6502MemoryLoc(RP_ERR, 0);
+  snoop_write6502MemoryLoc(RP_FLAGS, 0);
+  snoop_write6502MemoryLoc(RP_STATE, 0);
   rp_write16(RP_RES0L, 0);
 
   snoop_write6502MemoryLoc(RP_STATUS, RP_IDLE);

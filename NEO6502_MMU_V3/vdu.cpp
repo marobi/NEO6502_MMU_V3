@@ -756,13 +756,6 @@ void cmdClearScreen()
   setCursor(true);
 }
 
-/// <summary>
-/// 
-/// </summary>
-static void cmdContext() {
-  schedNextcontext();
-}
-
 //-----------------------------------------------------------------------------------------
 
 /// <summary>
@@ -795,7 +788,7 @@ static const vdu_cmd_t ctrlTable[32] = {
     cmdSmoothScroll, // ^U
     NULL,            // ^V
     NULL,            // ^W
-    cmdContext,      // ^X
+    NULL,            // ^X
     NULL,            // ^Y
     NULL             // ^Z  (return to monitor)
 };

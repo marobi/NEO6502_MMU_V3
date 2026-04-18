@@ -20,5 +20,5 @@ bool writeCPUQ(const uint8_t c);
 uint8_t readCPUQ();
 bool writeVDUQ(const uint8_t c);
 
-void inpInit();
-void inpExecute();
+void initInput();
+void taskInput();

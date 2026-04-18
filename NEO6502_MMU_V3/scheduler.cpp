@@ -17,18 +17,6 @@ Lesser General Public License for more details.
 #include "p6502.h"
 #include "cmd.h"
 
-//
-static bool statusContext[8] = {
-  true,
-  false,
-  false,
-  false,
-  false,
-  false,
-  false,
-  false
-};
-
 /// <summary>
 /// TEMP routine
 /// </summary>
@@ -36,7 +24,7 @@ static bool statusContext[8] = {
 static void schedHelp(const char* str) {
   uint8_t regs[7];
 
-  snoop_read6502Memory(0x0228, 7, regs);
+  snoop_read6502Memory(0x0240, 7, regs);
 
   Serial1.printf("%sPC=%02X%02X SR=%02X A=%02X X=%02X Y=%02X SP=%02X\n", str, regs[0], regs[1], regs[2], regs[3], regs[4], regs[5], regs[6]);
 }
@@ -45,79 +33,55 @@ static void schedHelp(const char* str) {
 /// 
 /// </summary>
 /// <param name="vContext"></param>
-bool schedSwitchcontext(const uint8_t vContext, const bool vForce) {
-  uint16_t trial;
-  uint8_t m;
-
-  Serial1.printf("*I: SWITCH: CTX%1X -> CTX%1X %s\n", getMMUContext(), vContext, (vForce) ? "RESET" : "RUN");
+void schedSwitchcontext(const uint8_t vContext) {
+  uint8_t c = getMMUContext();
 
   disableMMUInterrupt();
 
-  writeCmdSlot(CMD_SLOT_SYNC, 0x01);
-
-  IRQPin::low();                             // gen IRQ
-
-  trial = 500;
-  while (!triggerMMUIO() && (trial != 0)) {  // delay for 6502 to respond
-    delayNs<50>();
-    trial--;
-  }
-
-  trial = 50;
-  do {
-    m = readCmdSlot(CMD_SLOT_SYNC);
-    if (m == 0x01) {
-      delayNs<50>();
-      trial--;
-    }
-  } while ((m == 0x01) && trial);            // wait for CPU --> 0
-
-  IRQPin::high();                            // reset IRQ
-
-  if (trial == 0) {
-    // failed
-    Serial1.printf("*E: schedSwitchcontext failed [%02X]\n", vContext);
-    enableMMUInterrupt();                    // reenable MMU interrupts
-    DebugPin::high();
-    return false;
-  }
+  sysstate_t s = get6502State();
 
   // now the context switch
-  set6502State(sHALTED);                     // halt CPU
+  set6502State(sHALTED);        // halt CPU
 
-  setMMUContext(vContext);                   // switch context
+  setMMUContext(vContext);      // switch context
 
-  if (statusContext[vContext] && (!vForce)) {
-    writeCmdSlot(CMD_SLOT_STAT, 0x01);       // context switch
-  }
-  else {
-    writeCmdSlot(CMD_SLOT_STAT, 0x02);       // reset
-    statusContext[vContext] = true;
-  }
-
-  writeCmdSlot(CMD_SLOT_SYNC, 0x01);         // ==> 1, ACK
-
-  set6502State(sRUNNING);                    // continue CPU
+  set6502State(s);              // continue CPU
 
   enableMMUInterrupt();
 
-  return true;
+  Serial1.printf("*I: schedSwitchcontext: CTX%1X -> CTX%1X\n", c, vContext);
 }
 
 /// <summary>
 /// 
 /// </summary>
-/// <returns></returns>
-bool schedNextcontext() {
-  uint8_t lCurrent = getMMUContext();
+void taskScheduler() {
+  eCMD6502 lCmd;
+  uint8_t  lParam;
 
-  lCurrent++;
-  if (!statusContext[lCurrent]) {
-    lCurrent = 0;
+  getCommand6502(lCmd, lParam);
+
+  switch (lCmd) {
+  case CMD6502_NONE:
+    break;
+
+  case CMD6502_ACK_IRQ:
+    IRQPin::high();
+    ackCommand6502();
+
+    DebugPin::high();
+
+    Serial1.println("*I: taskScheduler: Ack IRQ");
+    break;
+
+  case CMD6502_CONTEXT_SWITCH:
+    schedSwitchcontext(lParam);
+    ackCommand6502();
+    break;
+
+  default:
+    break;
   }
-
-  schedSwitchcontext(lCurrent, false);
-  return true;
 }
 
 /// <summary>
