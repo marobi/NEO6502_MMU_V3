@@ -35,11 +35,6 @@
 #define RP_FLAGS        (RP_REQ_BASE + 9)
 #define RP_STATE        (RP_REQ_BASE + 10)
 
-// ------------------------------------------------------------
-// Doorbell + status in MMU I/O page
-// ------------------------------------------------------------
-#define RP_DOORBELL     0xD010          // sync with memory.ini
-#define RP_STATUS       0xD011
 
 // ------------------------------------------------------------
 // Status values

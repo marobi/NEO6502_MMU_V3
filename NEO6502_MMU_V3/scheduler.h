@@ -12,6 +12,20 @@ Lesser General Public License for more details.
 */
 #pragma once
 
+enum irq_source_t {
+  RP_SRC_NONE = 0,
+  RP_SRC_TIMER,
+  RP_SRC_MONITOR
+};
+
+bool genIRQ6502(irq_source_t vSrc);
+
+void stopIRQTimer();
+
+void startIRQTimer(const uint16_t vPeriod);
+
+void taskIRQTimer();
+
 void taskScheduler();
 
 void initScheduler();

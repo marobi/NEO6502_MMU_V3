@@ -16,6 +16,7 @@ Lesser General Public License for more details.
 #include "mmu.h"
 #include "p6502.h"
 #include "cmd.h"
+#include "mailbox.h"
 
 /// <summary>
 /// TEMP routine
@@ -34,7 +35,7 @@ static void schedHelp(const char* str) {
 /// </summary>
 /// <param name="vContext"></param>
 void schedSwitchcontext(const uint8_t vContext) {
-  uint8_t c = getMMUContext();
+//  uint8_t c = getMMUContext();
 
   disableMMUInterrupt();
 
@@ -49,7 +50,67 @@ void schedSwitchcontext(const uint8_t vContext) {
 
   enableMMUInterrupt();
 
-  Serial1.printf("*I: schedSwitchcontext: CTX%1X -> CTX%1X\n", c, vContext);
+//  Serial1.printf("*I: CTX%1X -> CTX%1X\n", c, vContext);
+}
+
+/// <summary>
+/// 
+/// </summary>
+/// <returns></returns>
+bool genIRQ6502(irq_source_t vSrc) {
+  if (snoop_read6502MemoryLoc(RP_IRQ_SOURCE) == 0) {
+    snoop_write6502MemoryLoc(RP_IRQ_SOURCE, (uint8_t)vSrc);
+
+    IRQPin::low();
+    DebugPin::low();
+
+    return true;
+  }
+  else
+    return false;
+}
+
+static bool irqTimerEnabled = false;
+static unsigned long irqTimerInterval;
+static unsigned long irqLastTS;
+
+/// <summary>
+/// 
+/// </summary>
+void stopIRQTimer() {
+  irqTimerEnabled = false;
+
+  Serial1.println("*D: stopIRQTimer: stopped");
+}
+
+/// <summary>
+/// 
+/// </summary>
+/// <param name="vPeriod"></param>
+void startIRQTimer(const uint16_t vPeriod) {
+  if (vPeriod < 65535) {
+    irqTimerInterval = vPeriod;
+    irqTimerEnabled = true;
+    irqLastTS = millis();
+    Serial1.printf("*D: startIRQTimer: %d ms\n", vPeriod);
+  }
+  else
+    stopIRQTimer();
+
+}
+
+/// <summary>
+/// 
+/// </summary>
+void taskIRQTimer() {
+  if (irqTimerEnabled) {
+    if (millis() >= (irqLastTS + irqTimerInterval)) {
+      // gen IRQ
+      if (!genIRQ6502(RP_SRC_TIMER))
+        Serial1.println("*E: taskIRQTimer: IRQ gen failed");
+      irqLastTS = millis();
+    }
+  }
 }
 
 /// <summary>
@@ -67,11 +128,12 @@ void taskScheduler() {
 
   case CMD6502_ACK_IRQ:
     IRQPin::high();
-    ackCommand6502();
-
     DebugPin::high();
 
-    Serial1.println("*I: taskScheduler: Ack IRQ");
+    snoop_write6502MemoryLoc(RP_IRQ_SOURCE, RP_SRC_NONE);
+    ackCommand6502();
+
+    //    Serial1.println("*I: taskScheduler: Ack IRQ");
     break;
 
   case CMD6502_CONTEXT_SWITCH:
@@ -88,5 +150,5 @@ void taskScheduler() {
 ///
 /// </summary>
 void initScheduler() {
-
+  snoop_write6502MemoryLoc(RP_IRQ_SOURCE, RP_SRC_NONE);
 }

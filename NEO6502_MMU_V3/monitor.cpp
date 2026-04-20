@@ -315,11 +315,43 @@ static void cmdClockCallback(cmd* c) {
 static void cmdIRQCallback(cmd* c) {
   Command cmd(c);
 
-  Serial1.println("IRQ ...");
-  IRQPin::low();                // raise IRQ
-  DebugPin::low();
+  Serial1.println("*I: IRQ ...");
+  if (!genIRQ6502(RP_SRC_TIMER)) {
+    Serial1.println("*E: cmdIRQCallback: IRQ gen failed");
+  }
 }
 
+/// <summary>
+/// 
+/// </summary>
+/// <param name="c"></param>
+static void cmdTimerCallback(cmd* c) {
+  Command cmd(c);
+
+  String arg1 = cmd.getArgument("freq").getValue();
+
+  uint32_t lInterval = 1000 / atof(arg1.c_str());
+
+  if (lInterval < 1) {
+    stopIRQTimer();
+  }
+  else {
+    startIRQTimer(lInterval);
+  }
+}
+
+/// <summary>
+/// 
+/// </summary>
+/// <param name="c"></param>
+static void cmdMonitorCallback(cmd* c) {
+  Command cmd(c);
+
+  Serial1.println("*I: Monitor ...");
+  if (!genIRQ6502(RP_SRC_MONITOR)) {
+    Serial1.println("*E: cmdIRQCallback: Monitor entry failed");
+  }
+}
 
 /// <summary>
 /// help overview of commands
@@ -335,6 +367,7 @@ static void cmdHelpCallback(cmd* c) {
  help                  help\n\
  irq                   IRQ\n\
  m/em <from> <to>      dump memory\n\
+ mon/itor              enter monitor\n\
  page <index> <page>   set mmu page\n\
  res/et                reset\n\
  s/top                 stop\n\
@@ -343,6 +376,7 @@ static void cmdHelpCallback(cmd* c) {
  st/at                 status of cpus/bus\n\
  syscfg                system configuration\n\
  t/erm                 terminal mode\n\
+ timer <freq>          IRQ timer\n\
  zero                  zero memory\n\
 \n");
 }
@@ -392,6 +426,8 @@ void initMonitor() {
   gCmd.addPositionalArgument("from", "0");
   gCmd.addPositionalArgument("to", "0");
 
+  gCmd = gCli.addCmd("mon/itor", cmdMonitorCallback);
+
   gCmd = gCli.addCmd("r/eset", cmdResetCallback);
 
   gCmd = gCli.addCmd("sc", cmdSCCallback);
@@ -407,6 +443,9 @@ void initMonitor() {
   gCmd = gCli.addCmd("s/top", cmdStopCallback);
 
   gCmd = gCli.addCmd("t/erm", cmdCommandCallback);
+
+  gCmd = gCli.addCmd("timer", cmdTimerCallback);
+  gCmd.addPositionalArgument("freq", "0");
 
   gCmd = gCli.addCmd("page", cmdPageCallback);
   gCmd.addPositionalArgument("index");

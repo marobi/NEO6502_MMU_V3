@@ -315,6 +315,7 @@ bool set6502State(const sysstate_t vSysState) {
     break;
 
   case sBOOT:  // system in boot mode
+    IRQPin::high();
     RESETPin::low();                    // reset
     halt6502clock(true);                // PHI2 = high
     RDYPin::low();
@@ -324,6 +325,7 @@ bool set6502State(const sysstate_t vSysState) {
     break;
 
   case sRESET:  // cpu helt reset
+    IRQPin::high();
     RESETPin::low();
     set6502Clock();
     RDYPin::low();
@@ -426,7 +428,6 @@ void setup6502() {
   gpio_set_dir(p6502SYNC, GPIO_IN);   // Set as input
 
   gpio_init(p6502IRQ);                // Always init
-  IRQPin::high();                     // no IRQ
   gpio_set_dir(p6502IRQ, GPIO_OUT);   // Set as output
   IRQPin::high();                     // no IRQ
 

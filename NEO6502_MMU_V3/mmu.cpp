@@ -237,7 +237,7 @@ void dumpMMUContextCompact(const uint8_t vContext) {
   for (uint8_t lPage = 0; lPage < NUM_CONTEXT_PAGES; lPage++) {
     Serial1.printf(" %02X", readMMUPage(vContext, lPage));
   }
-  Serial1.printf("\n");
+  Serial1.println("");
 }
 
 /// <summary>
@@ -325,16 +325,3 @@ bool initMMU() {
 
   return (lErrCount == 0);
 }
-
-#if 0
-/// <summary>
-/// 
-/// </summary>
-void testMMU() {
-  Serial1.printf("*D: Testing MMU\n");
-
-  while (true) {
-    writeMMUPage(random(NUM_CONTEXTS), random(NUM_CONTEXT_PAGES), random(256));
-  }
-}
-#endif

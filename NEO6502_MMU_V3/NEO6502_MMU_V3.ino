@@ -138,7 +138,7 @@ void setup() {
   Serial1.printf("*D: default context: CTX%1X\n", memoryConfig.boot_context);
 
   initMailbox();
-  Serial1.println("*D: mailbox initialized");
+//  Serial1.println("*D: mailbox initialized");
 
   initCmdInterface();           // init command interface
 
@@ -159,6 +159,8 @@ void setup() {
 /// </summary>
 void loop() {
   updateIndicator();             // manage status LED
+
+  taskIRQTimer();
 
   taskICMonitor();               // ICM
 
