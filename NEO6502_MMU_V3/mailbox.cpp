@@ -91,6 +91,12 @@ static uint32_t gWriteCount = 0;
 static uint32_t gErrorCount = 0;
 static uint32_t gUnknownCmdCount = 0;
 
+
+// ------------------------------------------------------------
+// Console Input selection
+// ------------------------------------------------------------
+static uint8_t gConsolePID = 0;
+
 // ------------------------------------------------------------
 // Helpers
 // ------------------------------------------------------------
@@ -231,6 +237,24 @@ static void rp_handle_unknown_command(uint8_t cmd) {
   gUnknownCmdCount++;
 
   rp_set_error(EINVAL, 0);
+}
+
+/// <summary>
+/// 
+/// </summary>
+/// <returns></returns>
+uint8_t getConsolePID() {
+  return gConsolePID;
+}
+
+/// <summary>
+/// 
+/// </summary>
+/// <param name="vPID"></param>
+void setConsolePID(const uint8_t vPID) {
+  snoop_write6502MemoryLoc(RP_CONSOLE_PID, vPID);
+
+  gConsolePID = vPID;
 }
 
 #if 0

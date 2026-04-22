@@ -13,7 +13,6 @@ Lesser General Public License for more details.
 #include "mmu.h"
 #include "cmd.h"
 #include "neobus.h"
-#include "input.h"
 
 /// <summary>
 /// readm a byte from 6502 slot-interface
@@ -45,11 +44,11 @@ static uint16_t inCount = 0;                             // clutch because for u
 /// get a 
 /// </summary>
 /// <returns></returns>
-bool getCommand6502(eCMD6502 &vCmd, uint8_t& vParam) {
+bool getCommand6502(uint8_t &vCmd, uint8_t& vParam) {
   inCount++;
 
   if (triggerMMUIO() || !( inCount % 1000L)) {          // got mmuInt interrupt or force checking
-    eCMD6502 cmd = (eCMD6502)readCmdSlot(CMD_SLOT_CMD);
+    uint8_t cmd = readCmdSlot(CMD_SLOT_CMD);
     if (cmd != CMD6502_NONE) {
       vCmd = cmd;
       vParam = readCmdSlot(CMD_SLOT_PARAM);
@@ -58,6 +57,7 @@ bool getCommand6502(eCMD6502 &vCmd, uint8_t& vParam) {
     }
   }
 
+  vCmd = CMD6502_NONE;
   return false;
 }
 
@@ -72,9 +72,7 @@ void ackCommand6502() {
 /// init cmd slots: set to 0x00
 /// </summary>
 void initCmdInterface() {
-  uint8_t ldata[5] = { 0x00, 0x00, 0x00, 0x00, 0x00 };
+  uint8_t ldata[4] = { 0x00, 0x00, 0x00, 0x00 };
 
-  snoop_write6502Memory(CMD_SLOT_BASE, 5, ldata);
-
-  initInput();
+  snoop_write6502Memory(CMD_SLOT_BASE, 4, ldata);
 }

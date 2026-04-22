@@ -29,6 +29,6 @@ enum eCMD6502 {
 
 void    initCmdInterface();
 
-bool    getCommand6502(eCMD6502 &vCmd, uint8_t &vParam);
+bool    getCommand6502(uint8_t &vCmd, uint8_t &vParam);
 
 void    ackCommand6502();

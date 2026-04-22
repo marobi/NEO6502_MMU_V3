@@ -326,6 +326,7 @@ bool set6502State(const sysstate_t vSysState) {
 
   case sRESET:  // cpu helt reset
     IRQPin::high();
+    DebugPin::high(); // TEMPORARY !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     RESETPin::low();
     set6502Clock();
     RDYPin::low();

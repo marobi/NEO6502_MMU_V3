@@ -35,7 +35,7 @@ static void schedHelp(const char* str) {
 /// </summary>
 /// <param name="vContext"></param>
 void schedSwitchcontext(const uint8_t vContext) {
-//  uint8_t c = getMMUContext();
+  //  uint8_t c = getMMUContext();
 
   disableMMUInterrupt();
 
@@ -50,7 +50,7 @@ void schedSwitchcontext(const uint8_t vContext) {
 
   enableMMUInterrupt();
 
-//  Serial1.printf("*I: CTX%1X -> CTX%1X\n", c, vContext);
+  //  Serial1.printf("*I: CTX%1X -> CTX%1X\n", c, vContext);
 }
 
 /// <summary>
@@ -117,10 +117,11 @@ void taskIRQTimer() {
 /// 
 /// </summary>
 void taskScheduler() {
-  eCMD6502 lCmd;
-  uint8_t  lParam;
+  uint8_t lCmd;
+  uint8_t lParam;
 
-  getCommand6502(lCmd, lParam);
+  if (!getCommand6502(lCmd, lParam))
+    return;
 
   switch (lCmd) {
   case CMD6502_NONE:

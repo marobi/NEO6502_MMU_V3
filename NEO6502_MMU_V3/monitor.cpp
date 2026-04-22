@@ -35,7 +35,10 @@ Lesser General Public License for more details.
 #include "vdu.h"
 #include "input.h"
 
+#include "mailbox.h"
 #include "scheduler.h"
+
+#include "debug_sched.h"
 
 // Create CLI Object
 static SimpleCLI gCli;
@@ -79,6 +82,7 @@ static void cmdResetCallback(cmd* c) {
   Command cmd(c); // Create wrapper object
 
   set6502State(sRESET);
+  stopIRQTimer();
   initCmdInterface();
   Serial1.println("CPU Reset");
 }
@@ -261,8 +265,12 @@ static void cmdPageCallback(cmd* c) {
 static void cmdCommandCallback(cmd* c) {
   Command cmd(c);
 
+  String arg1 = cmd.getArgument("PID").getValue();
+  uint8_t lPID = atoi(arg1.c_str()) & 0xFF;
+  setConsolePID(lPID);
+
   gInterface++;
-  Serial1.println("Entering terminal ...");
+  Serial1.printf("Entering terminal [%d]\n", lPID);
 }
 
 /// <summary>
@@ -354,11 +362,22 @@ static void cmdMonitorCallback(cmd* c) {
 }
 
 /// <summary>
+/// 
+/// </summary>
+/// <param name="c"></param>
+static void cmdInfoCallback(cmd* c) {
+  Command cmd(c);
+
+  dumpScheduler();
+}
+
+
+/// <summary>
 /// help overview of commands
 /// </summary>
 /// <param name="c"></param>
 static void cmdHelpCallback(cmd* c) {
-  Serial1.print("\nMICmon help:\n\
+  Serial1.print(F("\nMICmon help:\n\
  > <address> <data>    modify memory address(es)\n\
  clock <freq MHz>      set 6502 clock frequency\n\
  ctx                   show mmu context\n\
@@ -366,6 +385,7 @@ static void cmdHelpCallback(cmd* c) {
  g/o                   go\n\
  help                  help\n\
  irq                   IRQ\n\
+ i/nfo                 dump scheduler shared data\n\
  m/em <from> <to>      dump memory\n\
  mon/itor              enter monitor\n\
  page <index> <page>   set mmu page\n\
@@ -378,7 +398,7 @@ static void cmdHelpCallback(cmd* c) {
  t/erm                 terminal mode\n\
  timer <freq>          IRQ timer\n\
  zero                  zero memory\n\
-\n");
+\n"));
 }
 
 /// <summary>
@@ -420,6 +440,8 @@ void initMonitor() {
 
   gCmd = gCli.addCmd("irq", cmdIRQCallback);
 
+  gCmd = gCli.addCmd("i/nfo", cmdInfoCallback);
+
   gCmd = gCli.addBoundlessCommand(">", cmdMemCallback);
 
   gCmd = gCli.addCmd("m/em", cmdDumpCallback);
@@ -443,6 +465,7 @@ void initMonitor() {
   gCmd = gCli.addCmd("s/top", cmdStopCallback);
 
   gCmd = gCli.addCmd("t/erm", cmdCommandCallback);
+  gCmd.addPositionalArgument("PID", "0");
 
   gCmd = gCli.addCmd("timer", cmdTimerCallback);
   gCmd.addPositionalArgument("freq", "0");

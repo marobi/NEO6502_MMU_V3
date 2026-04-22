@@ -141,6 +141,7 @@ void setup() {
 //  Serial1.println("*D: mailbox initialized");
 
   initCmdInterface();           // init command interface
+  initInput();
 
   initScheduler();              // init context switching
 
