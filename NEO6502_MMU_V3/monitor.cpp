@@ -81,9 +81,11 @@ static int x2i(const char* s) {
 static void cmdResetCallback(cmd* c) {
   Command cmd(c); // Create wrapper object
 
+  gInMonitor = false;
   set6502State(sRESET);
   stopIRQTimer();
   initCmdInterface();
+  initMailbox();
   Serial1.println("CPU Reset");
 }
 
@@ -267,10 +269,21 @@ static void cmdCommandCallback(cmd* c) {
 
   String arg1 = cmd.getArgument("PID").getValue();
   uint8_t lPID = atoi(arg1.c_str()) & 0xFF;
+
+  if ((lPID > 0) && (gInMonitor)) {
+    Serial1.println("*E: in monitor!");
+    return;
+  }
+
+  Serial1.printf("Set console PID to %d\n", lPID);
+
   setConsolePID(lPID);
+  if (lPID == 0) {
+    gInMonitor = true;
+  }
 
   gInterface++;
-  Serial1.printf("Entering terminal [%d]\n", lPID);
+  Serial1.printf("Entering console [%d]\n", lPID);
 }
 
 /// <summary>
@@ -492,6 +505,7 @@ static void returnToICM() {
   gInterface = 0x00;                  // return to ICM
   gInputIndex = 0;
   gInputBuffer[0] = '\0';
+  gInMonitor = false;                 // TODO: not correct
 
   Serial1.printf("%x> ", getMMUContext()); // new prompt for CLI
 }

@@ -161,9 +161,11 @@ void setup() {
 void loop() {
   updateIndicator();             // manage status LED
 
+  taskVDU();                     // vdu task, mainly control of cursor blinking and smooth scroll
+
   taskIRQTimer();
 
-  taskICMonitor();               // ICM
+  taskICMonitor();              // ICM
 
   taskInput();                  // process FIFOs
 
@@ -171,5 +173,5 @@ void loop() {
 
   taskScheduler();
 
-  taskVDU();                     // vdu task, mainly control of cursor blinking and smooth scroll
+//  delayNs<500>();
 }

@@ -19,24 +19,6 @@
 #include "mmu.h"
 
 // ------------------------------------------------------------
-// Fixed request/result block in 6502 RAM
-// ------------------------------------------------------------
-#define RP_REQ_BASE     0x80C0
-
-#define RP_ARG0L        (RP_REQ_BASE + 0)
-#define RP_ARG0H        (RP_REQ_BASE + 1)
-#define RP_ARG1L        (RP_REQ_BASE + 2)
-#define RP_ARG1H        (RP_REQ_BASE + 3)
-#define RP_ARG2L        (RP_REQ_BASE + 4)
-#define RP_ARG2H        (RP_REQ_BASE + 5)
-#define RP_RES0L        (RP_REQ_BASE + 6)
-#define RP_RES0H        (RP_REQ_BASE + 7)
-#define RP_ERR          (RP_REQ_BASE + 8)
-#define RP_FLAGS        (RP_REQ_BASE + 9)
-#define RP_STATE        (RP_REQ_BASE + 10)
-
-
-// ------------------------------------------------------------
 // Status values
 // ------------------------------------------------------------
 #define RP_IDLE         0
@@ -273,6 +255,7 @@ void taskMailbox() {
   static uint16_t chunk;
   static uint16_t remaining;
   static uint8_t  buffer[RP_CONSOLE_CHUNK_SIZE];
+  static bool lastCheck = true;                     // empty
 
 #if 0
   if (last_mailbox_state != mailbox_state) {
@@ -281,6 +264,13 @@ void taskMailbox() {
   }
 #endif
 
+  bool lCheck = isEmptyCPUQ();
+
+  if (lCheck != lastCheck) {
+    snoop_write6502MemoryLoc(RP_CONSOLE_RDY, (lCheck) ? 0 : 1);
+    lastCheck = lCheck;
+  }
+
   // FSM
   switch (mailbox_state) {
   case mbINIT:
@@ -288,12 +278,18 @@ void taskMailbox() {
     break;
 
   case mbIDLE:
+    static uint16_t lCount = 0;
+
     gPollCount++;
+
+    if (!triggerMMUIO() && (lCount++ % 2500))
+      break;
 
     cmd = snoop_read6502MemoryLoc(RP_DOORBELL);
 
+    ackMMUIO();
+
     if (cmd != RP_CMD_NONE) {               // kling!
-      ackMMUIO();
 
       gCommandCount++;
 
@@ -415,4 +411,8 @@ void initMailbox() {
   rp_write16(RP_RES0L, 0);
 
   snoop_write6502MemoryLoc(RP_STATUS, RP_IDLE);
+
+  snoop_write6502MemoryLoc(RP_CONSOLE_RDY, 0x00); // no input data
+
+  snoop_write6502MemoryLoc(RP_IRQ_SOURCE, 0x00);  // no IRQ
 }

@@ -18,6 +18,8 @@ enum irq_source_t {
   RP_SRC_MONITOR
 };
 
+extern bool gInMonitor;
+
 bool genIRQ6502(irq_source_t vSrc);
 
 void stopIRQTimer();

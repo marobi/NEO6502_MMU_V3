@@ -49,6 +49,14 @@ uint8_t readCPUQ() {
 }
 
 /// <summary>
+/// 
+/// </summary>
+/// <returns></returns>
+bool isEmptyCPUQ() {
+  return cpu_tx_fifo.isEmpty();
+}
+
+/// <summary>
 /// process FIFO -> VDU
 /// </summary>
 bool writeVDUQ(const uint8_t c) {  

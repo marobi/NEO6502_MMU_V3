@@ -18,6 +18,8 @@ Lesser General Public License for more details.
 #include "cmd.h"
 #include "mailbox.h"
 
+bool gInMonitor = false;
+
 /// <summary>
 /// TEMP routine
 /// </summary>
