@@ -19,7 +19,7 @@ Lesser General Public License for more details.
 #define CMD_SLOT_PARAM   3        // param from 6502
 
 /// <summary>
-/// 
+/// commands that can be sent via the CMD interface.
 /// </summary>
 enum eCMD6502 {
   CMD6502_NONE = 0,

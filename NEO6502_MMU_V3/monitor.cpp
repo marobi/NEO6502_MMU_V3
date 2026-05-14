@@ -398,10 +398,10 @@ static void cmdHelpCallback(cmd* c) {
  g/o                   go\n\
  help                  help\n\
  irq                   IRQ\n\
- i/nfo                 dump scheduler shared data\n\
  m/em <from> <to>      dump memory\n\
  mon/itor              enter monitor\n\
  page <index> <page>   set mmu page\n\
+ ps                    dump scheduler info\n\
  res/et                reset\n\
  s/top                 stop\n\
  sc <cycles>           single cycle\n\
@@ -453,8 +453,6 @@ void initMonitor() {
 
   gCmd = gCli.addCmd("irq", cmdIRQCallback);
 
-  gCmd = gCli.addCmd("i/nfo", cmdInfoCallback);
-
   gCmd = gCli.addBoundlessCommand(">", cmdMemCallback);
 
   gCmd = gCli.addCmd("m/em", cmdDumpCallback);
@@ -462,6 +460,8 @@ void initMonitor() {
   gCmd.addPositionalArgument("to", "0");
 
   gCmd = gCli.addCmd("mon/itor", cmdMonitorCallback);
+
+  gCmd = gCli.addCmd("ps", cmdInfoCallback);
 
   gCmd = gCli.addCmd("r/eset", cmdResetCallback);
 

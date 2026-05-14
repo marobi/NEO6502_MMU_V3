@@ -65,7 +65,11 @@ bool getCommand6502(uint8_t &vCmd, uint8_t& vParam) {
 /// ACK command: write 0x00 to CMD_SLOT_CMD to ACK command received
 /// </summary>
 void ackCommand6502() {
-  writeCmdSlot(CMD_SLOT_CMD, 0x00);
+  if (readCmdSlot(CMD_SLOT_CMD) != CMD6502_NONE) {
+    writeCmdSlot(CMD_SLOT_CMD, CMD6502_NONE);
+  }
+  else
+    Serial1.println("*E: ackCommand6502: no command to ACK");
 }
 
 /// <summary>

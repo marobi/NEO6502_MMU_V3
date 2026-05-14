@@ -159,19 +159,19 @@ void setup() {
 /// and running the monitor.
 /// </summary>
 void loop() {
-  updateIndicator();             // manage status LED
-
-  taskVDU();                     // vdu task, mainly control of cursor blinking and smooth scroll
-
   taskIRQTimer();
 
-  taskICMonitor();              // ICM
+  taskScheduler();
 
   taskInput();                  // process FIFOs
 
   taskMailbox();
 
-  taskScheduler();
+  taskVDU();                     // vdu task, mainly control of cursor blinking and smooth scroll
 
-//  delayNs<500>();
+  taskICMonitor();              // ICM
+
+  updateIndicator();             // manage status LED
+
+  //  delayNs<500>();
 }

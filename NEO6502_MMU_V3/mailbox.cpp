@@ -125,6 +125,7 @@ static void rp_set_error(uint8_t err, uint16_t partial) {
 
   snoop_write6502MemoryLoc(RP_STATUS, RP_ERROR);
   snoop_write6502MemoryLoc(RP_DOORBELL, RP_CMD_NONE);   // reset doorbell
+
   gErrorCount++;
 }
 
@@ -166,7 +167,14 @@ static void rp_output_bytes(const uint8_t* buffer, const uint16_t len) {
 /// <param name="arg0"></param>
 /// <param name="arg1"></param>
 static void rp_debug_request(uint8_t cmd, uint16_t arg0, uint16_t arg1) {
-  Serial1.printf("[rp] cmd=0x%02X arg0=0x%04X arg1=0x%02X [%d %d]\n", cmd, arg0, arg1, gCommandCount, gErrorCount);
+  Serial1.printf(
+    "[rp] cmd=0x%02X arg0=0x%04X arg1=0x%04X [%d %d]\n",
+    cmd,
+    arg0,
+    arg1,
+    gCommandCount,
+    gErrorCount
+  );
 }
 
 
@@ -305,8 +313,10 @@ void taskMailbox() {
         break;
 
       case RP_CMD_CON_READ:
-        if (rp_handle_console_read_setup(target, len))
+        if (rp_handle_console_read_setup(target, len)) {
+//          Serial1.printf("[rp] console read request for %d bytes\n", len);
           mailbox_state = mbREAD;
+        }
         else
           mailbox_state = mbDONE;
         break;
@@ -350,7 +360,7 @@ void taskMailbox() {
 
     if (count != 0) {
       snoop_write6502Memory(target, count, buffer);
-
+  //    Serial1.printf("[rp] read %d bytes from console input\n", count);
       rp_set_done(count);
 
       mailbox_state = mbDONE;
@@ -399,12 +409,12 @@ void rp_print_diag() {
 // ------------------------------------------------------------
 void initMailbox() {
   snoop_write6502MemoryLoc(RP_DOORBELL, RP_CMD_NONE);
-  //  snoop_write6502MemoryLoc(RP_ARG0L, 0);
-  //  snoop_write6502MemoryLoc(RP_ARG0H, 0);
-  //  snoop_write6502MemoryLoc(RP_ARG1L, 0);
-  //  snoop_write6502MemoryLoc(RP_ARG1H, 0);
-  //  snoop_write6502MemoryLoc(RP_ARG2L, 0);
-  //  snoop_write6502MemoryLoc(RP_ARG2H, 0);
+  snoop_write6502MemoryLoc(RP_ARG0L, 0);
+  snoop_write6502MemoryLoc(RP_ARG0H, 0);
+  snoop_write6502MemoryLoc(RP_ARG1L, 0);
+  snoop_write6502MemoryLoc(RP_ARG1H, 0);
+  snoop_write6502MemoryLoc(RP_ARG2L, 0);
+  snoop_write6502MemoryLoc(RP_ARG2H, 0);
   snoop_write6502MemoryLoc(RP_ERR, 0);
   snoop_write6502MemoryLoc(RP_FLAGS, 0);
   snoop_write6502MemoryLoc(RP_STATE, 0);

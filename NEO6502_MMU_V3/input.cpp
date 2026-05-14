@@ -16,7 +16,7 @@ Lesser General Public License for more details.
 
 FIFO<uint8_t, 128> cpu_tx_fifo;         // FIFO to write to CPU
 
-FIFO<uint8_t, 128> vdu_tx_fifo;          // FIFO to write to VDU/user output
+FIFO<uint8_t, 128> vdu_tx_fifo;         // FIFO to write to VDU/user output
 
 /// <summary>
 /// 
@@ -29,7 +29,7 @@ bool writeCPUQ(const uint8_t c) {
     return true;
   }
   else {
-    //    Serial1.println("*E: inpWriteCPUQ: FIFO full");
+    Serial1.println("*E: writeCPUQ: FIFO full");
     return false;
   }
 }

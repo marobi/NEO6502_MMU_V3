@@ -12,6 +12,9 @@ Lesser General Public License for more details.
 */
 #pragma once
 
+/// <summary>
+/// irq_source_t defines the possible sources of interrupts that can be generated for the 6502 CPU.
+/// </summary>
 enum irq_source_t {
   RP_SRC_NONE = 0,
   RP_SRC_TIMER,

@@ -12,7 +12,7 @@ Lesser General Public License for more details.
 */
 #pragma once
 
-#define VERSION "3.8.397"
+#define VERSION "3.9.431"
 
 #define USE_VALIDATION 0
 

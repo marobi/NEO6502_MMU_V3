@@ -20,6 +20,7 @@ Lesser General Public License for more details.
 
 bool gInMonitor = false;
 
+#if 0
 /// <summary>
 /// TEMP routine
 /// </summary>
@@ -31,6 +32,7 @@ static void schedHelp(const char* str) {
 
   Serial1.printf("%sPC=%02X%02X SR=%02X A=%02X X=%02X Y=%02X SP=%02X\n", str, regs[0], regs[1], regs[2], regs[3], regs[4], regs[5], regs[6]);
 }
+#endif
 
 /// <summary>
 /// 
@@ -60,7 +62,7 @@ void schedSwitchcontext(const uint8_t vContext) {
 /// </summary>
 /// <returns></returns>
 bool genIRQ6502(irq_source_t vSrc) {
-  if (snoop_read6502MemoryLoc(RP_IRQ_SOURCE) == 0) {
+  if (snoop_read6502MemoryLoc(RP_IRQ_SOURCE) == RP_SRC_NONE) {
     snoop_write6502MemoryLoc(RP_IRQ_SOURCE, (uint8_t)vSrc);
 
     IRQPin::low();
@@ -81,8 +83,11 @@ static unsigned long irqLastTS;
 /// </summary>
 void stopIRQTimer() {
   irqTimerEnabled = false;
+  IRQPin::high();
+  DebugPin::high();
+  snoop_write6502MemoryLoc(RP_IRQ_SOURCE, RP_SRC_NONE);
 
-  Serial1.println("*D: stopIRQTimer: stopped");
+  Serial1.println("*D: stopIRQTimer");
 }
 
 /// <summary>
@@ -94,11 +99,13 @@ void startIRQTimer(const uint16_t vPeriod) {
     irqTimerInterval = vPeriod;
     irqTimerEnabled = true;
     irqLastTS = millis();
+    IRQPin::high();
+    DebugPin::high();
+
     Serial1.printf("*D: startIRQTimer: %d ms\n", vPeriod);
   }
   else
     stopIRQTimer();
-
 }
 
 /// <summary>
@@ -110,6 +117,7 @@ void taskIRQTimer() {
       // gen IRQ
       if (!genIRQ6502(RP_SRC_TIMER))
         Serial1.println("*E: taskIRQTimer: IRQ gen failed");
+
       irqLastTS = millis();
     }
   }
@@ -133,14 +141,15 @@ void taskScheduler() {
     IRQPin::high();
     DebugPin::high();
 
-    snoop_write6502MemoryLoc(RP_IRQ_SOURCE, RP_SRC_NONE);
     ackCommand6502();
+    snoop_write6502MemoryLoc(RP_IRQ_SOURCE, RP_SRC_NONE);
 
     //    Serial1.println("*I: taskScheduler: Ack IRQ");
     break;
 
   case CMD6502_CONTEXT_SWITCH:
     schedSwitchcontext(lParam);
+
     ackCommand6502();
     break;
 

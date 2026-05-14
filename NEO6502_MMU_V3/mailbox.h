@@ -3,7 +3,7 @@
 // ------------------------------------------------------------
 // Doorbell in MMU I/O page
 // ------------------------------------------------------------
-#define RP_DOORBELL     0xD010          // sync with memory.ini
+#define RP_DOORBELL     0xD010                      // sync with memory.ini
 
 // ------------------------------------------------------------
 // Fixed request/result block in 6502 RAM
