@@ -108,6 +108,8 @@ void startIRQTimer(const uint16_t vPeriod) {
     stopIRQTimer();
 }
 
+static uint8_t taskTimerCounter = 0;
+
 /// <summary>
 /// 
 /// </summary>
@@ -116,10 +118,15 @@ void taskIRQTimer() {
     if (millis() >= (irqLastTS + irqTimerInterval)) {
       // gen IRQ
       if (!genIRQ6502(RP_SRC_TIMER))
-        Serial1.println("*E: taskIRQTimer: IRQ gen failed");
+        taskTimerCounter++;
+      else
+        taskTimerCounter = 0;
 
       irqLastTS = millis();
     }
+
+    if (taskTimerCounter > 3)
+      Serial1.println("*E: taskIRQTimer: IRQ gen failed");
   }
 }
 

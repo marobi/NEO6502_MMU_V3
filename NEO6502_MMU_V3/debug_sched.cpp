@@ -95,6 +95,8 @@ struct __attribute__((packed)) scheduler_info_t {
   uint16_t brk_vector;
   
   uint8_t  rp_lock;
+  uint8_t  fd_lock;
+  uint8_t  pipe_lock;
   
   //-----------------------------------------------
   uint8_t current_pid;
@@ -149,6 +151,11 @@ struct __attribute__((packed)) scheduler_info_t {
   uint8_t console_read_len_lo;
   uint8_t console_read_len_hi;
 
+  //------------------------------------------------
+  uint8_t task_count;
+  uint8_t task_ptrL;
+  uint8_t task_ptrH;
+
   //
   // debug stuff, not necessarily in kernel 
   // 
@@ -161,12 +168,6 @@ struct __attribute__((packed)) scheduler_info_t {
   uint8_t sched_debug_state_old;
   uint8_t sched_debug_state_new;
 
-  //------------------------------------------------
-  // 
-  //------------------------------------------------
-  uint8_t test_ctr1;
-  uint8_t test_ctr2;
-  uint8_t test_turn;
 };
 
 static uint8_t SharedSpace[sizeof(scheduler_info_t)];
@@ -224,14 +225,16 @@ static void dumpOpenFiles() {
 /// <param name="vPID"></param>
 static void dumpTask(const uint8_t pid) {
     Serial1.printf(
-      " %3d %3d %3s   %1s   %02X %02d  %02d  | %3s  %02X  | ",
+      " %3d %3d %3s   %1s   %02X %02d  %02X  %02X%02X | %3s  %02X  | ",
       SharedInfo->proc_parent_pid[pid],
       pid,
-      txt_proc_state[SharedInfo->proc_state[pid]],
-      txt_signal_pending[SharedInfo->proc_signal_pending[pid]],
+      SharedInfo->proc_state[pid] < 6 ? txt_proc_state[SharedInfo->proc_state[pid]] : "?",
+      SharedInfo->proc_signal_pending[pid] < 4 ? txt_signal_pending[SharedInfo->proc_signal_pending[pid]] : "?",
       SharedInfo->proc_sp[pid],
       SharedInfo->proc_context[pid],
       SharedInfo->proc_flags[pid],
+      SharedInfo->proc_entryH[pid],
+      SharedInfo->proc_entryL[pid],
       SharedInfo->wait_reason[pid] < 6 ? txt_wait_reason[SharedInfo->wait_reason[pid]] : "?",
       SharedInfo->wait_object[pid]  // wait object
     );
@@ -242,7 +245,7 @@ static void dumpTask(const uint8_t pid) {
       const uint8_t flags = SharedInfo->proc_fd_flags[index];
 
       if (obj == FD_NONE) {
-        Serial1.print("-     ");
+        Serial1.print("-    ");
         continue;
       }
 
@@ -269,7 +272,7 @@ static void dumpTask(const uint8_t pid) {
 /// dump task info for all PIDs, must be compatible with kernel definition
 /// </summary>
 static void dumpTasks() {
-  Serial1.println("PPID PID State Sig SP Ctx Flg | Wait Obj | FD:");
+  Serial1.println("PPID PID State Sig SP Ctx Flg Mem  | Wait Obj | FD:");
   for (uint8_t p = 0; p < MAX_PROCS; p++) {
     dumpTask(p);
   }
@@ -307,7 +310,7 @@ void dumpScheduler() {
   snoop_read6502Memory(SHARED_STATE, sizeof(scheduler_info_t), SharedSpace);    // read struct
 
   switch (SharedInfo->kernel_version) {
-  case 0x0201:
+  case 0x0203:
 //    Serial1.println("---------------------------------------");
     Serial1.printf("Sched Lock        = %d\n", SharedInfo->sched_lock);
     Serial1.printf("Current PID       = %d\n", SharedInfo->current_pid);
@@ -320,25 +323,30 @@ void dumpScheduler() {
     Serial1.println();
     dumpTasks();
 
-#if 0
+#if 1
     Serial1.println();
     dumpOpenFiles();
 #endif
 
+#if 0
     Serial1.println();
     dumpTimers();
+#endif
 
+#if 1
     Serial1.println();
     dumpAccounting();
+    #endif
+
 #if 0
     Serial1.println();
     dumpInterface();
 #endif
 
+#if 0
     Serial1.println();
     dumpDebug();
-
-    Serial1.printf("\n\nCounters: %02X %02X\n", SharedInfo->test_ctr1, SharedInfo->test_ctr2);
+#endif
 
     break;
 

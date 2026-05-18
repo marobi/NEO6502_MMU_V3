@@ -8,7 +8,7 @@
 // ------------------------------------------------------------
 // Fixed request/result block in 6502 RAM
 // ------------------------------------------------------------
-#define RP_REQ_BASE     0x80C0
+#define RP_REQ_BASE     0xE000
 
 #define RP_ARG0L        (RP_REQ_BASE + 0)
 #define RP_ARG0H        (RP_REQ_BASE + 1)
