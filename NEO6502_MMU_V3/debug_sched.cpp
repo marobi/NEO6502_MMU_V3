@@ -9,22 +9,132 @@
 
 #include "neobus.h"
 
-// shared state address in 6502 memory
-#define  SHARED_STATE 0xC800
-
+// KERNEL CONFIGURATION
 #define  MAX_PROCS 4    // system wide
 #define  OPEN_MAX  8    // system wide
 
-#define  MAX_FDS   4    // per process
+#define  MAX_FDS   6    // per process
 
+#define  MAX_TIMER 8    // system wide
+
+#define  MAX_PIPES 8    // system wide
+
+// =============================================
+#define  SHARED_STATE 0xC800
+
+#define  PIPE_BUF_SIZE  64  // FIXED: must match kernel definition
+
+// =============================================
 #define  FD_NONE   0xFF
 
 #define  FD_FLAG_READ  0x01
 #define  FD_FLAG_WRITE 0x02
 
-#define  MAX_TIMER 8
-
 #define STDIN      0
+
+/// <summary>
+/// must be compatible with kernel definition
+/// </summary>
+struct __attribute__((packed)) scheduler_info_t {
+  uint16_t kernel_version;
+
+  uint16_t brk_vector;
+
+  uint8_t  rp_lock;
+  uint8_t  fd_lock;
+
+  //-----------------------------------------------
+  uint8_t current_pid;
+
+  uint8_t proc_state[MAX_PROCS];
+  uint8_t proc_context[MAX_PROCS];
+  uint8_t proc_sp[MAX_PROCS];
+  uint8_t proc_entryL[MAX_PROCS];
+  uint8_t proc_entryH[MAX_PROCS];
+  uint8_t proc_flags[MAX_PROCS];
+  uint8_t proc_resume_mode[MAX_PROCS];
+  uint8_t proc_parent_pid[MAX_PROCS];
+  uint8_t proc_signal_pending[MAX_PROCS];
+
+  uint8_t sched_lock;
+
+  uint8_t console_owner_pid;
+
+  uint8_t monitor_return_mode;
+
+  uint8_t monitor_active;
+
+  //------------------------------------------------
+  // file descriptors per process
+  uint8_t proc_fd_obj[MAX_PROCS * MAX_FDS];
+  uint8_t proc_fd_flags[MAX_PROCS * MAX_FDS];
+
+  // open files
+  uint8_t open_type[OPEN_MAX];
+  uint8_t open_refcnt[OPEN_MAX];
+  uint8_t open_flags[OPEN_MAX];
+  uint8_t open_dev[OPEN_MAX];
+
+  // wait queues
+  uint8_t wait_reason[MAX_PROCS];
+  uint8_t wait_object[MAX_PROCS];
+
+  // exit codes
+  uint8_t exit_code[MAX_PROCS];
+
+  //------------------------------------------------
+  uint8_t system_ticks_lo;
+  uint8_t system_ticks_hi;
+
+  uint8_t timer_pid[MAX_TIMER];
+  uint8_t timer_until_lo[MAX_TIMER];
+  uint8_t timer_until_hi[MAX_TIMER];
+
+  //------------------------------------------------
+  uint8_t proc_ticks_lo[MAX_PROCS];
+  uint8_t proc_ticks_hi[MAX_PROCS];
+
+  //------------------------------------------------
+  uint8_t console_read_len_lo;
+  uint8_t console_read_len_hi;
+
+  //------------------------------------------------
+  uint8_t init_task_count;
+  uint8_t init_task_ptrL;
+  uint8_t init_task_ptrH;
+
+  uint8_t pipe_lock;
+  uint8_t pipe_state[MAX_PIPES];
+  uint8_t pipe_head[MAX_PIPES];
+  uint8_t pipe_tail[MAX_PIPES];
+  uint8_t pipe_count[MAX_PIPES];
+  uint8_t pipe_readers[MAX_PIPES];
+  uint8_t pipe_writers[MAX_PIPES];
+
+  uint8_t pipe_buf[MAX_PIPES * PIPE_BUF_SIZE];
+
+  // Per-open-object pipe endpoint metadata.
+  // Indexed by open object number.
+  uint8_t open_pipe[OPEN_MAX];
+  uint8_t open_pipe_mode[OPEN_MAX];
+
+  //================================================
+  //
+  // debug stuff, not necessarily in kernel 
+  // 
+  uint8_t sched_debug_marker;
+  uint8_t sched_debug_pid;
+  uint8_t sched_debug_old_pid;
+  uint8_t sched_debug_old_state;
+
+  uint8_t sched_debug_state_pid;
+  uint8_t sched_debug_state_old;
+  uint8_t sched_debug_state_new;
+
+};
+
+static uint8_t SharedSpace[sizeof(scheduler_info_t)];
+static const scheduler_info_t* SharedInfo = (scheduler_info_t*)SharedSpace;
 
 /// <summary>
 /// txt for process states, must be compatible with kernel definition
@@ -87,91 +197,31 @@ static char txt_signal_pending[4][2] = {
 };
 
 /// <summary>
-/// must be compatible with kernel definition
+/// txt for pipe states, must be compatible with kernel definition
 /// </summary>
-struct __attribute__((packed)) scheduler_info_t {
-  uint16_t kernel_version;
-
-  uint16_t brk_vector;
-  
-  uint8_t  rp_lock;
-  uint8_t  fd_lock;
-  uint8_t  pipe_lock;
-  
-  //-----------------------------------------------
-  uint8_t current_pid;
-
-  uint8_t proc_state[MAX_PROCS];
-  uint8_t proc_context[MAX_PROCS];
-  uint8_t proc_sp[MAX_PROCS];
-  uint8_t proc_entryL[MAX_PROCS];
-  uint8_t proc_entryH[MAX_PROCS];
-  uint8_t proc_flags[MAX_PROCS];
-  uint8_t proc_resume_mode[MAX_PROCS];
-  uint8_t proc_parent_pid[MAX_PROCS];
-  uint8_t proc_signal_pending[MAX_PROCS];
-
-  uint8_t sched_lock;
-
-  uint8_t console_owner_pid;
-
-  uint8_t monitor_return_mode;
-
-  //------------------------------------------------
-  // file descriptors per process
-  uint8_t proc_fd_obj[MAX_PROCS * MAX_FDS];
-  uint8_t proc_fd_flags[MAX_PROCS * MAX_FDS];
-
-  // open files
-  uint8_t open_type[OPEN_MAX];
-  uint8_t open_refcnt[OPEN_MAX];
-  uint8_t open_flags[OPEN_MAX];
-  uint8_t open_dev[OPEN_MAX];
-
-  // wait queues
-  uint8_t wait_reason[MAX_PROCS];
-  uint8_t wait_object[MAX_PROCS];
-
-  // exit codes
-  uint8_t exit_code[MAX_PROCS];
-
-  //------------------------------------------------
-  uint8_t system_ticks_lo;
-  uint8_t system_ticks_hi;
-
-  uint8_t timer_pid[MAX_TIMER];
-  uint8_t timer_until_lo[MAX_TIMER];
-  uint8_t timer_until_hi[MAX_TIMER];
-
-  //------------------------------------------------
-  uint8_t proc_ticks_lo[MAX_PROCS];
-  uint8_t proc_ticks_hi[MAX_PROCS];
-
-  //------------------------------------------------
-  uint8_t console_read_len_lo;
-  uint8_t console_read_len_hi;
-
-  //------------------------------------------------
-  uint8_t task_count;
-  uint8_t task_ptrL;
-  uint8_t task_ptrH;
-
-  //
-  // debug stuff, not necessarily in kernel 
-  // 
-  uint8_t sched_debug_marker;
-  uint8_t sched_debug_pid;
-  uint8_t sched_debug_old_pid;
-  uint8_t sched_debug_old_state;
-
-  uint8_t sched_debug_state_pid;
-  uint8_t sched_debug_state_old;
-  uint8_t sched_debug_state_new;
-
+static char txt_pipe_state[2][5] = {
+  "FREE",
+  "USED"
 };
 
-static uint8_t SharedSpace[sizeof(scheduler_info_t)];
-static const scheduler_info_t* SharedInfo = (scheduler_info_t*)SharedSpace;
+/// <summary>
+/// dump pipe info, must be compatible with kernel definition
+/// </summary>
+static void dumpPipes() {
+  Serial1.println("Pipe State Head Tail Count Readers Writers");
+  for (uint8_t i = 0; i < MAX_PIPES; i++) {
+    Serial1.printf("%d    %4s   %02d   %02d   %02d    %02d      %02d\n",
+      i,
+      SharedInfo->pipe_state[i] < 2 ? txt_pipe_state[SharedInfo->pipe_state[i]] : "?",
+      SharedInfo->pipe_head[i],
+      SharedInfo->pipe_tail[i],
+      SharedInfo->pipe_count[i],
+      SharedInfo->pipe_readers[i],
+      SharedInfo->pipe_writers[i]);
+  }
+}
+
+
 
 /// <summary>
 /// dump accounting info, must be compatible with kernel definition
@@ -182,7 +232,6 @@ static void dumpAccounting() {
     Serial1.printf("%d   %5d\n", i, (SharedInfo->proc_ticks_hi[i] << 8) | SharedInfo->proc_ticks_lo[i]);
   }
 }
-
 
 /// <summary>
 /// dump timer info, must be compatible with kernel definition
@@ -225,7 +274,7 @@ static void dumpOpenFiles() {
 /// <param name="vPID"></param>
 static void dumpTask(const uint8_t pid) {
     Serial1.printf(
-      " %3d %3d %3s   %1s   %02X %02d  %02X  %02X%02X | %3s  %02X  | ",
+      " %3d %3d %3s   %1s   %02X %03d %02X  %02X%02X | %3s  %02X  | ",
       SharedInfo->proc_parent_pid[pid],
       pid,
       SharedInfo->proc_state[pid] < 6 ? txt_proc_state[SharedInfo->proc_state[pid]] : "?",
@@ -331,6 +380,11 @@ void dumpScheduler() {
 #if 0
     Serial1.println();
     dumpTimers();
+#endif
+
+#if 1
+    Serial1.println();
+    dumpPipes();
 #endif
 
 #if 1
