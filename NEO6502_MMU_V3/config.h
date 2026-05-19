@@ -12,15 +12,15 @@ Lesser General Public License for more details.
 */
 #pragma once
 
-#define VERSION "3.9.431"
+#define VERSION "3.11.543"
 
 #define USE_VALIDATION 0
 
 // -------------------------------------------------------------------------------------
 
-// Fixed RP2350 clock (adjust if you change it)
-constexpr uint32_t SYS_CLOCK_HZ = 240 * MHZ;
+// Fixed RP2350 clock
+constexpr uint32_t SYS_CLOCK_HZ       = 240 * MHZ;
 
-constexpr uint32_t DEFAULT_6502_CLOCK = (4 * MHZ);   // 4 MHZ;
+constexpr uint32_t DEFAULT_6502_CLOCK = (4 * MHZ);        // 4 MHZ;
 
-constexpr uint32_t RAM_SIZE = (512ul * 1024ul);      // RAM size;
+constexpr uint32_t RAM_SIZE           = (512ul * 1024ul); // RAM size;

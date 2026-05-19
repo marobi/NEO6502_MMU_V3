@@ -981,7 +981,7 @@ void resetDisplay(const uint8_t vMode) {
   display.setTextSize(1);       // Default size
 
   //  initSprites();
-  //  initTiles(); // no tiles defined
+  //  initTiles();              // no tiles defined
 
   cmdClearScreen();
 }
@@ -1000,7 +1000,7 @@ void initVDU() {
 
   resetDisplay(DEFAULT_MODE);
 
-  helloDisplay();
+//  helloDisplay();
 }
 
 /// <summary>

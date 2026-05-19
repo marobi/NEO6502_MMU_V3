@@ -110,7 +110,7 @@ void setup() {
 
   introDisplay();      // show intro
 
-  printFile("intro.txt");
+//  printFile("intro.txt");
 
   Serial1.println("*I: setup done");
 
@@ -131,14 +131,14 @@ void setup() {
 
 //  dumpSystemConfig();
 
-//  fillMemory(0x00);             // clear memory 64k of current context
 
   bootSystemWithMenu();         // load/boot system with menu to select configuration.
 
-  Serial1.printf("*D: default context: CTX%1X\n", memoryConfig.boot_context);
+  Serial1.printf("\n*D: default context: CTX%1X\n", memoryConfig.boot_context);
+
+  //  fillMemory(0x00);             // clear memory 64k of current context
 
   initMailbox();
-//  Serial1.println("*D: mailbox initialized");
 
   initCmdInterface();           // init command interface
   initInput();

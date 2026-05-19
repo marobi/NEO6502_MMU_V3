@@ -280,7 +280,7 @@ void gduSetCmdx(const uint8_t vCmd, const uint8_t nRegs, ...)
 /// </summary>
 void introDisplay() {
   setTColor(69);  // text color light blue
-  vduPrintf("\n\nVersion v%s\n\n", VERSION);
+  vduPrintf("NEO6502_mmu: version v%s\n\n", VERSION);
 
 #if 0
   gduSetReg(R6, DEFAULT_MODE);  gduSetCmd(CMD_VDU);    // gdu mode

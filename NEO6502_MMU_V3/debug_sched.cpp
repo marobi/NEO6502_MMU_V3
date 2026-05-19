@@ -22,7 +22,7 @@
 #define  FD_FLAG_READ  0x01
 #define  FD_FLAG_WRITE 0x02
 
-#define  MAX_TIMER      8
+#define  MAX_TIMER 8
 
 #define STDIN      0
 
@@ -47,7 +47,7 @@ static char txt_wait_reason[6][4] = {
   "DEV",  // device
   "PIP",  // pipe
   "TIM",  // timer
-  "PRO"   // process
+  "PRC"   // process
 };
 
 /// <summary>
@@ -236,7 +236,7 @@ static void dumpTask(const uint8_t pid) {
       SharedInfo->proc_entryH[pid],
       SharedInfo->proc_entryL[pid],
       SharedInfo->wait_reason[pid] < 6 ? txt_wait_reason[SharedInfo->wait_reason[pid]] : "?",
-      SharedInfo->wait_object[pid]  // wait object
+      SharedInfo->wait_object[pid]
     );
 
     for (uint8_t fd = 0; fd < MAX_FDS; fd++) {
@@ -311,16 +311,16 @@ void dumpScheduler() {
 
   switch (SharedInfo->kernel_version) {
   case 0x0203:
-//    Serial1.println("---------------------------------------");
-    Serial1.printf("Sched Lock        = %d\n", SharedInfo->sched_lock);
-    Serial1.printf("Current PID       = %d\n", SharedInfo->current_pid);
-    Serial1.printf("Current Context   = %d\n", getMMUContext());
-    Serial1.printf("Console Owner PID = %d\n", SharedInfo->console_owner_pid);
+    Serial1.println("---------------------------------------");
+//    Serial1.printf("Sched Lock        = %d\n", SharedInfo->sched_lock);
+//    Serial1.printf("Current PID       = %d\n", SharedInfo->current_pid);
+//    Serial1.printf("Current Context   = %d\n", getMMUContext());
+//    Serial1.printf("Console Owner PID = %d\n", SharedInfo->console_owner_pid);
 //    Serial1.printf("Mon Return Mode   = %d\n", SharedInfo->monitor_return_mode);
 
-    Serial1.printf("RP Lock           = %d\n", SharedInfo->rp_lock);
+//    Serial1.printf("RP Lock           = %d\n", SharedInfo->rp_lock);
 
-    Serial1.println();
+//    Serial1.println();
     dumpTasks();
 
 #if 1

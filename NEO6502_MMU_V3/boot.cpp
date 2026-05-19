@@ -115,6 +115,7 @@ bool activateConfiguration(int cfgIndex) {
   set6502State(sBOOT);
 
 
+  Serial1.println(" ROM                            CTX Load Size");
 
   for (uint8_t i = 0; i < configs[cfgIndex].count; i++) {
 
@@ -124,7 +125,7 @@ bool activateConfiguration(int cfgIndex) {
     char fullPath[64];
     snprintf(fullPath, sizeof(fullPath), "/system/%s", cartridges[cartIndex].file);
 
-    Serial1.printf("*I: Loading ROM %s into CTX %d\n", fullPath, ctx);
+    Serial1.printf("%32s %2d ", fullPath, ctx);
     
     // read image of ROM file into memory
     data = readBinaryFile(fullPath);

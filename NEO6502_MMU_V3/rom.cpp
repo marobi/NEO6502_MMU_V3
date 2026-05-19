@@ -79,7 +79,7 @@ bool loadROMCartridge(const uint8_t* vCartridge) {
 
   startAddress = (uint16_t)hdr->STARTADDRESS_H * 256 + hdr->STARTADDRESS_L;
   romSize = (uint16_t)hdr->SIZE_H * 256 + hdr->SIZE_L;
-//  Serial1.printf("*D: loadROMCartridge: ROM\t%04X: [%04X]\n", startAddress, romSize);
+  Serial1.printf("%04X %04X\n", startAddress, romSize);
 
   if (!loadBinary(startAddress, romSize, vCartridge + sizeof(defROM))) {
     Serial1.println("*E: loadROMCartridge: Failed to load ROM into memory");

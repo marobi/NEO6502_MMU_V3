@@ -12,7 +12,7 @@ Lesser General Public License for more details.
 */
 #pragma once
 
-#define MON_VERSION "v1.15.072"
+#define MON_VERSION "v2.03.145"
 
 // a little helper
 constexpr char ctrl(char c) {
