@@ -153,5 +153,8 @@
     <ClInclude Include="debug_sched.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="font_VT100_8x20.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

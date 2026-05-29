@@ -12,7 +12,7 @@ Lesser General Public License for more details.
 */
 #pragma once
 
-#define VERSION "3.11.543"
+#define VERSION "3.15.621"
 
 #define USE_VALIDATION 0
 
@@ -24,3 +24,16 @@ constexpr uint32_t SYS_CLOCK_HZ       = 240 * MHZ;
 constexpr uint32_t DEFAULT_6502_CLOCK = (4 * MHZ);        // 4 MHZ;
 
 constexpr uint32_t RAM_SIZE           = (512ul * 1024ul); // RAM size;
+
+#define RESOLUTION_640x480  1
+#define WIDTH            640   // TBD display.width()
+#define HEIGHT           480   // TBD display.height()
+#define FONT_CHAR_WIDTH  7 
+#define FONT_CHAR_HEIGHT 19
+#define FONT_CELL_WIDTH  (FONT_CHAR_WIDTH + 1)
+#define FONT_CELL_HEIGHT (FONT_CHAR_HEIGHT + 1)
+#define ROWS             (HEIGHT / FONT_CELL_HEIGHT)
+#define COLS             (WIDTH / FONT_CELL_WIDTH)
+
+#define FONT_BASELINE_Y  19
+

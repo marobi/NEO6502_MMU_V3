@@ -10,6 +10,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 Lesser General Public License for more details.
 */
 #include <Adafruit_dvhstx.h>
+#include "font_VT100_8x20.h"
 #include "config.h"
 #include "palette.h"
 #include "vdu.h"
@@ -17,8 +18,12 @@ Lesser General Public License for more details.
 
 // NEO6502_MMU settings: resolution 320x240 by 256 colors, single buffer
 DVHSTXPinout pinConfig = { 14, 18, 16, 12 };
+#ifdef RESOLUTION_320x240
 DVHSTX8 display(pinConfig, DVHSTX_RESOLUTION_320x240, false);
-
+#endif
+#ifdef RESOLUTION_640x480
+DVHSTX8 display(pinConfig, DVHSTX_RESOLUTION_640x480, false);
+#endif
 // visibleCursor cursorShape blinkCursor textMode geoAspect autoScroll smoothScroll textWrap localEcho ucaseOnly  CRLF, SceenMode
 static const vdu_mode_t vduModes[NUMBER_OF_MODES] = {
   {true,         cBLOCK,     true,       true,    false,    true,      true,        false,   false,    false,     true,  true  }, // Mode 0 text mode + block cursor + smoothscroll + sceen mode
@@ -75,6 +80,33 @@ static bool           smoothScroll = false;
 bool                  scrollActive = false;
 static uint8_t        scrollPixel = 0;
 static int            pendingCursorRow = -1;
+
+/// <summary>
+/// convert column number to pixel X coordinate
+/// </summary>
+/// <param name="col"></param>
+/// <returns></returns>
+static inline uint16_t cellPixelX(const uint8_t col) {
+  return col * FONT_CELL_WIDTH;
+}
+
+/// <summary>
+/// convert row number to pixel Y coordinate
+/// </summary>
+/// <param name="row"></param>
+/// <returns></returns>
+static inline uint16_t cellPixelY(const uint8_t row) {
+  return row * FONT_CELL_HEIGHT;
+}
+
+/// <summary>
+/// celculate baseline Y coordinate for a given row (for text rendering)
+/// </summary>
+/// <param name="row"></param>
+/// <returns></returns>
+static inline uint16_t cellBaselineY(const uint8_t row) {
+  return cellPixelY(row) + FONT_BASELINE_Y;
+}
 
 /// <summary>
 /// helper routine to convert RGB to BRG
@@ -194,7 +226,7 @@ static void vduDrawCell(const uint8_t col, const uint8_t row) {
 
   if (c.ch != ' ') {
     display.setTextColor(c.fg, c.bg);
-    display.setCursor(x, y);
+    display.setCursor(x, y + FONT_BASELINE_Y);
     display.write(c.ch);
   }
 }
@@ -234,7 +266,7 @@ static void showCursor() {
 
     if (cell.ch != ' ') {
       display.setTextColor(IDX_CURSOR_FG, IDX_CURSOR_BG);
-      display.setCursor(x, y);
+      display.setCursor(x, y + FONT_BASELINE_Y);
       display.write(cell.ch);
     }
     break;
@@ -351,7 +383,7 @@ static void vduRedrawLine(uint8_t row) {
 
       display.setCursor(
         col * FONT_CELL_WIDTH,
-        y
+        y + FONT_BASELINE_Y
       );
 
       display.write(cell->ch);
@@ -641,20 +673,18 @@ static void vduInsertc(uint8_t c) {
 /// <param name="c"></param>
 static void vduDisplayc(const uint8_t c) {
   if (c >= 0x20) {
+    uint16_t x = gCursor.col * FONT_CELL_WIDTH;
+    uint16_t y = gCursor.row * FONT_CELL_HEIGHT;
+
     gScreen[gCursor.row][gCursor.col].ch = c;
     gScreen[gCursor.row][gCursor.col].fg = currentColor;
     gScreen[gCursor.row][gCursor.col].bg = currentBGColor;
 
-    if (c == 0x20) {
-      vduDisplayClearcell(gCursor.col, gCursor.row);
-    }
-    else {
-      display.setTextColor(currentColor, currentBGColor);
-      display.setCursor(
-        gCursor.col * FONT_CELL_WIDTH,
-        gCursor.row * FONT_CELL_HEIGHT
-      );
+    vduDisplayClearcell(gCursor.col, gCursor.row);
 
+    if (c != 0x20) {
+      display.setTextColor(currentColor, currentBGColor);
+      display.setCursor(x, y + FONT_BASELINE_Y);
       display.write(c);
     }
   }
@@ -976,7 +1006,7 @@ void resetDisplay(const uint8_t vMode) {
   loadPalette();
 
   vduSetMode(vMode);            // VDU mode (cursor shape, auto scroll, text wrap, etc)
-  display.setFont();            // Use default font
+  display.setFont(&VT100_80x24_8x20);            // Use vt100 inspired font
   display.setTextWrap(vduMode->textWrap);
   display.setTextSize(1);       // Default size
 

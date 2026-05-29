@@ -41,14 +41,6 @@ Lesser General Public License for more details.
 ////////////////////////////////////////////////////////////////////////
 #define IDX_CURSOR_FG    253   // palette index for cursor FG color
 #define IDX_CURSOR_BG    254   // palette index for cursor BG color
-#define WIDTH            320   // TBD display.width()
-#define HEIGHT           240   // TBD display.height()
-#define FONT_CHAR_WIDTH  5  
-#define FONT_CHAR_HEIGHT 7
-#define FONT_CELL_WIDTH  (FONT_CHAR_WIDTH + 1)
-#define FONT_CELL_HEIGHT (FONT_CHAR_HEIGHT + 1)
-#define ROWS             (HEIGHT / FONT_CELL_HEIGHT)
-#define COLS             (WIDTH / FONT_CELL_WIDTH)
 
 /// <summary>
 /// cursor styles

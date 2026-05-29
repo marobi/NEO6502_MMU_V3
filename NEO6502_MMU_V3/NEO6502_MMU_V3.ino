@@ -159,8 +159,6 @@ void setup() {
 /// and running the monitor.
 /// </summary>
 void loop() {
-  taskIRQTimer();
-
   taskScheduler();
 
   taskInput();                  // process FIFOs
@@ -171,7 +169,9 @@ void loop() {
 
   taskICMonitor();              // ICM
 
+  taskIRQTimer();
+
   updateIndicator();             // manage status LED
 
-  //  delayNs<500>();
+  delayNs<100>();
 }

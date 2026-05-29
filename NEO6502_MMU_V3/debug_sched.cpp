@@ -42,6 +42,7 @@ struct __attribute__((packed)) scheduler_info_t {
 
   uint8_t  rp_lock;
   uint8_t  fd_lock;
+  uint8_t  ksys_io_lock;
 
   //-----------------------------------------------
   uint8_t current_pid;
@@ -60,9 +61,8 @@ struct __attribute__((packed)) scheduler_info_t {
 
   uint8_t console_owner_pid;
 
-  uint8_t monitor_return_mode;
-
   uint8_t monitor_active;
+  uint8_t monitor_pending;
 
   //------------------------------------------------
   // file descriptors per process
@@ -118,6 +118,15 @@ struct __attribute__((packed)) scheduler_info_t {
   uint8_t open_pipe[OPEN_MAX];
   uint8_t open_pipe_mode[OPEN_MAX];
 
+  uint8_t sched_tick_lo;
+  uint8_t sched_tick_hi;
+
+  //================================================
+  //
+  //
+  uint8_t ksys_io_owner;
+  uint8_t fd_lock_owner;
+
   //================================================
   //
   // debug stuff, not necessarily in kernel 
@@ -131,6 +140,9 @@ struct __attribute__((packed)) scheduler_info_t {
   uint8_t sched_debug_state_old;
   uint8_t sched_debug_state_new;
 
+  uint8_t sched_last_save_pid;
+  uint8_t sched_last_save_sp;
+  uint8_t sched_last_save_mode;
 };
 
 static uint8_t SharedSpace[sizeof(scheduler_info_t)];
@@ -151,13 +163,14 @@ static char txt_proc_state[6][4] = {
 /// <summary>
 /// txt for wait reasons, must be compatible with kernel definition
 /// </summary>
-static char txt_wait_reason[6][4] = {
+static char txt_wait_reason[7][4] = {
   "-",  // none
   "CON",  // console
   "DEV",  // device
   "PIP",  // pipe
   "TIM",  // timer
-  "PRC"   // process
+  "PRC",  // process
+  "KIO" // kernel io (blocking for some reason in ksys_io)
 };
 
 /// <summary>
@@ -210,7 +223,7 @@ static char txt_pipe_state[2][5] = {
 static void dumpPipes() {
   Serial1.println("Pipe State Head Tail Count Readers Writers");
   for (uint8_t i = 0; i < MAX_PIPES; i++) {
-    Serial1.printf("%d    %4s   %02d   %02d   %02d    %02d      %02d\n",
+    Serial1.printf("%d    %4s  %02d   %02d   %02d    %02d      %02d\n",
       i,
       SharedInfo->pipe_state[i] < 2 ? txt_pipe_state[SharedInfo->pipe_state[i]] : "?",
       SharedInfo->pipe_head[i],
@@ -220,8 +233,6 @@ static void dumpPipes() {
       SharedInfo->pipe_writers[i]);
   }
 }
-
-
 
 /// <summary>
 /// dump accounting info, must be compatible with kernel definition
@@ -284,7 +295,7 @@ static void dumpTask(const uint8_t pid) {
       SharedInfo->proc_flags[pid],
       SharedInfo->proc_entryH[pid],
       SharedInfo->proc_entryL[pid],
-      SharedInfo->wait_reason[pid] < 6 ? txt_wait_reason[SharedInfo->wait_reason[pid]] : "?",
+      SharedInfo->wait_reason[pid] < 7 ? txt_wait_reason[SharedInfo->wait_reason[pid]] : "?",
       SharedInfo->wait_object[pid]
     );
 
@@ -361,13 +372,14 @@ void dumpScheduler() {
   switch (SharedInfo->kernel_version) {
   case 0x0203:
     Serial1.println("---------------------------------------");
-//    Serial1.printf("Sched Lock        = %d\n", SharedInfo->sched_lock);
-//    Serial1.printf("Current PID       = %d\n", SharedInfo->current_pid);
-//    Serial1.printf("Current Context   = %d\n", getMMUContext());
-//    Serial1.printf("Console Owner PID = %d\n", SharedInfo->console_owner_pid);
-//    Serial1.printf("Mon Return Mode   = %d\n", SharedInfo->monitor_return_mode);
+    Serial1.printf("Sched Lock        = %d\n", SharedInfo->sched_lock);
+    Serial1.printf("Current PID       = %d\n", SharedInfo->current_pid);
+    Serial1.printf("Current Context   = %d\n", getMMUContext());
+    Serial1.printf("Console Owner PID = %d\n", SharedInfo->console_owner_pid);
 
-//    Serial1.printf("RP Lock           = %d\n", SharedInfo->rp_lock);
+    Serial1.printf("KSYS IO Lock      = %d (Owner = %d)\n", SharedInfo->ksys_io_lock, SharedInfo->ksys_io_owner, SharedInfo->ksys_io_owner);
+    Serial1.printf("FD Lock           = %d (Owner = %d)\n", SharedInfo->fd_lock, SharedInfo->fd_lock_owner);
+    Serial1.printf("RP Lock           = %d\n", SharedInfo->rp_lock);
 
 //    Serial1.println();
     dumpTasks();
@@ -397,7 +409,7 @@ void dumpScheduler() {
     dumpInterface();
 #endif
 
-#if 0
+#if 1
     Serial1.println();
     dumpDebug();
 #endif
