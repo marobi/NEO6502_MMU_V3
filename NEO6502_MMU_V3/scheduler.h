@@ -21,6 +21,14 @@ enum irq_source_t {
   RP_SRC_MONITOR
 };
 
+/// <summary>
+/// irq_state_t defines the possible states of an interrupt request for the 6502 CPU, indicating whether an interrupt is pending or not.
+/// </summary>
+enum irq_state_t {
+  RP_IRQ_NONE = 0,
+  RP_IRQ_PENDING
+};
+
 extern bool gInMonitor;
 
 bool genIRQ6502(irq_source_t vSrc);

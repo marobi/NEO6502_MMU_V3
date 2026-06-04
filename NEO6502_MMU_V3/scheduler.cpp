@@ -20,20 +20,6 @@ Lesser General Public License for more details.
 
 bool gInMonitor = false;
 
-#if 0
-/// <summary>
-/// TEMP routine
-/// </summary>
-/// <param name="str"></param>
-static void schedHelp(const char* str) {
-  uint8_t regs[7];
-
-  snoop_read6502Memory(0x0240, 7, regs);
-
-  Serial1.printf("%sPC=%02X%02X SR=%02X A=%02X X=%02X Y=%02X SP=%02X\n", str, regs[0], regs[1], regs[2], regs[3], regs[4], regs[5], regs[6]);
-}
-#endif
-
 /// <summary>
 /// 
 /// </summary>
@@ -57,21 +43,29 @@ void schedSwitchcontext(const uint8_t vContext) {
   //  Serial1.printf("*I: CTX%1X -> CTX%1X\n", c, vContext);
 }
 
+static bool gIntrPending = false;
+
 /// <summary>
 /// 
 /// </summary>
 /// <returns></returns>
 bool genIRQ6502(irq_source_t vSrc) {
-  if (snoop_read6502MemoryLoc(RP_IRQ_SOURCE) == RP_SRC_NONE) {
-    snoop_write6502MemoryLoc(RP_IRQ_SOURCE, (uint8_t)vSrc);
+  if (gIntrPending) {
+    Serial1.println("*E: genIRQ6502: pending IRQ not ACKed");
+    return false;
+  }
 
+  if (snoop_read6502MemoryLoc(RP_IRQ_STATE) == RP_IRQ_NONE) {     // check if no pending IRQ
+    snoop_write6502MemoryLoc(RP_IRQ_SOURCE, (uint8_t)vSrc);
+    snoop_write6502MemoryLoc(RP_IRQ_STATE, RP_IRQ_PENDING);
     IRQPin::low();
     DebugPin::low();
-
+    gIntrPending = true;
     return true;
   }
-  else
+  else {
     return false;
+  }
 }
 
 static bool irqTimerEnabled = false;
@@ -86,6 +80,8 @@ void stopIRQTimer() {
   IRQPin::high();
   DebugPin::high();
   snoop_write6502MemoryLoc(RP_IRQ_SOURCE, RP_SRC_NONE);
+  snoop_write6502MemoryLoc(RP_IRQ_STATE, RP_IRQ_NONE);
+  gIntrPending = false;
 
   Serial1.println("*D: stopIRQTimer");
 }
@@ -99,6 +95,8 @@ void startIRQTimer(const uint16_t vPeriod) {
     irqTimerInterval = vPeriod;
     irqTimerEnabled = true;
     irqLastTS = millis();
+    snoop_write6502MemoryLoc(RP_IRQ_SOURCE, RP_SRC_NONE);
+    snoop_write6502MemoryLoc(RP_IRQ_STATE, RP_IRQ_NONE);
     IRQPin::high();
     DebugPin::high();
 
@@ -114,10 +112,24 @@ static uint8_t taskTimerCounter = 0;
 /// 
 /// </summary>
 void taskIRQTimer() {
+  // check if IRQ is pending
+  if (gIntrPending) {
+    // check if source is ACKed by 6502
+    if (snoop_read6502MemoryLoc(RP_IRQ_SOURCE) == RP_SRC_NONE) {
+      // ACKed, clear pending state
+      gIntrPending = false;
+      IRQPin::high();
+      DebugPin::high();
+      snoop_write6502MemoryLoc(RP_IRQ_STATE, RP_IRQ_NONE);
+    }
+
+    return;
+  }
+
   if (irqTimerEnabled) {
     if (millis() >= (irqLastTS + irqTimerInterval)) {
       // gen IRQ
-      if (!genIRQ6502(RP_SRC_TIMER))
+      if (! genIRQ6502(RP_SRC_TIMER))
         taskTimerCounter++;
       else
         taskTimerCounter = 0;
@@ -144,16 +156,6 @@ void taskScheduler() {
   case CMD6502_NONE:
     break;
 
-  case CMD6502_ACK_IRQ:
-    IRQPin::high();
-    DebugPin::high();
-
-    ackCommand6502();
-    snoop_write6502MemoryLoc(RP_IRQ_SOURCE, RP_SRC_NONE);
-
-    //    Serial1.println("*I: taskScheduler: Ack IRQ");
-    break;
-
   case CMD6502_CONTEXT_SWITCH:
     schedSwitchcontext(lParam);
 
@@ -170,4 +172,5 @@ void taskScheduler() {
 /// </summary>
 void initScheduler() {
   snoop_write6502MemoryLoc(RP_IRQ_SOURCE, RP_SRC_NONE);
+  snoop_write6502MemoryLoc(RP_IRQ_STATE, RP_IRQ_NONE);
 }

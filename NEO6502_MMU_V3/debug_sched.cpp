@@ -62,7 +62,6 @@ struct __attribute__((packed)) scheduler_info_t {
   uint8_t console_owner_pid;
 
   uint8_t monitor_active;
-  uint8_t monitor_pending;
 
   //------------------------------------------------
   // file descriptors per process
@@ -80,7 +79,7 @@ struct __attribute__((packed)) scheduler_info_t {
   uint8_t wait_object[MAX_PROCS];
 
   // exit codes
-  uint8_t exit_code[MAX_PROCS];
+  uint8_t proc_exit_code[MAX_PROCS];
 
   //------------------------------------------------
   uint8_t system_ticks_lo;
@@ -118,14 +117,8 @@ struct __attribute__((packed)) scheduler_info_t {
   uint8_t open_pipe[OPEN_MAX];
   uint8_t open_pipe_mode[OPEN_MAX];
 
-  uint8_t sched_tick_lo;
-  uint8_t sched_tick_hi;
-
-  //================================================
-  //
-  //
-  uint8_t ksys_io_owner;
-  uint8_t fd_lock_owner;
+  uint8_t sched_ticks_lo;
+  uint8_t sched_ticks_hi;
 
   //================================================
   //
@@ -140,9 +133,39 @@ struct __attribute__((packed)) scheduler_info_t {
   uint8_t sched_debug_state_old;
   uint8_t sched_debug_state_new;
 
-  uint8_t sched_last_save_pid;
-  uint8_t sched_last_save_sp;
-  uint8_t sched_last_save_mode;
+  uint8_t dbg_sched_path;
+  uint8_t dbg_sched_current_pid;
+  uint8_t dbg_sched_selected_pid;
+
+  uint8_t dbg_sched_saved_pid;
+  uint8_t dbg_sched_saved_sp;
+  uint8_t dbg_sched_saved_mode;
+
+  uint8_t dbg_sched_loaded_pid;
+  uint8_t dbg_sched_loaded_sp;
+  uint8_t dbg_sched_resume_mode;
+  uint8_t dbg_sched_resume_pid;
+  uint8_t dbg_sched_resume_context;
+
+  uint8_t dbg_proc_state_pid;
+  uint8_t dbg_proc_state_old;
+  uint8_t dbg_proc_state_new;
+
+  uint8_t ksys_io_owner;
+  uint8_t fd_lock_owner;
+  uint8_t pipe_lock_owner;
+  uint8_t rp_lock_owner;
+
+  uint8_t ksys_io_phase;
+  uint8_t dbg_io_wait_reason;
+  uint8_t dbg_io_wait_object;
+
+  uint8_t dbg_timer_pid;
+  uint8_t dbg_timer_slot;
+  uint8_t dbg_timer_until_lo;
+  uint8_t dbg_timer_until_hi;
+  uint8_t dbg_timer_now_lo;
+  uint8_t dbg_timer_now_hi;
 };
 
 static uint8_t SharedSpace[sizeof(scheduler_info_t)];
@@ -218,6 +241,43 @@ static char txt_pipe_state[2][5] = {
 };
 
 /// <summary>
+/// Dump scheduler debug info. Must match kernel/shared_state.asm and include/debug.inc.
+/// </summary>
+static const char* dbgPathName(uint8_t path) {
+  switch (path) {
+  case 0x00: return "-";
+  case 0x01: return "IRQ";
+  case 0x02: return "YLD";
+  default:   return "?";
+  }
+}
+
+static const char* dbgModeName(uint8_t mode) {
+  switch (mode) {
+  case 0x00: return "-";
+  case 0x01: return "RTI";
+  case 0x02: return "RTS";
+  default:   return "?";
+  }
+}
+
+static const char* dbgMarkerName(uint8_t marker) {
+  switch (marker) {
+  case 0x00: return "-";
+  case 0x01: return "IRQ";
+  case 0x02: return "SAV";
+  case 0x03: return "PCK";
+  case 0x04: return "YLD";
+  case 0x61: return "SEL";
+  case 0x62: return "STK";
+  case 0x63: return "RTI";
+  case 0x64: return "RTS";
+  case 0xEE: return "ERR";
+  default:   return "?";
+  }
+}
+
+/// <summary>
 /// dump pipe info, must be compatible with kernel definition
 /// </summary>
 static void dumpPipes() {
@@ -248,7 +308,6 @@ static void dumpAccounting() {
 /// dump timer info, must be compatible with kernel definition
 /// </summary>
 static void dumpTimers() {
-  Serial1.printf("Sys ticks: %d\n", (SharedInfo->system_ticks_hi << 8) | SharedInfo->system_ticks_lo);
   Serial1.println("Timer PID Ticks");
   for (uint8_t i = 0; i < MAX_TIMER; i++) {
     if (SharedInfo->timer_pid[i] != 0xFF) {
@@ -339,17 +398,57 @@ static void dumpTasks() {
 }
 
 /// <summary>
-/// dump debug info, must be compatible with kernel definition
+/// Dump scheduler debug info, compatible with kernel shared debug layout.
 /// </summary>
-static void dumpDebug() {
-  Serial1.printf("Debug marker : %02X\n", SharedInfo->sched_debug_marker);
-  Serial1.printf("Debug PID    : %02d\n", SharedInfo->sched_debug_pid);
-  Serial1.printf("Debug Old PID: %02d\n", SharedInfo->sched_debug_old_pid);
-  Serial1.printf("Debug Old St : %02X\n", SharedInfo->sched_debug_old_state);
+static void dumpSchedDebug() {
+  Serial1.println();
+  Serial1.println("Scheduler debug:");
+  Serial1.println("Path   Marker Current Selected");
+  Serial1.printf(
+    "%-6s %02X/%-3s %02d      %02d\n",
+    dbgPathName(SharedInfo->dbg_sched_path),
+    SharedInfo->sched_debug_marker,
+    dbgMarkerName(SharedInfo->sched_debug_marker),
+    SharedInfo->dbg_sched_current_pid,
+    SharedInfo->dbg_sched_selected_pid
+  );
 
-  Serial1.printf("Debug St PID : %02d\n", SharedInfo->sched_debug_state_pid);
-  Serial1.printf("Debug St Old : %02X\n", SharedInfo->sched_debug_state_old);
-  Serial1.printf("Debug St New : %02X\n", SharedInfo->sched_debug_state_new);
+  Serial1.println();
+  Serial1.println("Save  PID SP Mode");
+  Serial1.printf(
+    "      %02d  %02X %-3s\n",
+    SharedInfo->dbg_sched_saved_pid,
+    SharedInfo->dbg_sched_saved_sp,
+    dbgModeName(SharedInfo->dbg_sched_saved_mode)
+  );
+
+  Serial1.println("Load  PID SP Mode");
+  Serial1.printf(
+    "      %02d  %02X %-3s\n",
+    SharedInfo->dbg_sched_loaded_pid,
+    SharedInfo->dbg_sched_loaded_sp,
+    dbgModeName(SharedInfo->dbg_sched_resume_mode)
+  );
+
+  Serial1.println("Resume PID Ctx Mode");
+  Serial1.printf(
+    "       %02d  %03d %-3s\n",
+    SharedInfo->dbg_sched_resume_pid,
+    SharedInfo->dbg_sched_resume_context,
+    dbgModeName(SharedInfo->dbg_sched_resume_mode)
+  );
+
+  Serial1.println();
+  Serial1.println("State change:");
+  Serial1.println("PID Old     New");
+  Serial1.printf(
+    "%02d  %-3s/%02X  %-3s/%02X\n",
+    SharedInfo->dbg_proc_state_pid,
+    SharedInfo->dbg_proc_state_old < 6 ? txt_proc_state[SharedInfo->dbg_proc_state_old] : "???",
+    SharedInfo->dbg_proc_state_old,
+    SharedInfo->dbg_proc_state_new < 6 ? txt_proc_state[SharedInfo->dbg_proc_state_new] : "???",
+    SharedInfo->dbg_proc_state_new
+  );
 }
 
 /// <summary>
@@ -363,6 +462,19 @@ static void dumpInterface() {
   Serial1.printf("RP_RES0L:       %02X\n", snoop_read6502MemoryLoc(RP_RES0L));
   Serial1.printf("RP_RES0H:       %02X\n", snoop_read6502MemoryLoc(RP_RES0H));
 }
+
+/// <summary>
+/// dump lock info, must be compatible with kernel definition
+/// </summary>
+void dumpLocks(){
+  Serial1.println("Locks:\nName    Value  Owner Phase");
+  Serial1.printf( "SCHED   %d\n", SharedInfo->sched_lock);
+  Serial1.printf( "KSYS_IO %d     %d    %d\n", SharedInfo->ksys_io_lock, SharedInfo->ksys_io_owner, SharedInfo->ksys_io_phase);
+  Serial1.printf( "FD      %d     %d\n", SharedInfo->fd_lock, SharedInfo->fd_lock_owner);
+  Serial1.printf( "PIPE    %d     %d\n", SharedInfo->pipe_lock, SharedInfo->pipe_lock_owner);
+  Serial1.printf( "RP      %d     %d\n", SharedInfo->rp_lock, SharedInfo->rp_lock_owner);
+}
+
 /// <summary>
 /// dump scheduler info, must be compatible with kernel definition
 /// </summary>
@@ -371,17 +483,20 @@ void dumpScheduler() {
 
   switch (SharedInfo->kernel_version) {
   case 0x0203:
-    Serial1.println("---------------------------------------");
-    Serial1.printf("Sched Lock        = %d\n", SharedInfo->sched_lock);
+    Serial1.println("---------------------------------------\nSystem:");
+    Serial1.printf("Sys ticks         = %d\n", (SharedInfo->system_ticks_hi << 8) | SharedInfo->system_ticks_lo);
     Serial1.printf("Current PID       = %d\n", SharedInfo->current_pid);
     Serial1.printf("Current Context   = %d\n", getMMUContext());
     Serial1.printf("Console Owner PID = %d\n", SharedInfo->console_owner_pid);
+    Serial1.printf("Monitor Active    = %d\n", SharedInfo->monitor_active);
 
-    Serial1.printf("KSYS IO Lock      = %d (Owner = %d)\n", SharedInfo->ksys_io_lock, SharedInfo->ksys_io_owner, SharedInfo->ksys_io_owner);
-    Serial1.printf("FD Lock           = %d (Owner = %d)\n", SharedInfo->fd_lock, SharedInfo->fd_lock_owner);
-    Serial1.printf("RP Lock           = %d\n", SharedInfo->rp_lock);
+    Serial1.println();
+    dumpLocks();
 
-//    Serial1.println();
+    Serial1.println();
+    dumpSchedDebug();
+
+    Serial1.println();
     dumpTasks();
 
 #if 1
@@ -389,7 +504,7 @@ void dumpScheduler() {
     dumpOpenFiles();
 #endif
 
-#if 0
+#if 1
     Serial1.println();
     dumpTimers();
 #endif
@@ -399,7 +514,7 @@ void dumpScheduler() {
     dumpPipes();
 #endif
 
-#if 1
+#if 0
     Serial1.println();
     dumpAccounting();
     #endif
@@ -407,11 +522,6 @@ void dumpScheduler() {
 #if 0
     Serial1.println();
     dumpInterface();
-#endif
-
-#if 1
-    Serial1.println();
-    dumpDebug();
 #endif
 
     break;

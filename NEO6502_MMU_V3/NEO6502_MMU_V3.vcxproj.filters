@@ -73,6 +73,9 @@
     <ClCompile Include="debug_sched.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="simple_io.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="__vm\.NEO6502_MMU_V3.vsarduino.h">
@@ -154,6 +157,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="font_VT100_8x20.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="simple_io.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

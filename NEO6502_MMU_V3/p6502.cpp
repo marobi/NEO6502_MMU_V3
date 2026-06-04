@@ -166,7 +166,7 @@ void set6502Clock() {
   pwm_set_clkdiv_int_frac(slice_num, divider16 / 16, divider16 & 0xF);
   pwm_set_wrap(slice_num, wrap);
   pwm_set_chan_level(slice_num, channel, wrap / 2);  // 50% duty cycle
-//  pwm_set_chan_level(slice_num, channel, (wrap * 40) / 100);  // duty cycle
+  //  pwm_set_chan_level(slice_num, channel, (wrap * 40) / 100);  // duty cycle
   pwm_set_enabled(slice_num, true);
 
   gClockState = eON;
@@ -267,22 +267,28 @@ void singleCycle6502(const uint8_t vSteps, const bool vDisplay) {
 /// </summary>
 /// <param name="vDisplay"></param>
 void singleStep6502(const bool vDisplay) {
+  uint8_t ss_wait = 0;
   sysstate_t lState = get6502State();
 
   set6502State(sHALTED);
   set6502State(sREAD);
 
-    do {
-      ss6502ClockStep();
+  do {
+    ss6502ClockStep();
 
-      if (gpio_get(p6502SYNC)) {
-        if (vDisplay) {
-          Serial1.printf("%04X: %02X\n", readCPUBusAddress(), read6502Data());
-        }
+    if (gpio_get(p6502SYNC)) {
+      if (vDisplay) {
+        Serial1.printf("%04X: %02X\n", readCPUBusAddress(), read6502Data());
       }
-      delayMicroseconds(1);
+    }
+    delayMicroseconds(1);
+    ss_wait++;
 
-    } while (!gpio_get(p6502SYNC));
+  } while ((ss_wait < 8) && (!gpio_get(p6502SYNC)));
+
+  if (ss_wait >= 8) {
+    Serial1.println("*E: singleStep6502: timeout waiting for SYNC");
+  }
 
   set6502State(lState);  // restore state
 }
@@ -305,7 +311,7 @@ sysstate_t get6502State() {
 bool set6502State(const sysstate_t vSysState) {
   //Serial1.printf("*D: set6502State: %s --> %s\n", lTxtSystemState[gSysState], lTxtSystemState[vSysState]);
 
-  if (vSysState == gSysState) 
+  if (vSysState == gSysState)
     return true;
 
   switch (vSysState) {
@@ -378,7 +384,7 @@ bool set6502State(const sysstate_t vSysState) {
   }
 
   gSysState = vSysState;
-  
+
   return true;
 }
 

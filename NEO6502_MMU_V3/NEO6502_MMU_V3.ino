@@ -37,6 +37,7 @@ Lesser General Public License for more details.
 #include "sys_config.h"
 #include "boot.h"
 
+#include "simple_io.h"
 
 #include "monitor.h"
 #include "input.h"
@@ -142,6 +143,7 @@ void setup() {
 
   initCmdInterface();           // init command interface
   initInput();
+  initSimpleIO();               // simple I/O between CPU and VDU (active only when console PID is 0)
 
   initScheduler();              // init context switching
 
@@ -159,19 +161,21 @@ void setup() {
 /// and running the monitor.
 /// </summary>
 void loop() {
+  taskIRQTimer();
+
   taskScheduler();
+
+  taskSimpleIO();               // simple I/O between CPU and VDU (active only when console PID is 0)
 
   taskInput();                  // process FIFOs
 
   taskMailbox();
 
-  taskVDU();                     // vdu task, mainly control of cursor blinking and smooth scroll
+  taskVDU();                    // vdu task, mainly control of cursor blinking and smooth scroll
 
   taskICMonitor();              // ICM
 
-  taskIRQTimer();
+  updateIndicator();            // manage status LED
 
-  updateIndicator();             // manage status LED
-
-  delayNs<100>();
+  delayNs<250>();
 }

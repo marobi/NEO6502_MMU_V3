@@ -271,11 +271,11 @@ static void cmdCommandCallback(cmd* c) {
   uint8_t lPID = atoi(arg1.c_str()) & 0xFF;
 
   if ((lPID > 0) && (gInMonitor)) {
-    Serial1.println("*E: in monitor!");
+    Serial1.println("*E: cmdCommandCallback: already in monitor!");
     return;
   }
 
-  Serial1.printf("Set console PID to %d\n", lPID);
+  Serial1.printf("*I: Set console PID to %d\n", lPID);
 
   setConsolePID(lPID);
   if (lPID == 0) {
@@ -283,7 +283,7 @@ static void cmdCommandCallback(cmd* c) {
   }
 
   gInterface++;
-  Serial1.printf("Entering console [%d]\n", lPID);
+  Serial1.printf("*I: Entering console [%d]\n", lPID);
 }
 
 /// <summary>
@@ -369,7 +369,8 @@ static void cmdMonitorCallback(cmd* c) {
   Command cmd(c);
 
   Serial1.println("*I: Monitor ...");
-  if (!genIRQ6502(RP_SRC_MONITOR)) {
+//  stopIRQTimer();
+  if (! genIRQ6502(RP_SRC_MONITOR)) {
     Serial1.println("*E: cmdIRQCallback: Monitor entry failed");
   }
 }
