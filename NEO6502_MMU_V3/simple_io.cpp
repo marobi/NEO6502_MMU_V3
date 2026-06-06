@@ -5,11 +5,11 @@
 #include "simple_io.h"
 #include "neobus.h"
 #include "mmu.h"
-#include "mailbox.h"
+//#include "mailbox.h"
 #include "input.h"
 
 /// <summary>
-/// simple_getchar checks if the CPU is ready to receive input by reading a specific memory location.
+/// simple_getchar checks if the CPU is ready to receive input by reading the RP_GETCHAR location.
 /// </summary>
 /// <returns></returns>
 void simple_getchar() {
@@ -23,16 +23,18 @@ void simple_getchar() {
 }
 
 /// <summary>
-/// simple_putchar checks if the CPU has written a char to the memory location, 
+/// simple_putchar checks if the CPU has written a char to the memory location RP_PUTCHAR, 
 /// and if so, writes it to the VDU and resets the memory location for the next char. 
-/// This allows the CPU to output characters to the VDU by writing to a specific memory location.
+/// This allows the CPU to output characters to the VDU by writing to RP_PUTCHAR.
 /// </summary>
 /// <param name="c"></param>
 void simple_putchar() {
-  uint8_t c = snoop_read6502MemoryLoc(RP_PUTCHAR);
-  if (c != 0x00) {                                // check if CPU has written a char to the memory location
-    writeVDUQ(c);                                 // write it to the VDU
-    snoop_write6502MemoryLoc(RP_PUTCHAR, 0x00);   // and reset the memory location for the next char
+  if (!isFullVDUQ()) {
+    uint8_t c = snoop_read6502MemoryLoc(RP_PUTCHAR);
+    if (c != 0x00) {                                // check if CPU has written a char to the memory location
+      writeVDUQ(c);                                 // write it to the VDU
+      snoop_write6502MemoryLoc(RP_PUTCHAR, 0x00);   // and reset the memory location for the next char
+    }
   }
 }
 
@@ -52,6 +54,6 @@ void taskSimpleIO() {
 /// initialize simple I/O by setting the memory locations for getchar and putchar to 0,
 /// </summary>
 void initSimpleIO() {
-  snoop_write6502MemoryLoc(RP_GETCHAR, 0x00); // initialize memory locations
+  snoop_write6502MemoryLoc(RP_GETCHAR, 0x00);
   snoop_write6502MemoryLoc(RP_PUTCHAR, 0x00);
 }

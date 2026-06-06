@@ -19,7 +19,9 @@ extern FIFO<uint8_t, 128>  vdu_tx_fifo;         // FIFO to write to VDU/user out
 bool writeCPUQ(const uint8_t c);
 uint8_t readCPUQ();
 bool isEmptyCPUQ();
+
 bool writeVDUQ(const uint8_t c);
+bool isFullVDUQ();
 
 void initInput();
 void taskInput();

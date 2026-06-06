@@ -65,6 +65,14 @@ bool writeVDUQ(const uint8_t c) {
   return true;
 }
 
+/// <summary>
+/// isFullVDUQ checks if the VDU output FIFO is full
+/// </summary>
+/// <returns></returns>
+bool isFullVDUQ() {
+  return vdu_tx_fifo.isFull();
+}
+
 #if 0
 /// <summary>
 /// process FIFO CPU 

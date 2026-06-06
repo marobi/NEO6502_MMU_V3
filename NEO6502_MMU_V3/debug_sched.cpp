@@ -63,6 +63,8 @@ struct __attribute__((packed)) scheduler_info_t {
 
   uint8_t monitor_active;
 
+  uint8_t active_context;
+
   //------------------------------------------------
   // file descriptors per process
   uint8_t proc_fd_obj[MAX_PROCS * MAX_FDS];
