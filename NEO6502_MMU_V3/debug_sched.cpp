@@ -41,8 +41,20 @@ struct __attribute__((packed)) scheduler_info_t {
   uint16_t brk_vector;
 
   uint8_t  rp_lock;
-  uint8_t  fd_lock;
-  uint8_t  ksys_io_lock;
+  //-----------------------------------------------
+  uint8_t file_io_gate;
+  uint8_t file_io_gate_owner;
+  uint8_t file_io_gate_phase;
+  uint8_t file_io_gate_wait_head;
+  uint8_t file_io_gate_wait_tail;
+  uint8_t file_io_gate_next[MAX_PROCS];
+
+  uint8_t proc_gate;
+  uint8_t proc_gate_owner;
+  uint8_t proc_gate_phase;
+  uint8_t proc_gate_wait_head;
+  uint8_t proc_gate_wait_tail;
+  uint8_t proc_gate_next[MAX_PROCS];
 
   //-----------------------------------------------
   uint8_t current_pid;
@@ -58,6 +70,10 @@ struct __attribute__((packed)) scheduler_info_t {
   uint8_t proc_signal_pending[MAX_PROCS];
 
   uint8_t sched_lock;
+  uint8_t sched_lock_owner;
+  uint8_t sched_lock_phase;
+  uint8_t sched_lock_depth;
+  uint8_t sched_lock_underflow;
 
   uint8_t console_owner_pid;
 
@@ -104,23 +120,18 @@ struct __attribute__((packed)) scheduler_info_t {
   uint8_t init_task_ptrL;
   uint8_t init_task_ptrH;
 
-  uint8_t pipe_lock;
   uint8_t pipe_state[MAX_PIPES];
   uint8_t pipe_head[MAX_PIPES];
   uint8_t pipe_tail[MAX_PIPES];
   uint8_t pipe_count[MAX_PIPES];
   uint8_t pipe_readers[MAX_PIPES];
   uint8_t pipe_writers[MAX_PIPES];
-
   uint8_t pipe_buf[MAX_PIPES * PIPE_BUF_SIZE];
 
   // Per-open-object pipe endpoint metadata.
   // Indexed by open object number.
   uint8_t open_pipe[OPEN_MAX];
   uint8_t open_pipe_mode[OPEN_MAX];
-
-  uint8_t sched_ticks_lo;
-  uint8_t sched_ticks_hi;
 
   //================================================
   //
@@ -145,6 +156,7 @@ struct __attribute__((packed)) scheduler_info_t {
 
   uint8_t dbg_sched_loaded_pid;
   uint8_t dbg_sched_loaded_sp;
+
   uint8_t dbg_sched_resume_mode;
   uint8_t dbg_sched_resume_pid;
   uint8_t dbg_sched_resume_context;
@@ -153,14 +165,10 @@ struct __attribute__((packed)) scheduler_info_t {
   uint8_t dbg_proc_state_old;
   uint8_t dbg_proc_state_new;
 
-  uint8_t ksys_io_owner;
-  uint8_t fd_lock_owner;
-  uint8_t pipe_lock_owner;
   uint8_t rp_lock_owner;
 
-  uint8_t ksys_io_phase;
-  uint8_t dbg_io_wait_reason;
-  uint8_t dbg_io_wait_object;
+  uint8_t dbg_gate_wait_reason;
+  uint8_t dbg_gate_wait_object;
 
   uint8_t dbg_timer_pid;
   uint8_t dbg_timer_slot;
@@ -168,10 +176,57 @@ struct __attribute__((packed)) scheduler_info_t {
   uint8_t dbg_timer_until_hi;
   uint8_t dbg_timer_now_lo;
   uint8_t dbg_timer_now_hi;
+
+  uint8_t dbg_irq_preempt_count;
+  uint8_t dbg_irq_current_pid;
+  uint8_t dbg_irq_selected_pid;
+  uint8_t dbg_irq_saved_sp;
+  uint8_t dbg_irq_loaded_sp;
+  uint8_t dbg_irq_skip_reason;
+
+  uint8_t dbg_read_ret_pid;
+  uint8_t dbg_read_ret_fd;
+  uint8_t dbg_read_ret_len_lo;
+  uint8_t dbg_read_ret_len_hi;
+  uint8_t dbg_read_ret_carry;
+  uint8_t dbg_read_ret_lo;
+  uint8_t dbg_read_ret_hi;
+  uint8_t dbg_read_ret_errno;
+  uint8_t dbg_read_ret_phase;
 };
 
 static uint8_t SharedSpace[sizeof(scheduler_info_t)];
 static const scheduler_info_t* SharedInfo = (scheduler_info_t*)SharedSpace;
+
+/*
+E_OK                = 0
+EIO                 = 3
+EINVAL              = 6
+EMFILE              = 8        ; too many open file descriptors
+EBADF               = 9
+ENODEV              = 10
+ENOSYS              = 11
+EAGAIN              = 12       ; operation would block / try again
+ENOMEM              = 13       ; no free kernel memory/object/table slot
+EPIPE               = 14       ; write on pipe with no readers
+*/
+static char txt_errno[15][7] = {
+  "OK",
+  "?",
+  "?",
+  "EIO",
+  "?",
+  "?",
+  "EINVAL",
+  "?",
+  "EMFILE",
+  "EBADF",
+  "ENODEV",
+  "ENOSYS",
+  "EAGAIN",
+  "ENOMEM",
+  "EPIPE"
+};
 
 /// <summary>
 /// txt for process states, must be compatible with kernel definition
@@ -185,18 +240,26 @@ static char txt_proc_state[6][4] = {
   "STP",
 };
 
-/// <summary>
-/// txt for wait reasons, must be compatible with kernel definition
-/// </summary>
-static char txt_wait_reason[7][4] = {
-  "-",  // none
-  "CON",  // console
-  "DEV",  // device
-  "PIP",  // pipe
-  "TIM",  // timer
-  "PRC",  // process
-  "KIO" // kernel io (blocking for some reason in ksys_io)
+static const char* txt_wait_reason[] = {
+  "-",     // 0 WAIT_NONE
+  "CON",   // 1 WAIT_CONSOLE
+  "DEV",   // 2 WAIT_DEVICE
+  "PIP",   // 3 WAIT_PIPE
+  "TIM",   // 4 WAIT_TIMER
+  "PRC",   // 5 WAIT_PROC
+  "LCK"    // 6 WAIT_LOCK
 };
+
+#define WAIT_NONE       0x00
+#define WAIT_CONSOLE    0x01
+#define WAIT_DEVICE     0x02
+#define WAIT_PIPE       0x03
+#define WAIT_TIMER      0x04
+#define WAIT_PROC       0x05
+#define WAIT_LOCK       0x06
+
+#define LOCK_ID_FILE_IO 0x00
+#define LOCK_ID_PROC    0x01
 
 /// <summary>
 /// txt for open file types, must be compatible with kernel definition
@@ -220,8 +283,8 @@ static char txt_dev_type[2][4] = {
 /// txt for process resume modes, must be compatible with kernel definition
 /// </summary>
 static char txt_proc_resume_mode[2][4] = {
-  "RTI",  // RTI
-  "RTS",  // RTS
+  "RTI",  // 0 = PROC_RESUME_RTI / PROC_FRAME_RTI
+  "?"     // 1 = invalid in RTI-only scheduler
 };
 
 /// <summary>
@@ -242,6 +305,25 @@ static char txt_pipe_state[2][5] = {
   "USED"
 };
 
+/*
+-- = no skip / IRQ entered scheduler
+M  = skipped because monitor_active != 0
+S  = skipped because sched_lock != 0
+R  = skipped because rp_lock != 0
+F  = skipped because file_io_gate != 0
+P  = skipped because proc_gate != 0
+E  = enter switch
+*/
+static char txt_irq_skip_reason[7][2] = {
+  "-",
+  "M",
+  "S",
+  "R",
+  "F",
+  "P",
+  "E"
+};
+
 /// <summary>
 /// Dump scheduler debug info. Must match kernel/shared_state.asm and include/debug.inc.
 /// </summary>
@@ -254,29 +336,69 @@ static const char* dbgPathName(uint8_t path) {
   }
 }
 
+/// <summary>
+/// debug mode name, must be compatible with kernel definition and usage in scheduler code.
+/// </summary>
+/// <param name="mode"></param>
+/// <returns></returns>
 static const char* dbgModeName(uint8_t mode) {
   switch (mode) {
   case 0x00: return "-";
-  case 0x01: return "RTI";
-  case 0x02: return "RTS";
+  case 0x01: return "IRQ";   // RTI frame created by IRQ/preemption path
+  case 0x02: return "YLD";   // RTI frame created by cooperative yield path
+  case 0x03: return "BOOT";  // first-run bootstrap path, if used by kernel debug
   default:   return "?";
   }
 }
 
-static const char* dbgMarkerName(uint8_t marker) {
+/// <summary>
+/// scheduler marker text, must be compatible with kernel definition.
+/// These markers are used to identify where in the scheduler code we are, 
+/// for better understanding of scheduler behavior and easier debugging.
+/// </summary>
+/// <param name="marker"></param>
+/// <returns></returns>
+static const char* dbgMarkerText(const uint8_t marker) {
   switch (marker) {
   case 0x00: return "-";
   case 0x01: return "IRQ";
-  case 0x02: return "SAV";
-  case 0x03: return "PCK";
+  case 0x02: return "SAVE";
+  case 0x03: return "PICK";
   case 0x04: return "YLD";
   case 0x61: return "SEL";
-  case 0x62: return "STK";
+  case 0x62: return "LOAD";
   case 0x63: return "RTI";
-  case 0x64: return "RTS";
-  case 0xEE: return "ERR";
+  case 0x64: return "BOOT";
+  case 0xEE: return "STALE";
+  case 0xE1: return "GREC";
+  case 0xE2: return "GREL";
   default:   return "?";
   }
+}
+
+/// <summary>
+/// wait object text, must be compatible with kernel definition
+/// </summary>
+/// <param name="reason"></param>
+/// <param name="object"></param>
+/// <returns></returns>
+static const char* waitObjectText(const uint8_t reason, const uint8_t object) {
+  if (reason == WAIT_LOCK) {
+    switch (object) {
+    case LOCK_ID_FILE_IO:
+      return "FIO";
+    case LOCK_ID_PROC:
+      return "PRC";
+    default:
+      return "???";
+    }
+  }
+
+  if (reason == WAIT_NONE) {
+    return "--";
+  }
+
+  return nullptr;
 }
 
 /// <summary>
@@ -345,50 +467,63 @@ static void dumpOpenFiles() {
 /// </summary>
 /// <param name="vPID"></param>
 static void dumpTask(const uint8_t pid) {
-    Serial1.printf(
-      " %3d %3d %3s   %1s   %02X %03d %02X  %02X%02X | %3s  %02X  | ",
-      SharedInfo->proc_parent_pid[pid],
-      pid,
-      SharedInfo->proc_state[pid] < 6 ? txt_proc_state[SharedInfo->proc_state[pid]] : "?",
-      SharedInfo->proc_signal_pending[pid] < 4 ? txt_signal_pending[SharedInfo->proc_signal_pending[pid]] : "?",
-      SharedInfo->proc_sp[pid],
-      SharedInfo->proc_context[pid],
-      SharedInfo->proc_flags[pid],
-      SharedInfo->proc_entryH[pid],
-      SharedInfo->proc_entryL[pid],
-      SharedInfo->wait_reason[pid] < 7 ? txt_wait_reason[SharedInfo->wait_reason[pid]] : "?",
-      SharedInfo->wait_object[pid]
-    );
+  const uint8_t waitReason = SharedInfo->wait_reason[pid];
+  const uint8_t waitObject = SharedInfo->wait_object[pid];
 
-    for (uint8_t fd = 0; fd < MAX_FDS; fd++) {
-      const uint8_t index = pid * MAX_FDS + fd;
-      const uint8_t obj = SharedInfo->proc_fd_obj[index];
-      const uint8_t flags = SharedInfo->proc_fd_flags[index];
+  const char* waitReasonText =
+    waitReason < 7 ? txt_wait_reason[waitReason] : "?";
 
-      if (obj == FD_NONE) {
-        Serial1.print("-    ");
-        continue;
-      }
+  const char* waitObjectName = waitObjectText(waitReason, waitObject);
 
-      Serial1.printf("%d:", obj);
+  Serial1.printf(
+    " %3d %3d %3s   %1s   %02X %03d %02X  %02X%02X | %3s  ",
+    SharedInfo->proc_parent_pid[pid],
+    pid,
+    SharedInfo->proc_state[pid] < 6 ? txt_proc_state[SharedInfo->proc_state[pid]] : "?",
+    SharedInfo->proc_signal_pending[pid] < 4 ? txt_signal_pending[SharedInfo->proc_signal_pending[pid]] : "?",
+    SharedInfo->proc_sp[pid],
+    SharedInfo->proc_context[pid],
+    SharedInfo->proc_flags[pid],
+    SharedInfo->proc_entryH[pid],
+    SharedInfo->proc_entryL[pid],
+    waitReasonText
+  );
 
-      if (flags & FD_FLAG_READ) {
-        Serial1.print("r");
-      }
+  if (waitObjectName != nullptr) {
+    Serial1.printf("%3s | ", waitObjectName);
+  }
+  else {
+    Serial1.printf("%02X  | ", waitObject);
+  }
 
-      if (flags & FD_FLAG_WRITE) {
-        Serial1.print("w");
-      }
+  for (uint8_t fd = 0; fd < MAX_FDS; fd++) {
+    const uint8_t index = pid * MAX_FDS + fd;
+    const uint8_t obj = SharedInfo->proc_fd_obj[index];
+    const uint8_t flags = SharedInfo->proc_fd_flags[index];
 
-      if (pid == SharedInfo->console_owner_pid && fd == STDIN)
-        Serial1.print("* ");
-      else
-        Serial1.print("  ");
+    if (obj == FD_NONE) {
+      Serial1.print("-    ");
+      continue;
     }
 
-    Serial1.println();
-}
+    Serial1.printf("%d:", obj);
 
+    if (flags & FD_FLAG_READ) {
+      Serial1.print("r");
+    }
+
+    if (flags & FD_FLAG_WRITE) {
+      Serial1.print("w");
+    }
+
+    if (pid == SharedInfo->console_owner_pid && fd == STDIN)
+      Serial1.print("* ");
+    else
+      Serial1.print("  ");
+  }
+
+  Serial1.println();
+}
 /// <summary>
 /// dump task info for all PIDs, must be compatible with kernel definition
 /// </summary>
@@ -407,37 +542,49 @@ static void dumpSchedDebug() {
   Serial1.println("Scheduler debug:");
   Serial1.println("Path   Marker Current Selected");
   Serial1.printf(
-    "%-6s %02X/%-3s %02d      %02d\n",
+    "%-6s %02X/%-4s %02d      %02d\n",
     dbgPathName(SharedInfo->dbg_sched_path),
     SharedInfo->sched_debug_marker,
-    dbgMarkerName(SharedInfo->sched_debug_marker),
+    dbgMarkerText(SharedInfo->sched_debug_marker),
     SharedInfo->dbg_sched_current_pid,
     SharedInfo->dbg_sched_selected_pid
   );
 
   Serial1.println();
-  Serial1.println("Save  PID SP Mode");
+  Serial1.println("Save   PID SP Src");
   Serial1.printf(
-    "      %02d  %02X %-3s\n",
+    "       %02d  %02X %-4s\n",
     SharedInfo->dbg_sched_saved_pid,
     SharedInfo->dbg_sched_saved_sp,
     dbgModeName(SharedInfo->dbg_sched_saved_mode)
   );
 
-  Serial1.println("Load  PID SP Mode");
+  Serial1.println("Load   PID SP");
   Serial1.printf(
-    "      %02d  %02X %-3s\n",
+    "       %02d  %02X\n",
     SharedInfo->dbg_sched_loaded_pid,
-    SharedInfo->dbg_sched_loaded_sp,
-    dbgModeName(SharedInfo->dbg_sched_resume_mode)
+    SharedInfo->dbg_sched_loaded_sp
   );
 
-  Serial1.println("Resume PID Ctx Mode");
+  Serial1.println("Resume PID Ctx Src");
   Serial1.printf(
-    "       %02d  %03d %-3s\n",
+    "       %02d  %03d %-4s\n",
     SharedInfo->dbg_sched_resume_pid,
     SharedInfo->dbg_sched_resume_context,
     dbgModeName(SharedInfo->dbg_sched_resume_mode)
+  );
+
+  // IRQ preemption debug info, useful for understanding IRQ behavior and debugging IRQ-related issues.
+  Serial1.println("\nIRQ preemt:\nCount Current Selected SavedSP LoadSP Skip");
+  Serial1.printf(
+    "%05d  %02d      %02d       %02X      %02X  %-1s/%02X\n",
+    SharedInfo->dbg_irq_preempt_count,
+    SharedInfo->dbg_irq_current_pid,
+    SharedInfo->dbg_irq_selected_pid,
+    SharedInfo->dbg_irq_saved_sp,
+    SharedInfo->dbg_irq_loaded_sp,
+    SharedInfo->dbg_irq_skip_reason < 7 ? txt_irq_skip_reason[SharedInfo->dbg_irq_skip_reason] : "?",
+    SharedInfo->dbg_irq_skip_reason
   );
 
   Serial1.println();
@@ -465,16 +612,80 @@ static void dumpInterface() {
   Serial1.printf("RP_RES0H:       %02X\n", snoop_read6502MemoryLoc(RP_RES0H));
 }
 
-/// <summary>
-/// dump lock info, must be compatible with kernel definition
-/// </summary>
-void dumpLocks(){
-  Serial1.println("Locks:\nName    Value  Owner Phase");
-  Serial1.printf( "SCHED   %d\n", SharedInfo->sched_lock);
-  Serial1.printf( "KSYS_IO %d     %d    %d\n", SharedInfo->ksys_io_lock, SharedInfo->ksys_io_owner, SharedInfo->ksys_io_phase);
-  Serial1.printf( "FD      %d     %d\n", SharedInfo->fd_lock, SharedInfo->fd_lock_owner);
-  Serial1.printf( "PIPE    %d     %d\n", SharedInfo->pipe_lock, SharedInfo->pipe_lock_owner);
-  Serial1.printf( "RP      %d     %d\n", SharedInfo->rp_lock, SharedInfo->rp_lock_owner);
+/*
+Locks/Gates:
+Name     Val Owner Phase Head Tail
+SCHED    00  FF    00    00   00
+FILE_IO  00  FF    00    FF   FF
+PROC     00  FF    00    FF   FF
+RP       00  FF
+*/
+void dumpLockGates() {
+  Serial1.println("Locks/Gates:");
+  Serial1.println("Name     Val Owner Phase Depth Under");
+  Serial1.printf("SCHED    %02X  %02X    %02X    %02X    %02X\n",
+    SharedInfo->sched_lock,
+    SharedInfo->sched_lock_owner,
+    SharedInfo->sched_lock_phase,
+    SharedInfo->sched_lock_depth,
+    SharedInfo->sched_lock_underflow);
+  Serial1.println("\nName     Val Owner Phase Head  Tail");
+  Serial1.printf("FILE_IO  %02X  %02X    %02X    %02X    %02X\n",
+    SharedInfo->file_io_gate,
+    SharedInfo->file_io_gate_owner,
+    SharedInfo->file_io_gate_phase,
+    SharedInfo->file_io_gate_wait_head,
+    SharedInfo->file_io_gate_wait_tail);
+  Serial1.printf("PROC     %02X  %02X    %02X    %02X    %02X\n",
+    SharedInfo->proc_gate,
+    SharedInfo->proc_gate_owner,
+    SharedInfo->proc_gate_phase,
+    SharedInfo->proc_gate_wait_head,
+    SharedInfo->proc_gate_wait_tail);
+   Serial1.printf("RP       %02X  %02X\n",
+    SharedInfo->rp_lock,
+     SharedInfo->rp_lock_owner);
+}
+
+static void dumpContextWarning() {
+  const uint8_t pid = SharedInfo->current_pid;
+
+  if (pid < MAX_PROCS) {
+    const uint8_t expectedContext = SharedInfo->proc_context[pid];
+
+    if (SharedInfo->active_context != expectedContext) {
+      Serial1.printf(
+        "WARNING: active_context mismatch: active=%u expected=%u for PID=%u\n",
+        SharedInfo->active_context,
+        expectedContext,
+        pid
+      );
+    }
+  }
+}
+
+/*
+PID   = dbg_read_ret_pid
+FD    = dbg_read_ret_fd
+Len   = dbg_read_ret_len_hi:dbg_read_ret_len_lo
+C     = dbg_read_ret_carry
+Ret   = dbg_read_ret_hi:dbg_read_ret_lo
+Err   = dbg_read_ret_errno
+Phase = dbg_read_ret_phase
+*/
+void dumpReadIO() {
+  Serial1.println("Last read:");
+  Serial1.println("PID FD Len  C  Ret  Err       Phase");
+  Serial1.printf("%02X  %02X %04X %02X %04X %-6s/%02X %02X\n",
+    SharedInfo->dbg_read_ret_pid,
+    SharedInfo->dbg_read_ret_fd,
+    (SharedInfo->dbg_read_ret_len_hi << 8) | SharedInfo->dbg_read_ret_len_lo,
+    SharedInfo->dbg_read_ret_carry,
+    (SharedInfo->dbg_read_ret_hi << 8) | SharedInfo->dbg_read_ret_lo,
+    SharedInfo->dbg_read_ret_errno < 15 ? txt_errno[SharedInfo->dbg_read_ret_errno] : "???",
+    SharedInfo->dbg_read_ret_errno,
+    SharedInfo->dbg_read_ret_phase
+  );
 }
 
 /// <summary>
@@ -493,7 +704,7 @@ void dumpScheduler() {
     Serial1.printf("Monitor Active    = %d\n", SharedInfo->monitor_active);
 
     Serial1.println();
-    dumpLocks();
+    dumpLockGates();
 
     Serial1.println();
     dumpSchedDebug();
@@ -526,6 +737,13 @@ void dumpScheduler() {
     dumpInterface();
 #endif
 
+    Serial1.println();
+    dumpReadIO();
+
+    Serial1.println();
+    dumpContextWarning();
+
+    Serial1.println();
     break;
 
   default:

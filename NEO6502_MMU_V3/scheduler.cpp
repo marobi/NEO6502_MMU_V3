@@ -116,11 +116,11 @@ void taskIRQTimer() {
   if (gIntrPending) {
     // check if source is ACKed by 6502
     if (snoop_read6502MemoryLoc(RP_IRQ_SOURCE) == RP_SRC_NONE) {
-      // ACKed, clear pending state
-      gIntrPending = false;
       IRQPin::high();
       DebugPin::high();
+      // ACKed, clear pending state
       snoop_write6502MemoryLoc(RP_IRQ_STATE, RP_IRQ_NONE);
+      gIntrPending = false;
     }
 
     return;
