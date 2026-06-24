@@ -35,7 +35,7 @@ bool genIRQ6502(irq_source_t vSrc);
 
 void stopIRQTimer();
 
-void startIRQTimer(const uint16_t vPeriod);
+void startIRQTimer(const unsigned long vPeriod);
 
 void taskIRQTimer();
 

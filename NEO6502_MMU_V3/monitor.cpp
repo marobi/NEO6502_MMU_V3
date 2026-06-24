@@ -38,7 +38,8 @@ Lesser General Public License for more details.
 #include "mailbox.h"
 #include "scheduler.h"
 
-#include "debug_sched.h"
+#include "debug_neox.h"
+#include "usb_storage.h"
 
 // Create CLI Object
 static SimpleCLI gCli;
@@ -351,7 +352,7 @@ static void cmdTimerCallback(cmd* c) {
 
   String arg1 = cmd.getArgument("freq").getValue();
 
-  uint32_t lInterval = 1000 / atof(arg1.c_str());
+  unsigned long lInterval = 1000 / atof(arg1.c_str());
 
   if (lInterval < 1) {
     stopIRQTimer();
@@ -382,7 +383,7 @@ static void cmdMonitorCallback(cmd* c) {
 static void cmdInfoCallback(cmd* c) {
   Command cmd(c);
 
-  dumpScheduler();
+  dumpNEOX();
 }
 
 
@@ -483,6 +484,9 @@ void initMonitor() {
 
   gCmd = gCli.addCmd("timer", cmdTimerCallback);
   gCmd.addPositionalArgument("freq", "0");
+
+
+
 
   gCmd = gCli.addCmd("page", cmdPageCallback);
   gCmd.addPositionalArgument("index");

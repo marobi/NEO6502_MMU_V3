@@ -45,6 +45,8 @@ Lesser General Public License for more details.
 
 #include "scheduler.h"
 
+#include "usb_storage.h"
+
 #include "indicator.h"
 
 /// <summary>
@@ -139,6 +141,8 @@ void setup() {
 
   //  fillMemory(0x00);             // clear memory 64k of current context
 
+  initUSBStorage();
+
   initMailbox();
 
   initCmdInterface();           // init command interface
@@ -161,6 +165,8 @@ void setup() {
 /// and running the monitor.
 /// </summary>
 void loop() {
+  taskUSBStorage();              // USB storage task: TinyUSB MSC + FatFs mount/test
+
   taskIRQTimer();
 
   taskScheduler();
@@ -177,5 +183,5 @@ void loop() {
 
   updateIndicator();            // manage status LED
 
-  delayNs<250>();
+//  delayNs<500>();
 }

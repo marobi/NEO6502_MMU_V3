@@ -5,7 +5,7 @@
 
 #include "mmu.h"
 #include "mailbox.h"
-#include "debug_sched.h"
+#include "debug_neox.h"
 
 #include "neobus.h"
 
@@ -57,7 +57,8 @@ struct __attribute__((packed)) scheduler_info_t {
   uint8_t proc_gate_next[MAX_PROCS];
 
   //-----------------------------------------------
-  uint8_t current_pid;
+  uint8_t active_pid;
+  uint8_t sched_cursor_pid;
 
   uint8_t proc_state[MAX_PROCS];
   uint8_t proc_context[MAX_PROCS];
@@ -65,7 +66,6 @@ struct __attribute__((packed)) scheduler_info_t {
   uint8_t proc_entryL[MAX_PROCS];
   uint8_t proc_entryH[MAX_PROCS];
   uint8_t proc_flags[MAX_PROCS];
-  uint8_t proc_resume_mode[MAX_PROCS];
   uint8_t proc_parent_pid[MAX_PROCS];
   uint8_t proc_signal_pending[MAX_PROCS];
 
@@ -184,15 +184,6 @@ struct __attribute__((packed)) scheduler_info_t {
   uint8_t dbg_irq_loaded_sp;
   uint8_t dbg_irq_skip_reason;
 
-  uint8_t dbg_read_ret_pid;
-  uint8_t dbg_read_ret_fd;
-  uint8_t dbg_read_ret_len_lo;
-  uint8_t dbg_read_ret_len_hi;
-  uint8_t dbg_read_ret_carry;
-  uint8_t dbg_read_ret_lo;
-  uint8_t dbg_read_ret_hi;
-  uint8_t dbg_read_ret_errno;
-  uint8_t dbg_read_ret_phase;
 };
 
 static uint8_t SharedSpace[sizeof(scheduler_info_t)];
@@ -231,23 +222,28 @@ static char txt_errno[15][7] = {
 /// <summary>
 /// txt for process states, must be compatible with kernel definition
 /// </summary>
-static char txt_proc_state[6][4] = {
+static char txt_proc_state[7][4] = {
   "EMP",
   "NEW",
   "RDY",
   "RUN",
   "BLK",
   "STP",
+  "ZOM"
 };
 
+/// <summary>
+/// txt for wait reasons, must be compatible with kernel definition
+/// </summary>
 static const char* txt_wait_reason[] = {
   "-",     // 0 WAIT_NONE
   "CON",   // 1 WAIT_CONSOLE
   "DEV",   // 2 WAIT_DEVICE
-  "PIP",   // 3 WAIT_PIPE
+  "PIR",   // 3 WAIT_PIPE_READ
   "TIM",   // 4 WAIT_TIMER
   "PRC",   // 5 WAIT_PROC
-  "LCK"    // 6 WAIT_LOCK
+  "LCK",   // 6 WAIT_LOCK
+  "PIW",   // 7 WAIT_PIPE_WRITE
 };
 
 #define WAIT_NONE       0x00
@@ -479,7 +475,7 @@ static void dumpTask(const uint8_t pid) {
     " %3d %3d %3s   %1s   %02X %03d %02X  %02X%02X | %3s  ",
     SharedInfo->proc_parent_pid[pid],
     pid,
-    SharedInfo->proc_state[pid] < 6 ? txt_proc_state[SharedInfo->proc_state[pid]] : "?",
+    SharedInfo->proc_state[pid] < 7 ? txt_proc_state[SharedInfo->proc_state[pid]] : "?",
     SharedInfo->proc_signal_pending[pid] < 4 ? txt_signal_pending[SharedInfo->proc_signal_pending[pid]] : "?",
     SharedInfo->proc_sp[pid],
     SharedInfo->proc_context[pid],
@@ -642,77 +638,38 @@ void dumpLockGates() {
     SharedInfo->proc_gate_phase,
     SharedInfo->proc_gate_wait_head,
     SharedInfo->proc_gate_wait_tail);
-   Serial1.printf("RP       %02X  %02X\n",
+  Serial1.printf("RP       %02X  %02X\n",
     SharedInfo->rp_lock,
-     SharedInfo->rp_lock_owner);
-}
-
-static void dumpContextWarning() {
-  const uint8_t pid = SharedInfo->current_pid;
-
-  if (pid < MAX_PROCS) {
-    const uint8_t expectedContext = SharedInfo->proc_context[pid];
-
-    if (SharedInfo->active_context != expectedContext) {
-      Serial1.printf(
-        "WARNING: active_context mismatch: active=%u expected=%u for PID=%u\n",
-        SharedInfo->active_context,
-        expectedContext,
-        pid
-      );
-    }
-  }
-}
-
-/*
-PID   = dbg_read_ret_pid
-FD    = dbg_read_ret_fd
-Len   = dbg_read_ret_len_hi:dbg_read_ret_len_lo
-C     = dbg_read_ret_carry
-Ret   = dbg_read_ret_hi:dbg_read_ret_lo
-Err   = dbg_read_ret_errno
-Phase = dbg_read_ret_phase
-*/
-void dumpReadIO() {
-  Serial1.println("Last read:");
-  Serial1.println("PID FD Len  C  Ret  Err       Phase");
-  Serial1.printf("%02X  %02X %04X %02X %04X %-6s/%02X %02X\n",
-    SharedInfo->dbg_read_ret_pid,
-    SharedInfo->dbg_read_ret_fd,
-    (SharedInfo->dbg_read_ret_len_hi << 8) | SharedInfo->dbg_read_ret_len_lo,
-    SharedInfo->dbg_read_ret_carry,
-    (SharedInfo->dbg_read_ret_hi << 8) | SharedInfo->dbg_read_ret_lo,
-    SharedInfo->dbg_read_ret_errno < 15 ? txt_errno[SharedInfo->dbg_read_ret_errno] : "???",
-    SharedInfo->dbg_read_ret_errno,
-    SharedInfo->dbg_read_ret_phase
-  );
+    SharedInfo->rp_lock_owner);
 }
 
 /// <summary>
 /// dump scheduler info, must be compatible with kernel definition
 /// </summary>
-void dumpScheduler() {
+void dumpNEOX() {
   snoop_read6502Memory(SHARED_STATE, sizeof(scheduler_info_t), SharedSpace);    // read struct
 
   switch (SharedInfo->kernel_version) {
   case 0x0203:
     Serial1.println("---------------------------------------\nSystem:");
     Serial1.printf("Sys ticks         = %d\n", (SharedInfo->system_ticks_hi << 8) | SharedInfo->system_ticks_lo);
-    Serial1.printf("Current PID       = %d\n", SharedInfo->current_pid);
-    Serial1.printf("Current Context   = %d\n", getMMUContext());
+    Serial1.printf("Active PID        = %d\n", SharedInfo->active_pid);
+    Serial1.printf("Active Context    = %d\n", SharedInfo->active_context);
     Serial1.printf("Console Owner PID = %d\n", SharedInfo->console_owner_pid);
     Serial1.printf("Monitor Active    = %d\n", SharedInfo->monitor_active);
 
     Serial1.println();
     dumpLockGates();
 
+#if 0
     Serial1.println();
     dumpSchedDebug();
+#endif
 
     Serial1.println();
     dumpTasks();
 
-#if 1
+#if 0
     Serial1.println();
     dumpOpenFiles();
 #endif
@@ -722,26 +679,20 @@ void dumpScheduler() {
     dumpTimers();
 #endif
 
-#if 1
+#if 0
     Serial1.println();
     dumpPipes();
 #endif
 
-#if 0
+#if 1
     Serial1.println();
     dumpAccounting();
-    #endif
+#endif
 
 #if 0
     Serial1.println();
     dumpInterface();
 #endif
-
-    Serial1.println();
-    dumpReadIO();
-
-    Serial1.println();
-    dumpContextWarning();
 
     Serial1.println();
     break;

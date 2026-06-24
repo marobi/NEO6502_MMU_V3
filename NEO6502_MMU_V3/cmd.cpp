@@ -47,7 +47,7 @@ static uint16_t inCount = 0;                             // clutch because for u
 bool getCommand6502(uint8_t &vCmd, uint8_t& vParam) {
   inCount++;
 
-  if (triggerMMUIO() || !( inCount % 1000L)) {          // got mmuInt interrupt or force checking
+  if (triggerMMUIO() || !( inCount % 10L)) {          // got mmuInt interrupt or force checking
     uint8_t cmd = readCmdSlot(CMD_SLOT_CMD);
     if (cmd != CMD6502_NONE) {
       vCmd = cmd;

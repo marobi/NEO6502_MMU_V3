@@ -2,4 +2,4 @@
 
 #pragma once
 
-void dumpScheduler();
+void dumpNEOX();

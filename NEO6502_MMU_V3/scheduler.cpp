@@ -56,10 +56,9 @@ bool genIRQ6502(irq_source_t vSrc) {
   }
 
   if (snoop_read6502MemoryLoc(RP_IRQ_STATE) == RP_IRQ_NONE) {     // check if no pending IRQ
-    snoop_write6502MemoryLoc(RP_IRQ_SOURCE, (uint8_t)vSrc);
     snoop_write6502MemoryLoc(RP_IRQ_STATE, RP_IRQ_PENDING);
+    snoop_write6502MemoryLoc(RP_IRQ_SOURCE, (uint8_t)vSrc);
     IRQPin::low();
-    DebugPin::low();
     gIntrPending = true;
     return true;
   }
@@ -78,7 +77,6 @@ static unsigned long irqLastTS;
 void stopIRQTimer() {
   irqTimerEnabled = false;
   IRQPin::high();
-  DebugPin::high();
   snoop_write6502MemoryLoc(RP_IRQ_SOURCE, RP_SRC_NONE);
   snoop_write6502MemoryLoc(RP_IRQ_STATE, RP_IRQ_NONE);
   gIntrPending = false;
@@ -90,15 +88,14 @@ void stopIRQTimer() {
 /// 
 /// </summary>
 /// <param name="vPeriod"></param>
-void startIRQTimer(const uint16_t vPeriod) {
-  if (vPeriod < 65535) {
+void startIRQTimer(const unsigned long vPeriod) {
+  if (vPeriod < 65535L) {
     irqTimerInterval = vPeriod;
     irqTimerEnabled = true;
     irqLastTS = millis();
     snoop_write6502MemoryLoc(RP_IRQ_SOURCE, RP_SRC_NONE);
     snoop_write6502MemoryLoc(RP_IRQ_STATE, RP_IRQ_NONE);
     IRQPin::high();
-    DebugPin::high();
 
     Serial1.printf("*D: startIRQTimer: %d ms\n", vPeriod);
   }
@@ -117,7 +114,6 @@ void taskIRQTimer() {
     // check if source is ACKed by 6502
     if (snoop_read6502MemoryLoc(RP_IRQ_SOURCE) == RP_SRC_NONE) {
       IRQPin::high();
-      DebugPin::high();
       // ACKed, clear pending state
       snoop_write6502MemoryLoc(RP_IRQ_STATE, RP_IRQ_NONE);
       gIntrPending = false;
@@ -128,13 +124,12 @@ void taskIRQTimer() {
 
   if (irqTimerEnabled) {
     if (millis() >= (irqLastTS + irqTimerInterval)) {
+      irqLastTS = millis();
       // gen IRQ
       if (! genIRQ6502(RP_SRC_TIMER))
         taskTimerCounter++;
       else
         taskTimerCounter = 0;
-
-      irqLastTS = millis();
     }
 
     if (taskTimerCounter > 3)
@@ -157,9 +152,11 @@ void taskScheduler() {
     break;
 
   case CMD6502_CONTEXT_SWITCH:
+    DebugPin::low();
     schedSwitchcontext(lParam);
 
     ackCommand6502();
+    DebugPin::high();
     break;
 
   default:
