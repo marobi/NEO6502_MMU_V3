@@ -41,6 +41,7 @@ Lesser General Public License for more details.
 #include "debug_neox.h"
 #include "usb_storage.h"
 #include "rp_fs.h"
+#include "usb_keyboard_layout.h"
 
 // Create CLI Object
 static SimpleCLI gCli;
@@ -387,6 +388,36 @@ static void cmdInfoCallback(cmd* c) {
   dumpNEOX();
 }
 
+/// <summary>
+/// cmdKeymapCallback shows or changes the active USB keyboard locale.
+/// Supported locales are US and DE. The mapping remains ASCII-safe.
+/// </summary>
+/// <param name="c">SimpleCLI command object.</param>
+static void cmdKeymapCallback(cmd* c) {
+  Command cmd(c);
+  String locale = cmd.getArgument("locale").getValue();
+  locale.trim();
+  locale.toLowerCase();
+
+  if (locale.length() == 0 || locale == "?") {
+    Serial1.printf("*I: USB keyboard layout: %s\n", usb_keyboard_get_locale_name());
+    return;
+  }
+
+  if (locale == "us") {
+    usb_keyboard_set_locale(USB_KEYBOARD_LOCALE_US);
+    Serial1.printf("*I: USB keyboard layout: %s\n", usb_keyboard_get_locale_name());
+    return;
+  }
+
+  if (locale == "de") {
+    usb_keyboard_set_locale(USB_KEYBOARD_LOCALE_DE);
+    Serial1.printf("*I: USB keyboard layout: %s\n", usb_keyboard_get_locale_name());
+    return;
+  }
+
+  Serial1.println("*E: keymap: use us or de");
+}
 
 
 // DEBUG BEGIN: temporary RP filesystem local read-test monitor command
@@ -424,6 +455,7 @@ static void cmdHelpCallback(cmd* c) {
  help                  help\n\
  irq                   IRQ\n\
  fstest                RP filesystem local read test\n\
+ keymap [us|de]        show/set USB keyboard layout\n\
  m/em <from> <to>      dump memory\n\
  mon/itor              enter monitor\n\
  page <index> <page>   set mmu page\n\
@@ -482,6 +514,9 @@ void initMonitor() {
   // DEBUG END: temporary RP filesystem local read-test monitor command
 
   gCmd = gCli.addCmd("irq", cmdIRQCallback);
+
+  gCmd = gCli.addCmd("keymap", cmdKeymapCallback);
+  gCmd.addPositionalArgument("locale", "");
 
   gCmd = gCli.addBoundlessCommand(">", cmdMemCallback);
 

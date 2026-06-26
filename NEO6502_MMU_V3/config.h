@@ -12,9 +12,15 @@ Lesser General Public License for more details.
 */
 #pragma once
 
-#define VERSION "3.15.621"
+#define VERSION "3.15.622"
 
 #define USE_VALIDATION 0
+
+// USB keyboard locale default. Supported values:
+//   USB_KEYBOARD_LOCALE_US
+//   USB_KEYBOARD_LOCALE_DE
+// Runtime monitor command: keymap [us|de]
+#define USB_KEYBOARD_DEFAULT_LOCALE USB_KEYBOARD_LOCALE_US
 
 // -------------------------------------------------------------------------------------
 

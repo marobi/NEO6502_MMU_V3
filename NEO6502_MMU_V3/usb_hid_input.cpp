@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <string.h>
 #include "usb_hid_input.h"
+#include "usb_keyboard_layout.h"
 #include "tusb_config.h"
 #include "Adafruit_TinyUSB.h"
 #include "monitor.h"
@@ -214,19 +215,13 @@ static USBHIDRole usb_hid_classify_descriptor(uint8_t const* desc_report, uint16
 }
 
 /// <summary>
-/// usb_keyboard_shift_active checks whether either shift modifier is active.
+/// usb_keyboard_keycode_to_ascii converts a boot-keyboard HID key code to the
+/// active locale's single-byte console character. Function keys are handled
+/// before this point and are not layout-dependent. Unsupported locale-specific
+/// extended characters return 0 and are ignored.
 /// </summary>
-static bool usb_keyboard_shift_active(uint8_t modifier) {
-  return (modifier & (KEYBOARD_MODIFIER_LEFTSHIFT | KEYBOARD_MODIFIER_RIGHTSHIFT)) != 0;
-}
-
-/// <summary>
-/// usb_keyboard_ctrl_active checks whether either control modifier is active.
-/// Control is handled before normal ASCII translation so USB keyboard
-/// combinations such as Ctrl-C and Ctrl-Z produce real control bytes.
-/// </summary>
-static bool usb_keyboard_ctrl_active(uint8_t modifier) {
-  return (modifier & (KEYBOARD_MODIFIER_LEFTCTRL | KEYBOARD_MODIFIER_RIGHTCTRL)) != 0;
+static uint8_t usb_keyboard_keycode_to_ascii(uint8_t keycode, uint8_t modifier) {
+  return usb_keyboard_keycode_to_ascii_locale(keycode, modifier);
 }
 
 /// <summary>
@@ -242,10 +237,10 @@ static bool usb_keyboard_key_is_down(const hid_keyboard_report_t& report, uint8_
   return false;
 }
 
-
 /// <summary>
 /// usb_keyboard_is_route_key checks whether a raw HID key code is reserved for
-/// RP-side keyboard context selection.
+/// RP-side keyboard context selection. Locale layout handling must not affect
+/// F-key routing.
 /// </summary>
 static bool usb_keyboard_is_route_key(uint8_t keycode) {
   return keycode >= USB_HID_KEY_F1 && keycode <= USB_HID_KEY_F12;
@@ -283,69 +278,6 @@ static bool usb_keyboard_handle_route_key_down(uint8_t keycode) {
 }
 
 /// <summary>
-/// usb_keyboard_keycode_to_ascii converts a boot-keyboard HID key code to a
-/// simple US-ASCII byte. Control-modified keys are translated before printable
-/// ASCII so Ctrl-A..Ctrl-Z and common terminal control combinations work from
-/// the USB keyboard. Unsupported keys return 0 and are ignored.
-/// </summary>
-static uint8_t usb_keyboard_keycode_to_ascii(uint8_t keycode, uint8_t modifier) {
-  bool const shift = usb_keyboard_shift_active(modifier);
-  bool const ctrl = usb_keyboard_ctrl_active(modifier);
-
-  if (ctrl) {
-    if (keycode >= HID_KEY_A && keycode <= HID_KEY_Z)
-      return (uint8_t)(keycode - HID_KEY_A + 1);       // Ctrl-A .. Ctrl-Z
-
-    switch (keycode) {
-      case HID_KEY_BRACKET_LEFT:  return 0x1B;          // Ctrl-[  = ESC
-      case HID_KEY_BACKSLASH:     return 0x1C;          // Ctrl-\  = FS
-      case HID_KEY_BRACKET_RIGHT: return 0x1D;          // Ctrl-]  = GS
-      case HID_KEY_6:             return 0x1E;          // Ctrl-^  = RS
-      case HID_KEY_MINUS:         return 0x1F;          // Ctrl-_  = US
-      case HID_KEY_ENTER:         return '\r';
-      case HID_KEY_ESCAPE:        return 0x1B;
-      case HID_KEY_BACKSPACE:     return 0x08;
-      case HID_KEY_TAB:           return '\t';
-      default:                    return 0;
-    }
-  }
-
-  if (keycode >= HID_KEY_A && keycode <= HID_KEY_Z) {
-    uint8_t c = (uint8_t)('a' + (keycode - HID_KEY_A));
-    return shift ? (uint8_t)(c - ('a' - 'A')) : c;
-  }
-
-  if (keycode >= HID_KEY_1 && keycode <= HID_KEY_9) {
-    static const char normal[]  = "123456789";
-    static const char shifted[] = "!@#$%^&*(";
-    return (uint8_t)(shift ? shifted[keycode - HID_KEY_1] : normal[keycode - HID_KEY_1]);
-  }
-
-  if (keycode == HID_KEY_0)
-    return (uint8_t)(shift ? ')' : '0');
-
-  switch (keycode) {
-    case HID_KEY_ENTER:         return '\r';
-    case HID_KEY_ESCAPE:        return 0x1B;
-    case HID_KEY_BACKSPACE:     return 0x08;
-    case HID_KEY_TAB:           return '\t';
-    case HID_KEY_SPACE:         return ' ';
-    case HID_KEY_MINUS:         return (uint8_t)(shift ? '_' : '-');
-    case HID_KEY_EQUAL:         return (uint8_t)(shift ? '+' : '=');
-    case HID_KEY_BRACKET_LEFT:  return (uint8_t)(shift ? '{' : '[');
-    case HID_KEY_BRACKET_RIGHT: return (uint8_t)(shift ? '}' : ']');
-    case HID_KEY_BACKSLASH:     return (uint8_t)(shift ? '|' : '\\');
-    case HID_KEY_SEMICOLON:     return (uint8_t)(shift ? ':' : ';');
-    case HID_KEY_APOSTROPHE:    return (uint8_t)(shift ? '"' : '\'');
-    case HID_KEY_GRAVE:         return (uint8_t)(shift ? '~' : '`');
-    case HID_KEY_COMMA:         return (uint8_t)(shift ? '<' : ',');
-    case HID_KEY_PERIOD:        return (uint8_t)(shift ? '>' : '.');
-    case HID_KEY_SLASH:         return (uint8_t)(shift ? '?' : '/');
-    default:                    return 0;
-  }
-}
-
-/// <summary>
 /// usb_hid_select_keyboard chooses the first mounted interface classified as a
 /// keyboard.
 /// </summary>
@@ -365,9 +297,10 @@ static bool usb_hid_select_keyboard() {
     memset(&g_pendingKeyboardReport, 0, sizeof(g_pendingKeyboardReport));
     usb_keyboard_repeat_clear();
 
-    Serial1.printf("*I: USB keyboard ready: dev=%u inst=%u\n",
+    Serial1.printf("*I: USB keyboard ready: dev=%u inst=%u layout=%s\n",
                    g_keyboardDevAddr,
-                   g_keyboardInstance);
+                   g_keyboardInstance,
+                   usb_keyboard_get_locale_name());
     return true;
   }
 

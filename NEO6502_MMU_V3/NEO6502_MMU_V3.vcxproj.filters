@@ -94,6 +94,9 @@
     <ClCompile Include="usb_hid_input.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="usb_keyboard_layout.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="__vm\.NEO6502_MMU_V3.vsarduino.h">
@@ -196,6 +199,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="usb_hid_input.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="usb_keyboard_layout.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="tusb_config.h">
