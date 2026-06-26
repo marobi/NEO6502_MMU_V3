@@ -27,6 +27,9 @@ int rp_fs_open_readonly_83(const char* filename);
 bool rp_fs_close(uint8_t handle);
 int rp_fs_read(uint8_t handle, uint8_t* dst, uint16_t len);
 
+bool rp_fs_is_open(uint8_t handle);
+uint8_t rp_fs_free_handle_count();
+
 uint32_t rp_fs_size(uint8_t handle);
 uint32_t rp_fs_position(uint8_t handle);
 

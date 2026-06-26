@@ -18,6 +18,16 @@
 #if defined(USE_TINYUSB_HOST)
   #include "Adafruit_TinyUSB.h"
 
+  #ifndef CFG_TUH_HUB
+  #define CFG_TUH_HUB 0
+  #endif
+  #ifndef CFG_TUH_DEVICE_MAX
+  #define CFG_TUH_DEVICE_MAX 0
+  #endif
+  #ifndef CFG_TUH_MSC
+  #define CFG_TUH_MSC 0
+  #endif
+
   static Adafruit_USBH_Host gUSBHost;
 #endif
 
@@ -42,6 +52,10 @@ void initUSBStorage() {
 
 #if defined(USE_TINYUSB_HOST)
   Serial1.println("*I: USB host storage: init native host controller");
+  Serial1.printf("*I: USB host cfg: hub=%u device_max=%u msc=%u\n",
+                 (unsigned)CFG_TUH_HUB,
+                 (unsigned)CFG_TUH_DEVICE_MAX,
+                 (unsigned)CFG_TUH_MSC);
   gUSBHost.begin(0);
 #else
   Serial1.println("*E: USB host storage: USE_TINYUSB_HOST is not enabled");
@@ -67,8 +81,12 @@ void taskUSBStorage() {
     // The TinyUSB callback only records device presence. Normal task context
     // performs the synchronous FatFs mount/open/read validation.
     if (gUSBStorageDeviceMounted && !usb_fatfs_mounted()) {
-      if (usb_fatfs_mount())
-        rp_fs_test_read_files();
+      if (usb_fatfs_mount()) {
+        // Keep the mount path short. The RP-local TEST.TXT/BIG.TXT
+        // validation routine remains available through the temporary monitor
+        // command "fstest".
+        Serial1.println("*I: USB storage ready; use monitor command 'fstest' for RP FS local read test");
+      }
     }
   }
 #endif

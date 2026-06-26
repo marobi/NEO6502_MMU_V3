@@ -17,6 +17,7 @@ Lesser General Public License for more details.
 */
 
 #include <Arduino.h>
+#include "tusb_config.h"
 #include <LittleFS.h>
 
 #include "config.h"
@@ -46,6 +47,7 @@ Lesser General Public License for more details.
 #include "scheduler.h"
 
 #include "usb_storage.h"
+#include "usb_hid_input.h"
 
 #include "indicator.h"
 
@@ -70,6 +72,7 @@ static void printFile(const char* vFile) {
 
   Serial1.println("----------");
 }
+
 
 /// <summary>
 /// setup the system, including initializing the 6502 CPU, MMU, gdu, and other components. 
@@ -142,6 +145,7 @@ void setup() {
   //  fillMemory(0x00);             // clear memory 64k of current context
 
   initUSBStorage();
+  initUSBHIDInput();
 
   initMailbox();
 
@@ -165,7 +169,9 @@ void setup() {
 /// and running the monitor.
 /// </summary>
 void loop() {
-  taskUSBStorage();              // USB storage task: TinyUSB MSC + FatFs mount/test
+  taskUSBStorage();              // USB storage task: TinyUSB MSC + FatFs mount
+
+  taskUSBHIDInput();            // USB HID keyboard/mouse input, armed only after storage ready
 
   taskIRQTimer();
 

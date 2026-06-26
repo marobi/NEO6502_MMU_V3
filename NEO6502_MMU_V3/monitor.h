@@ -12,6 +12,8 @@ Lesser General Public License for more details.
 */
 #pragma once
 
+#include <stdint.h>
+
 #define MON_VERSION "v2.03.145"
 
 // a little helper
@@ -22,3 +24,11 @@ constexpr char ctrl(char c) {
 void initMonitor();
 
 void taskICMonitor();
+
+/// <summary>
+/// Feeds one byte into the console/terminal input path. Serial1 callers pass
+/// allowReturnToICM=true. USB keyboard callers pass false so Ctrl-Z is
+/// delivered as a normal control byte instead of returning to the Serial1
+/// monitor.
+/// </summary>
+bool monitorConsoleInput(uint8_t c, bool allowReturnToICM);

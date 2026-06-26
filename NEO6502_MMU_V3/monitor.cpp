@@ -40,6 +40,7 @@ Lesser General Public License for more details.
 
 #include "debug_neox.h"
 #include "usb_storage.h"
+#include "rp_fs.h"
 
 // Create CLI Object
 static SimpleCLI gCli;
@@ -387,6 +388,28 @@ static void cmdInfoCallback(cmd* c) {
 }
 
 
+
+// DEBUG BEGIN: temporary RP filesystem local read-test monitor command
+/// <summary>
+/// cmdFSTestCallback runs the temporary RP-local TEST.TXT/BIG.TXT read
+/// validation from the monitor. This is intentionally manual so USB storage and
+/// HID keyboard startup remain independent.
+/// </summary>
+/// <param name="c">SimpleCLI command object.</param>
+static void cmdFSTestCallback(cmd* c) {
+  Command cmd(c);
+  (void)cmd;
+
+  if (!usb_storage_ready()) {
+    Serial1.println("*E: fstest: USB storage/FatFs is not ready");
+    return;
+  }
+
+  Serial1.println("*I: fstest: running RP FS local read test");
+  rp_fs_test_read_files();
+}
+// DEBUG END: temporary RP filesystem local read-test monitor command
+
 /// <summary>
 /// help overview of commands
 /// </summary>
@@ -400,6 +423,7 @@ static void cmdHelpCallback(cmd* c) {
  g/o                   go\n\
  help                  help\n\
  irq                   IRQ\n\
+ fstest                RP filesystem local read test\n\
  m/em <from> <to>      dump memory\n\
  mon/itor              enter monitor\n\
  page <index> <page>   set mmu page\n\
@@ -452,6 +476,10 @@ void initMonitor() {
   gCmd = gCli.addCmd("g/o", cmdGoCallback);
 
   gCmd = gCli.addCmd("h/elp", cmdHelpCallback);
+
+  // DEBUG BEGIN: temporary RP filesystem local read-test monitor command
+  gCmd = gCli.addCmd("fstest", cmdFSTestCallback);
+  // DEBUG END: temporary RP filesystem local read-test monitor command
 
   gCmd = gCli.addCmd("irq", cmdIRQCallback);
 
@@ -516,51 +544,71 @@ static void returnToICM() {
 }
 
 /// <summary>
-/// 
+/// monitorConsoleInput feeds one byte into the console/terminal input path.
+/// It performs the same local echo and CPU queue handling as the existing
+/// Serial1 terminal path. When allowReturnToICM is false, Ctrl-Z is treated as
+/// a normal control byte and is delivered to the selected console instead of
+/// returning to the Serial1 monitor.
+/// </summary>
+/// <param name="c">Input byte.</param>
+/// <param name="allowReturnToICM">true for Serial1 terminal mode, false for USB keyboard input.</param>
+/// <returns>true if the byte was accepted; false if CPU input queueing failed.</returns>
+bool monitorConsoleInput(uint8_t c, bool allowReturnToICM) {
+  if (c == ctrl('Z') && allowReturnToICM) { // ^Z returns only Serial1 terminal mode to ICM
+    returnToICM();
+    return true;
+  }
+
+  if ((c == '\n') || (c == '\r')) {
+    uint8_t lBuffer[COLS + 1];
+    uint8_t* lPtr = lBuffer;
+
+    writeVDUQ('\r');
+
+    if (getAsScreenMode()) {
+      vduGetCurrentScreenline(lBuffer);
+      //        Serial1.printf("*D: normalInput: [%s]\n\n", lBuffer);
+
+      vduRestoreCursor();
+
+      while (*lPtr) {
+        if (!writeCPUQ(*lPtr++)) {
+          if (allowReturnToICM)
+            returnToICM();
+          return false;
+        }
+      }
+
+      if (!writeCPUQ('\r')) {            // go
+        if (allowReturnToICM)
+          returnToICM();
+        return false;
+      }
+    }
+  }
+  else {
+    //      Serial1.printf("*D: ICM->VDU: [%02X]\n", c);
+    writeVDUQ(c);
+  }
+
+  if (!getAsScreenMode()) {              // normal mode
+    if (!writeCPUQ(c)) {
+      if (allowReturnToICM)
+        returnToICM();
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/// <summary>
+/// normalInput is the Serial1 terminal input wrapper. It keeps the legacy
+/// Ctrl-Z return-to-ICM behavior for PicoProbe/debug use only.
 /// </summary>
 /// <param name="c"></param>
 static void normalInput(uint8_t c) {
-  switch (c) {
-  case ctrl('Z'):                          // ^Z
-    returnToICM();
-    break;
-
-  default:
-    if ((c == '\n') || (c == '\r')) {
-      uint8_t lBuffer[COLS + 1];
-      uint8_t* lPtr = lBuffer;
-
-      writeVDUQ('\r');
-
-      if (getAsScreenMode()) {
-        vduGetCurrentScreenline(lBuffer);
-        //        Serial1.printf("*D: normalInput: [%s]\n\n", lBuffer);
-
-        vduRestoreCursor();
-
-        while (*lPtr) {
-          if (!writeCPUQ(*lPtr++)) {
-            returnToICM();
-            break;
-          }
-        }
-
-        writeCPUQ('\r');                     // go
-      }
-    }
-    else {
-      //      Serial1.printf("*D: ICM->VDU: [%02X]\n", c);
-      writeVDUQ(c);
-    }
-
-    if (!getAsScreenMode()) {              // normal mode
-      if (!writeCPUQ(c)) {
-        returnToICM();
-      }
-    }
-
-    break;
-  }
+  (void)monitorConsoleInput(c, true);
 }
 
 /// <summary>

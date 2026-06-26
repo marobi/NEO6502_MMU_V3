@@ -97,9 +97,11 @@
     <ClCompile Include="ram.cpp" />
     <ClCompile Include="rom.cpp" />
     <ClCompile Include="rp_fs.cpp" />
+    <ClCompile Include="rp_fs_mailbox.cpp" />
     <ClCompile Include="usb_storage.cpp" />
     <ClCompile Include="usb_fatfs.cpp" />
     <ClCompile Include="usb_msc_diskio.cpp" />
+    <ClCompile Include="usb_hid_input.cpp" />
     <ClCompile Include="vdu.cpp" />
     <ClCompile Include="gdu.cpp" />
   </ItemGroup>
@@ -129,9 +131,12 @@
     <ClInclude Include="ram.h" />
     <ClInclude Include="rom.h" />
     <ClInclude Include="rp_fs.h" />
+    <ClInclude Include="rp_fs_mailbox.h" />
     <ClInclude Include="usb_storage.h" />
     <ClInclude Include="usb_fatfs.h" />
     <ClInclude Include="usb_msc_diskio.h" />
+    <ClInclude Include="usb_hid_input.h" />
+    <ClInclude Include="tusb_config.h" />
     <ClInclude Include="vdu.h" />
     <ClInclude Include="gdu.h" />
     <ClInclude Include="cmd_interface.h" />

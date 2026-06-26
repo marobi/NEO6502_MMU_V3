@@ -3,10 +3,10 @@
 // NEO6502 MMU - RP2350 Arduino mailbox handler
 //
 // Mailbox model:
-//   - Request/result block in normal 6502 RAM at $02C0
-//   - Doorbell/status registers in MMU I/O page
+//   - Request/result block in normal 6502 RAM at RP_REQ_BASE ($E000)
+//   - RP_DOORBELL is the interrupt-generating MMU I/O register at $D010
+//   - RP_STATUS and request/result fields live in the RAM request block
 //   - BIOS already uses $D000-$D004
-//   - OS uses $D010 = RP_DOORBELL, $D011 = RP_STATUS
 //
 // ============================================================
 
@@ -17,33 +17,7 @@
 #include "input.h"
 #include "neobus.h"
 #include "mmu.h"
-
-// ------------------------------------------------------------
-// Status values
-// ------------------------------------------------------------
-#define RP_IDLE         0
-#define RP_BUSY         1
-#define RP_DONE         2
-#define RP_ERROR        3
-
-// ------------------------------------------------------------
-// Command values
-// ------------------------------------------------------------
-#define RP_CMD_NONE         0x00
-#define RP_CMD_CON_WRITE    0x10
-#define RP_CMD_CON_READ     0x11
-
-// ------------------------------------------------------------
-// Error codes aligned with 6502 side
-// ------------------------------------------------------------
-#define E_OK           0
-#define EPERM          1
-#define ENOENT         2
-#define EIO            3
-#define ENOMEM         4
-#define EBUSY          5
-#define EINVAL         6
-#define EPIPE          7
+#include "rp_fs_mailbox.h"
 
 // ------------------------------------------------------------
 // Local limits
@@ -82,7 +56,9 @@ static uint8_t gConsolePID = 0;
 // ------------------------------------------------------------
 // Helpers
 // ------------------------------------------------------------
-static uint16_t rp_read16(uint16_t addr) {
+// Read a little-endian 16-bit value from the shared 6502 mailbox area.
+// Keep this as the single helper used by all RP mailbox command handlers.
+uint16_t rp_read16(uint16_t addr) {
   uint8_t lo;
   uint8_t hi;
 
@@ -92,12 +68,9 @@ static uint16_t rp_read16(uint16_t addr) {
   return (uint16_t)lo | ((uint16_t)hi << 8);
 }
 
-/// <summary>
-/// 
-/// </summary>
-/// <param name="addr"></param>
-/// <param name="value"></param>
-static void rp_write16(uint16_t addr, uint16_t value) {
+// Write a little-endian 16-bit value to the shared 6502 mailbox area.
+// This avoids duplicate low/high byte handling in individual command modules.
+void rp_write16(uint16_t addr, uint16_t value) {
   snoop_write6502MemoryLoc(addr, (uint8_t)(value & 0xFF));
   snoop_write6502MemoryLoc((uint16_t)(addr + 1), (uint8_t)((value >> 8) & 0xFF));
 }
@@ -108,7 +81,7 @@ static void rp_write16(uint16_t addr, uint16_t value) {
 /// <param name="result"></param>
 static void rp_set_done(uint16_t result) {
   rp_write16(RP_RES0L, result);
-  snoop_write6502MemoryLoc(RP_ERR, E_OK);
+  snoop_write6502MemoryLoc(RP_ERR, RP_ERR_OK);
 
   snoop_write6502MemoryLoc(RP_STATUS, RP_DONE);
   snoop_write6502MemoryLoc(RP_DOORBELL, RP_CMD_NONE);   // reset doorbell
@@ -226,7 +199,7 @@ static bool rp_handle_console_read_setup(uint16_t& dst, uint16_t& len) {
 static void rp_handle_unknown_command(uint8_t cmd) {
   gUnknownCmdCount++;
 
-  rp_set_error(EINVAL, 0);
+  rp_set_error(RP_ERR_EINVAL, 0);
 }
 
 /// <summary>
@@ -321,8 +294,29 @@ void taskMailbox() {
           mailbox_state = mbDONE;
         break;
 
+      case RP_CMD_FS_STATUS:
+        rp_fs_mailbox_handle_status();
+        mailbox_state = mbDONE;
+        break;
+
+      case RP_CMD_FS_OPEN:
+        rp_fs_mailbox_handle_open();
+        mailbox_state = mbDONE;
+        break;
+
+      case RP_CMD_FS_READ:
+        rp_fs_mailbox_handle_read();
+        mailbox_state = mbDONE;
+        break;
+
+      case RP_CMD_FS_CLOSE:
+        rp_fs_mailbox_handle_close();
+        mailbox_state = mbDONE;
+        break;
+
       default:
         rp_handle_unknown_command(cmd);
+        mailbox_state = mbDONE;
         break;
       }
     }
@@ -402,6 +396,8 @@ void rp_print_diag() {
   Serial1.print(gErrorCount);
   Serial1.print(F(" unknown="));
   Serial1.println(gUnknownCmdCount);
+
+  rp_fs_mailbox_print_diag();
 }
 
 // ------------------------------------------------------------
@@ -419,6 +415,10 @@ void initMailbox() {
   snoop_write6502MemoryLoc(RP_FLAGS, 0);
   snoop_write6502MemoryLoc(RP_STATE, 0);
   rp_write16(RP_RES0L, 0);
+
+  // Close mailbox-owned file handles on mailbox reinitialization. This is
+  // the RP-side reset hook; the 6502 reset-side callout remains separate.
+  rp_fs_mailbox_reset();
 
   snoop_write6502MemoryLoc(RP_STATUS, RP_IDLE);
 

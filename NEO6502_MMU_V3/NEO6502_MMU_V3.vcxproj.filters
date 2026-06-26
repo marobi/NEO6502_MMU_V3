@@ -79,6 +79,9 @@
     <ClCompile Include="rp_fs.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="rp_fs_mailbox.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="usb_storage.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -86,6 +89,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="usb_msc_diskio.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="usb_hid_input.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -177,6 +183,9 @@
     <ClInclude Include="rp_fs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="rp_fs_mailbox.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="usb_storage.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -184,6 +193,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="usb_msc_diskio.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="usb_hid_input.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tusb_config.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

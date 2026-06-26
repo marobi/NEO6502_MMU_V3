@@ -22,6 +22,19 @@ static bool rp_fs_valid_handle(uint8_t handle) {
   return handle < RP_FS_MAX_HANDLES && gRPFSHandles[handle].in_use;
 }
 
+bool rp_fs_is_open(uint8_t handle) {
+  return rp_fs_valid_handle(handle);
+}
+
+uint8_t rp_fs_free_handle_count() {
+  uint8_t count = 0;
+  for (uint8_t i = 0; i < RP_FS_MAX_HANDLES; i++) {
+    if (!gRPFSHandles[i].in_use)
+      count++;
+  }
+  return count;
+}
+
 static bool rp_fs_make_path(const char* filename, char* out, size_t out_len) {
   if (filename == nullptr || filename[0] == '\0' || out == nullptr || out_len == 0)
     return false;

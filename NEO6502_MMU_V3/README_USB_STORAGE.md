@@ -1,80 +1,66 @@
-# NEO6502_MMU RP2350 USB host storage status
+# USB storage + HID input baseline
 
-Current storage stack:
+This version keeps the validated RP2350 USB host setup for a powered hub with MSC storage, a USB HID keyboard, and USB HID mouse testing.
 
-```text
-RP2350 native USB host
-  -> Adafruit TinyUSB MSC host
-  -> usb_storage_read_blocks()
-  -> usb_msc_diskio.*
-  -> Arduino-Pico FatFS
-  -> rp_fs.* RP-side file handles
-  -> later 6502 mailbox FS_STATUS / FS_OPEN / FS_READ / FS_CLOSE
-```
+- USB storage mounts normally through TinyUSB MSC and FatFs.
+- USB HID keyboard/mouse input is staged until storage is ready.
+- Keyboard normal input uses `monitorConsoleInput(c, false)`, so USB keyboard input has local echo and the same console input behavior as the Serial1 terminal path, without USB Ctrl-Z returning to ICM.
+- Function keys are consumed by the RP for context/PID routing.
+- Mouse input is diagnostic-only and rate-limited.
+- The RP-local `TEST.TXT` / `BIG.TXT` validation is manual through the temporary monitor command `fstest`.
 
-## Current validated state
+## USB HID input module
 
-The manual FAT32/MBR parser has been removed from the runtime path. The system
-now mounts the USB stick through FatFs and reads files through the RP-side handle
-API.
+The HID input module is `usb_hid_input.cpp/.h`. It handles keyboard and mouse HID interfaces through the single global TinyUSB HID callback set.
 
-Validated before this version:
+Boot stability rules:
 
-```text
-USB MSC mount                 OK
-USB block geometry            OK
-FatFs f_mount("0:")           OK
-TEST.TXT small read           OK
-BIG.TXT multi-cluster read    OK
-```
+- no Serial output from TinyUSB HID callbacks;
+- no `writeCPUQ()` from TinyUSB HID callbacks;
+- no `tuh_hid_interface_protocol()` in the boot-sensitive path;
+- no report arming from `tuh_hid_mount_cb()`;
+- report arming and input processing happen from normal loop context only.
 
-This version moves the read validation from `usb_fatfs.*` into `rp_fs.*`.
-`usb_fatfs.*` now only owns FatFs mount/unmount state.
+## TinyUSB host configuration
 
-Expected startup output:
+The baseline uses the composite-HID-safe configuration validated with MSC + keyboard + mouse through the powered hub:
 
-```text
-*I: USB MSC mounted: dev=1 lun=0
-    block size        : 512
-    block count       : ...
-*I: USB FatFs: mounting drive 0:
-*I: USB FatFs mounted
-    text: This is a test
-*I: RP FS: read TEST.TXT size=14 read=14 chunks=1 checksum=000004F5
-*I: RP FS: read BIG.TXT size=49190 read=49190 chunks=193 checksum=003D828E
-```
+- `CFG_TUH_DEVICE_MAX = 6`
+- `CFG_TUH_HID = 8`
+- `CFG_TUH_ENUMERATION_BUFSIZE = 256`
+- HID endpoint buffers remain 64 bytes.
 
-## RP-local API
+## Keyboard routing
 
-`rp_fs.h` exposes:
+USB keyboard input uses the existing RP console PID state; no separate keyboard router state is kept. Function keys are consumed by the RP and are not sent to the CPU input FIFO:
 
-```cpp
-bool rp_fs_ready();
-int rp_fs_open_readonly_83(const char* filename);
-bool rp_fs_close(uint8_t handle);
-int rp_fs_read(uint8_t handle, uint8_t* dst, uint16_t len);
-uint32_t rp_fs_size(uint8_t handle);
-uint32_t rp_fs_position(uint8_t handle);
-void rp_fs_close_all();
-```
+- F1..F9 select contexts/PIDs 1..9 via `setConsolePID()`
+- F10 selects context/PID 0 via `setConsolePID(0)`
+- F11/F12 are reserved and consumed
+- normal ASCII/control keys use `monitorConsoleInput(c, false)` for local echo plus CPU queue delivery
+- keyboard removal resets the route to context/PID 0
 
-Current constraints:
+Serial1 output is diagnostic only. The functional path is USB HID keyboard -> function-key routing / ASCII decode -> `setConsolePID()` for F-keys or `monitorConsoleInput(c, false)` for normal keys.
 
-```text
-read-only
-4 RP-side file handles
-FatFs drive 0:
-no 6502 mailbox binding yet
-no write/seek/sync mailbox commands yet
-```
+## V24 control character support
 
-## Visual Micro / Arduino-Pico notes
+USB keyboard Ctrl combinations produce real control bytes before normal ASCII translation:
 
-Use the plain Arduino-Pico FatFS library:
+- Ctrl-A..Ctrl-Z -> 0x01..0x1A
+- Ctrl-[ -> ESC / 0x1B
+- Ctrl-\\ -> 0x1C
+- Ctrl-] -> 0x1D
+- Ctrl-^ -> 0x1E
+- Ctrl-_ -> 0x1F
 
-```text
-...\packages\rp2040\hardware\rp2040\5.6.1\libraries\FatFS\src
-```
+USB keyboard Ctrl-Z is delivered to the selected console as a control byte. Serial1 Ctrl-Z still returns to ICM.
 
-Do not use `FatFSUSB`. It is incompatible with the Adafruit TinyUSB host setup
-used here.
+## V26 key repeat
+
+Software key repeat is added in `usb_hid_input.cpp`:
+
+- normal routed keys repeat after a 500 ms initial delay;
+- repeated characters are emitted every 50 ms while the key remains held;
+- F1-F12 routing keys do not repeat;
+- repeat is cleared on key release, keyboard removal, or keyboard reselection.
+
