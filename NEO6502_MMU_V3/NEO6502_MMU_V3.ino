@@ -171,7 +171,7 @@ void setup() {
 void loop() {
   taskUSBStorage();              // USB storage task: TinyUSB MSC + FatFs mount
 
-  taskUSBHIDInput();            // USB HID keyboard/mouse input, armed only after storage ready
+  taskUSBHIDInput();            // USB HID keyboard/mouse input, staged independently from storage
 
   taskIRQTimer();
 

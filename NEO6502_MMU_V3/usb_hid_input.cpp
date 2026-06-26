@@ -6,7 +6,6 @@
 #include "Adafruit_TinyUSB.h"
 #include "monitor.h"
 #include "mailbox.h"
-#include "usb_storage.h"
 
 // ============================================================
 // usb_hid_input.cpp
@@ -14,8 +13,10 @@
 //
 // The USB host controller and TinyUSB host task are owned by usb_storage.cpp.
 // This module records HID keyboard/mouse interfaces, enables HID reports after
-// storage is ready, translates simple boot-keyboard reports to ASCII, and logs
-// mouse movement/button reports for hub stability testing.
+// a short staged delay, translates simple boot-keyboard reports to ASCII, and
+// logs mouse movement/button reports for hub stability testing. HID activation
+// deliberately does not depend on USB MSC/FatFs readiness, so keyboard/mouse
+// still work when no USB storage stick is inserted.
 //
 // Boot stability rules for this module:
 //   - no Serial output from TinyUSB HID callbacks;
@@ -112,8 +113,8 @@ static int32_t g_mouseAccumWheel = 0;
 static int32_t g_mouseAccumPan = 0;
 static uint8_t g_mouseLastButtonsPrinted = 0;
 
-static bool g_storageReadySeen = false;
-static uint32_t g_storageReadyMs = 0;
+static bool g_hidArmDelayStarted = false;
+static uint32_t g_hidArmDelayStartMs = 0;
 
 static void usb_keyboard_repeat_clear();
 
@@ -552,7 +553,8 @@ static void usb_hid_arm_mouse_report() {
 
 /// <summary>
 /// initUSBHIDInput announces that the staged HID input layer is present. TinyUSB
-/// host initialization remains owned by usb_storage.
+/// host initialization remains owned by usb_storage. HID report arming is delayed
+/// in normal loop context, but it is not gated by MSC/FatFs readiness.
 /// </summary>
 void initUSBHIDInput() {
   setConsolePID(0);
@@ -575,15 +577,20 @@ void taskUSBHIDInput() {
     Serial1.println("*I: USB mouse removed");
   }
 
-  if (usb_storage_ready() && !g_storageReadySeen) {
-    g_storageReadySeen = true;
-    g_storageReadyMs = millis();
+  if (!g_hidArmDelayStarted) {
+    for (uint8_t i = 0; i < USB_HID_MAX_RECORDS; i++) {
+      if (g_hidRecords[i].mounted) {
+        g_hidArmDelayStarted = true;
+        g_hidArmDelayStartMs = millis();
+        break;
+      }
+    }
   }
 
-  if (!g_storageReadySeen)
+  if (!g_hidArmDelayStarted)
     return;
 
-  if ((uint32_t)(millis() - g_storageReadyMs) < USB_HID_ARM_DELAY_MS)
+  if ((uint32_t)(millis() - g_hidArmDelayStartMs) < USB_HID_ARM_DELAY_MS)
     return;
 
   usb_hid_select_keyboard();
