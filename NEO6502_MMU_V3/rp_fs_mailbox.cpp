@@ -5,6 +5,7 @@
 #include "mailbox.h"
 #include "neobus.h"
 #include "rp_fs.h"
+#include "usb_fatfs.h"
 
 // ============================================================
 // rp_fs_mailbox.cpp
@@ -14,12 +15,15 @@
 //
 //   FS_STATUS:
 //     in : none
-//     out: RES0 bit 0 = filesystem ready/mounted
+//     out: RES0 bit 0      = at least one filesystem ready/mounted
+//          RES0 bits 8..15 = number of mounted FatFs devices
+//          FLAGS bits 0..7 = mounted/ready device bitmask
 //
 //   FS_OPEN:
 //     in : ARG0 = pointer to NUL-terminated filename in 6502 RAM
 //          ARG1 = maximum filename bytes to scan, including NUL
-//          ARG2 = open flags; only 0 is accepted for read-only
+//          ARG2 low byte  = open flags; only 0 is accepted for read-only
+//          ARG2 high byte = device id / FatFs drive number
 //     out: RES0 = RP file handle 0..RP_FS_MAX_HANDLES-1
 //
 //   FS_READ:
@@ -132,27 +136,31 @@ static bool rp_fs_mb_read_filename(uint16_t src, uint16_t scan_len, char* dst, s
 
 /// <summary>
 /// rp_fs_mb_handle_status processes FS_STATUS. It returns a compact status word
-/// in RES0 where bit 0 means that FatFs is mounted and the RP filesystem handle
-/// layer is usable.
+/// in RES0 where bit 0 means at least one FatFs device is mounted, bits 8..15
+/// contain the mounted-device count, and FLAGS contains the mounted-device
+/// bitmask.
 /// </summary>
 static void rp_fs_mb_handle_status() {
-  // More detail can be added later via RP_FLAGS or additional status bits.
-  uint16_t const status = rp_fs_ready() ? RP_FS_STATUS_READY : 0;
-  rp_fs_mb_set_done(status);
+  uint8_t const mask = usb_fatfs_mounted_mask();
+  uint8_t const count = usb_fatfs_mounted_count();
+  uint16_t const status = (mask != 0 ? RP_FS_STATUS_READY : 0) | ((uint16_t)count << 8);
+  rp_fs_mb_set_done(status, mask);
 
   gFSStatusCount++;
 }
 
 /// <summary>
 /// rp_fs_mb_handle_open processes FS_OPEN. ARG0 is a pointer to a
-/// NUL-terminated filename in 6502 RAM, ARG1 bounds the filename scan, and ARG2
-/// must be zero because this milestone only supports read-only opens. RES0
-/// receives the RP-side file handle on success.
+/// NUL-terminated filename in 6502 RAM, ARG1 bounds the filename scan, ARG2 low
+/// byte contains read-only flags, and ARG2 high byte selects the device/FatFs
+/// drive. RES0 receives the RP-side file handle on success.
 /// </summary>
 static void rp_fs_mb_handle_open() {
   uint16_t const src = rp_read16(RP_ARG0L);
   uint16_t const scan_len = rp_read16(RP_ARG1L);
-  uint16_t const flags = rp_read16(RP_ARG2L);
+  uint16_t const open_arg = rp_read16(RP_ARG2L);
+  uint8_t const flags = (uint8_t)(open_arg & 0xFF);
+  uint8_t const device = (uint8_t)(open_arg >> 8);
 
   if (flags != 0) {
     rp_fs_mb_set_error(RP_ERR_EPERM);
@@ -170,9 +178,9 @@ static void rp_fs_mb_handle_open() {
     return;
   }
 
-  int const handle = rp_fs_open_readonly_83(filename);
+  int const handle = rp_fs_open_readonly_83(device, filename);
   if (handle < 0) {
-    if (!rp_fs_ready())
+    if (!rp_fs_ready(device))
       rp_fs_mb_set_error(RP_ERR_EIO);
     else
       rp_fs_mb_set_error(RP_ERR_ENOENT);

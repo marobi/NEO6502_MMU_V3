@@ -43,6 +43,12 @@
     <ClCompile Include="cmd.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="fatfs_local\ff.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="fatfs_local\ffunicode.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="vdu.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -112,6 +118,18 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="p6502.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="fatfs_local\diskio.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="fatfs_local\ff.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="fatfs_local\ffconf.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="fatfs_local\integer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="pins.h">

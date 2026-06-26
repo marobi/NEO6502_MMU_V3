@@ -420,6 +420,17 @@ static void cmdKeymapCallback(cmd* c) {
 }
 
 
+/// <summary>
+/// cmdUSBDisksCallback prints the current USB MSC slot/FatFs state.
+/// </summary>
+/// <param name="c">SimpleCLI command object.</param>
+static void cmdUSBDisksCallback(cmd* c) {
+  Command cmd(c);
+  (void)cmd;
+
+  usb_storage_print_disks();
+}
+
 // DEBUG BEGIN: temporary RP filesystem local read-test monitor command
 /// <summary>
 /// cmdFSTestCallback runs the temporary RP-local TEST.TXT/BIG.TXT read
@@ -429,15 +440,35 @@ static void cmdKeymapCallback(cmd* c) {
 /// <param name="c">SimpleCLI command object.</param>
 static void cmdFSTestCallback(cmd* c) {
   Command cmd(c);
-  (void)cmd;
+  String device_arg = cmd.getArgument("device").getValue();
+  device_arg.trim();
 
-  if (!usb_storage_ready()) {
-    Serial1.println("*E: fstest: USB storage/FatFs is not ready");
+  uint8_t device = 0;
+  if (device_arg.length() > 0) {
+    for (uint16_t i = 0; i < device_arg.length(); i++) {
+      if (!isDigit(device_arg[i])) {
+        Serial1.println("*E: fstest: device must be 0..3");
+        return;
+      }
+    }
+
+    long const parsed = device_arg.toInt();
+    if (parsed < 0 || parsed >= USB_STORAGE_MAX_DEVICES) {
+      Serial1.println("*E: fstest: device must be 0..3");
+      return;
+    }
+    device = (uint8_t)parsed;
+  }
+
+  if (!usb_storage_ready(device)) {
+    Serial1.printf("*E: fstest: USB storage/FatFs device %u is not ready\n", (unsigned)device);
     return;
   }
 
-  Serial1.println("*I: fstest: running RP FS local read test");
-  rp_fs_test_read_files();
+  Serial1.printf("*I: fstest: running RP FS local read test on device %u drive %u:\n",
+                 (unsigned)device,
+                 (unsigned)device);
+  rp_fs_test_read_files(device);
 }
 // DEBUG END: temporary RP filesystem local read-test monitor command
 
@@ -454,8 +485,9 @@ static void cmdHelpCallback(cmd* c) {
  g/o                   go\n\
  help                  help\n\
  irq                   IRQ\n\
- fstest                RP filesystem local read test\n\
+ fstest [device]       RP filesystem local read test, default device 0\n\
  keymap [us|de]        show/set USB keyboard layout\n\
+ usbdisks              show USB MSC slots/FatFs drives\n\
  m/em <from> <to>      dump memory\n\
  mon/itor              enter monitor\n\
  page <index> <page>   set mmu page\n\
@@ -511,12 +543,15 @@ void initMonitor() {
 
   // DEBUG BEGIN: temporary RP filesystem local read-test monitor command
   gCmd = gCli.addCmd("fstest", cmdFSTestCallback);
+  gCmd.addPositionalArgument("device", "0");
   // DEBUG END: temporary RP filesystem local read-test monitor command
 
   gCmd = gCli.addCmd("irq", cmdIRQCallback);
 
   gCmd = gCli.addCmd("keymap", cmdKeymapCallback);
   gCmd.addPositionalArgument("locale", "");
+
+  gCmd = gCli.addCmd("usbdisks", cmdUSBDisksCallback);
 
   gCmd = gCli.addBoundlessCommand(">", cmdMemCallback);
 

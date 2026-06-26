@@ -64,3 +64,15 @@ Software key repeat is added in `usb_hid_input.cpp`:
 - F1-F12 routing keys do not repeat;
 - repeat is cleared on key release, keyboard removal, or keyboard reselection.
 
+
+## V28c notes
+
+V28c keeps the validated local FatFs multi-volume build and makes the RP FS layer device-aware:
+
+- RP FS handles now record their owning device/FatFs drive.
+- `rp_fs_open_readonly_83(device, filename)` opens on `device:/`.
+- `rp_fs_close_all_for_device(device)` closes only handles for the removed/unmounted drive.
+- `FS_OPEN` uses `ARG2` low byte as flags and high byte as device id.
+- `FS_STATUS` returns ready bit, mounted count, and mounted-device bitmask.
+- `fstest [device]` tests `TEST.TXT` and `BIG.TXT` on the selected drive.
+- `usbdisks` now labels device 0 as `default` rather than implying other mounted drives are inactive.
