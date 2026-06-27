@@ -91,7 +91,6 @@ bool usb_fatfs_mount(uint8_t device) {
     return false;
   }
 
-  Serial1.printf("*I: USB FatFs: mounting drive %s\n", drive);
   FRESULT const fr = f_mount(&gUSBFatFs[device], drive, 1);
   if (fr != FR_OK) {
     Serial1.printf("*E: USB FatFs: f_mount %s failed fr=%u\n", drive, (unsigned)fr);
@@ -99,7 +98,6 @@ bool usb_fatfs_mount(uint8_t device) {
   }
 
   gUSBFatFsMounted[device] = true;
-  Serial1.printf("*I: USB FatFs mounted: drive %s\n", drive);
   return true;
 }
 

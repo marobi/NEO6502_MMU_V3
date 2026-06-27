@@ -298,10 +298,7 @@ static bool usb_hid_select_keyboard() {
     memset(&g_pendingKeyboardReport, 0, sizeof(g_pendingKeyboardReport));
     usb_keyboard_repeat_clear();
 
-    Serial1.printf("*I: USB keyboard ready: dev=%u inst=%u layout=%s\n",
-                   g_keyboardDevAddr,
-                   g_keyboardInstance,
-                   usb_keyboard_get_locale_name());
+    Serial1.printf("*I: USB keyboard ready: layout=%s\n", usb_keyboard_get_locale_name());
     return true;
   }
 
@@ -333,9 +330,7 @@ static bool usb_hid_select_mouse() {
     g_mouseDebugPending = false;
     g_lastMouseDebugPrintMs = millis();
 
-    Serial1.printf("*I: USB mouse ready: dev=%u inst=%u\n",
-                   g_mouseDevAddr,
-                   g_mouseInstance);
+    Serial1.println("*I: USB mouse ready");
     return true;
   }
 
@@ -524,7 +519,6 @@ static void usb_hid_arm_keyboard_report() {
     g_keyboardReportActive = true;
     if (!g_keyboardActiveAnnounced) {
       g_keyboardActiveAnnounced = true;
-      Serial1.println("*I: USB keyboard input active");
     }
   }
 }
@@ -546,19 +540,17 @@ static void usb_hid_arm_mouse_report() {
     g_mouseReportActive = true;
     if (!g_mouseActiveAnnounced) {
       g_mouseActiveAnnounced = true;
-      Serial1.println("*I: USB mouse input active");
     }
   }
 }
 
 /// <summary>
-/// initUSBHIDInput announces that the staged HID input layer is present. TinyUSB
-/// host initialization remains owned by usb_storage. HID report arming is delayed
+/// initUSBHIDInput initializes the staged HID input layer. TinyUSB host
+/// initialization remains owned by usb_storage. HID report arming is delayed
 /// in normal loop context, but it is not gated by MSC/FatFs readiness.
 /// </summary>
 void initUSBHIDInput() {
   setConsolePID(0);
-  Serial1.printf("*I: USB HID input: staged keyboard/mouse enabled; key repeat active; current context %u; F1-F9 route contexts 1-9, F10 routes context 0\n", getConsolePID());
 }
 
 /// <summary>

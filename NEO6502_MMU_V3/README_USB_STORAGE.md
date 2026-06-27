@@ -76,3 +76,21 @@ V28c keeps the validated local FatFs multi-volume build and makes the RP FS laye
 - `FS_STATUS` returns ready bit, mounted count, and mounted-device bitmask.
 - `fstest [device]` tests `TEST.TXT` and `BIG.TXT` on the selected drive.
 - `usbdisks` now labels device 0 as `default` rather than implying other mounted drives are inactive.
+
+
+## Quiet boot output
+
+Boot-time USB informational output is intentionally quiet. Use `usbdisks` and `fstest [device]` for explicit diagnostics. Errors and device-removal notices remain on Serial1.
+
+
+## V28e boot status policy
+
+V28e keeps concise USB lifecycle confirmation while avoiding verbose boot debug:
+
+```text
+*I: USB MSC ready: device=N drive=N:
+*I: USB keyboard ready: layout=US/DE
+*I: USB mouse ready
+```
+
+Verbose block geometry, FatFs mount steps, HID activation details, and fstest reminders remain removed. Use `usbdisks` and `fstest [device]` for explicit diagnostics.

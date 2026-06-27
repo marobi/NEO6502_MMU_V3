@@ -100,11 +100,6 @@ void initUSBStorage() {
     return;
 
 #if defined(USE_TINYUSB_HOST)
-  Serial1.println("*I: USB host storage: init native host controller");
-  Serial1.printf("*I: USB host cfg: hub=%u device_max=%u msc=%u\n",
-                 (unsigned)CFG_TUH_HUB,
-                 (unsigned)CFG_TUH_DEVICE_MAX,
-                 (unsigned)CFG_TUH_MSC);
   gUSBHost.begin(0);
 #else
   Serial1.println("*E: USB host storage: USE_TINYUSB_HOST is not enabled");
@@ -134,12 +129,9 @@ void taskUSBStorage() {
 
     if (slot->present && !usb_fatfs_mounted(device)) {
       if (usb_fatfs_mount(device)) {
-        Serial1.printf("*I: USB storage ready: device=%u drive=%u:\n",
+        Serial1.printf("*I: USB MSC ready: device=%u drive=%u:\n",
                        (unsigned)device,
                        (unsigned)device);
-        if (device == 0) {
-          Serial1.println("*I: use monitor command 'fstest' for RP FS local read test");
-        }
       }
     }
   }
@@ -407,12 +399,6 @@ void tuh_msc_mount_cb(uint8_t dev_addr) {
   slot->present = true;
   slot->mount_pending = true;
 
-  Serial1.printf("*I: USB MSC mounted: slot=%u dev=%u lun=%u\n",
-                 (unsigned)device,
-                 dev_addr,
-                 lun);
-  Serial1.printf("    block size        : %lu\n", (unsigned long)slot->block_size);
-  Serial1.printf("    block count       : %lu\n", (unsigned long)slot->block_count);
 }
 
 void tuh_msc_umount_cb(uint8_t dev_addr) {
