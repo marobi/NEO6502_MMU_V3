@@ -15,8 +15,12 @@ using namespace fatfs;
 struct RPFSHandle {
   bool in_use;
   uint8_t device;
+  uint8_t flags;
   FIL  file;
 };
+
+static constexpr uint8_t RP_FS_HANDLE_READ  = 0x01;
+static constexpr uint8_t RP_FS_HANDLE_WRITE = 0x02;
 
 static RPFSHandle gRPFSHandles[RP_FS_MAX_HANDLES];
 
@@ -41,8 +45,57 @@ static bool rp_fs_valid_device(uint8_t device) {
   return device < USB_STORAGE_MAX_DEVICES;
 }
 
+static bool rp_fs_is_valid_83_name(const char* filename) {
+  if (filename == nullptr || filename[0] == '\0')
+    return false;
+
+  const char* name = filename;
+  if ((filename[0] >= '0' && filename[0] <= '9') && filename[1] == ':' && filename[2] == '/')
+    name = filename + 3;
+
+  uint8_t base_len = 0;
+  uint8_t ext_len = 0;
+  bool in_ext = false;
+
+  for (const char* p = name; *p != '\0'; p++) {
+    char const c = *p;
+
+    if (c == '/' || c == '\\' || c == ':' || c < 33 || c >= 127)
+      return false;
+
+    if (c >= 'a' && c <= 'z')
+      return false;
+
+    if (c == '.') {
+      if (in_ext || base_len == 0)
+        return false;
+      in_ext = true;
+      continue;
+    }
+
+    if (!(c >= 'A' && c <= 'Z') && !(c >= '0' && c <= '9') && c != '_' && c != '-' && c != '$' && c != '~')
+      return false;
+
+    if (in_ext) {
+      ext_len++;
+      if (ext_len > 3)
+        return false;
+    }
+    else {
+      base_len++;
+      if (base_len > 8)
+        return false;
+    }
+  }
+
+  return base_len != 0 && (!in_ext || ext_len != 0);
+}
+
 static bool rp_fs_make_path(uint8_t device, const char* filename, char* out, size_t out_len) {
   if (filename == nullptr || filename[0] == '\0' || out == nullptr || out_len == 0)
+    return false;
+
+  if (!rp_fs_is_valid_83_name(filename))
     return false;
 
   // Accept already-qualified FatFs paths such as "0:/TEST.TXT" only when
@@ -120,6 +173,53 @@ int rp_fs_open_readonly_83(uint8_t device, const char* filename) {
   }
 
   gRPFSHandles[slot].device = device;
+  gRPFSHandles[slot].flags = RP_FS_HANDLE_READ;
+  gRPFSHandles[slot].in_use = true;
+  return slot;
+}
+
+int rp_fs_open_write_truncate_83(const char* filename) {
+  return rp_fs_open_write_truncate_83(0, filename);
+}
+
+int rp_fs_open_write_truncate_83(uint8_t device, const char* filename) {
+  if (!rp_fs_valid_device(device)) {
+    Serial1.printf("*E: RP FS: invalid device %u\n", (unsigned)device);
+    return -1;
+  }
+
+  if (!usb_fatfs_mounted(device)) {
+    if (!usb_fatfs_mount(device))
+      return -1;
+  }
+
+  int slot = -1;
+  for (uint8_t i = 0; i < RP_FS_MAX_HANDLES; i++) {
+    if (!gRPFSHandles[i].in_use) {
+      slot = i;
+      break;
+    }
+  }
+
+  if (slot < 0) {
+    Serial1.println("*E: RP FS: no free file handles");
+    return -1;
+  }
+
+  char path[96];
+  if (!rp_fs_make_path(device, filename, path, sizeof(path))) {
+    Serial1.println("*E: RP FS: invalid 8.3 filename");
+    return -1;
+  }
+
+  FRESULT const fr = f_open(&gRPFSHandles[slot].file, path, FA_WRITE | FA_CREATE_ALWAYS);
+  if (fr != FR_OK) {
+    Serial1.printf("*W: RP FS: open write %s failed fr=%u\n", path, (unsigned)fr);
+    return -1;
+  }
+
+  gRPFSHandles[slot].device = device;
+  gRPFSHandles[slot].flags = RP_FS_HANDLE_WRITE;
   gRPFSHandles[slot].in_use = true;
   return slot;
 }
@@ -131,11 +231,15 @@ bool rp_fs_close(uint8_t handle) {
   FRESULT const fr = f_close(&gRPFSHandles[handle].file);
   gRPFSHandles[handle].in_use = false;
   gRPFSHandles[handle].device = 0;
+  gRPFSHandles[handle].flags = 0;
   return fr == FR_OK;
 }
 
 int rp_fs_read(uint8_t handle, uint8_t* dst, uint16_t len) {
   if (!rp_fs_valid_handle(handle) || dst == nullptr)
+    return -1;
+
+  if ((gRPFSHandles[handle].flags & RP_FS_HANDLE_READ) == 0)
     return -1;
 
   if (len == 0)
@@ -149,6 +253,26 @@ int rp_fs_read(uint8_t handle, uint8_t* dst, uint16_t len) {
   }
 
   return (int)br;
+}
+
+int rp_fs_write(uint8_t handle, const uint8_t* src, uint16_t len) {
+  if (!rp_fs_valid_handle(handle) || src == nullptr)
+    return -1;
+
+  if ((gRPFSHandles[handle].flags & RP_FS_HANDLE_WRITE) == 0)
+    return -1;
+
+  if (len == 0)
+    return 0;
+
+  UINT bw = 0;
+  FRESULT const fr = f_write(&gRPFSHandles[handle].file, src, len, &bw);
+  if (fr != FR_OK) {
+    Serial1.printf("*E: RP FS: write handle=%u failed fr=%u partial=%u\n", handle, (unsigned)fr, (unsigned)bw);
+    return -1;
+  }
+
+  return (int)bw;
 }
 
 uint32_t rp_fs_size(uint8_t handle) {
@@ -171,6 +295,7 @@ void rp_fs_close_all() {
       f_close(&gRPFSHandles[i].file);
       gRPFSHandles[i].in_use = false;
       gRPFSHandles[i].device = 0;
+      gRPFSHandles[i].flags = 0;
     }
   }
 }
@@ -184,6 +309,7 @@ void rp_fs_close_all_for_device(uint8_t device) {
       f_close(&gRPFSHandles[i].file);
       gRPFSHandles[i].in_use = false;
       gRPFSHandles[i].device = 0;
+      gRPFSHandles[i].flags = 0;
     }
   }
 }

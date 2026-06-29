@@ -163,6 +163,7 @@ static const RPMailboxCommandEntry gMailboxCommands[] = {
   { RP_GROUP_FS,      RP_FS_CMD_OPEN,   "fs.open",       rp_fs_mailbox_handle_open    },
   { RP_GROUP_FS,      RP_FS_CMD_READ,   "fs.read",       rp_fs_mailbox_handle_read    },
   { RP_GROUP_FS,      RP_FS_CMD_CLOSE,  "fs.close",      rp_fs_mailbox_handle_close   },
+  { RP_GROUP_FS,      RP_FS_CMD_WRITE,  "fs.write",      rp_fs_mailbox_handle_write   },
 };
 
 /// <summary>

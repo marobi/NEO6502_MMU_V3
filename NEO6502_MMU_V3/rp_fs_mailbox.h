@@ -30,6 +30,11 @@ mailbox_state_t rp_fs_mailbox_handle_open();
 mailbox_state_t rp_fs_mailbox_handle_read();
 
 /// <summary>
+/// Handles FS_WRITE for the central mailbox command table.
+/// </summary>
+mailbox_state_t rp_fs_mailbox_handle_write();
+
+/// <summary>
 /// Handles FS_CLOSE for the central mailbox command table.
 /// </summary>
 mailbox_state_t rp_fs_mailbox_handle_close();

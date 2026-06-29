@@ -27,9 +27,12 @@ bool rp_fs_ready(uint8_t device);
 // FatFs performs the actual path/name parsing.
 int rp_fs_open_readonly_83(const char* filename);
 int rp_fs_open_readonly_83(uint8_t device, const char* filename);
+int rp_fs_open_write_truncate_83(const char* filename);
+int rp_fs_open_write_truncate_83(uint8_t device, const char* filename);
 
 bool rp_fs_close(uint8_t handle);
 int rp_fs_read(uint8_t handle, uint8_t* dst, uint16_t len);
+int rp_fs_write(uint8_t handle, const uint8_t* src, uint16_t len);
 
 bool rp_fs_is_open(uint8_t handle);
 uint8_t rp_fs_free_handle_count();

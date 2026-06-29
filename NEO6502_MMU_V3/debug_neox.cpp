@@ -10,8 +10,8 @@
 #include "neobus.h"
 
 // KERNEL CONFIGURATION
-#define  MAX_PROCS 5    // system wide
-#define  OPEN_MAX  8    // system wide
+#define  MAX_PROCS 8    // system wide
+#define  OPEN_MAX  16   // system wide
 
 #define  MAX_FDS   6    // per process
 

@@ -9,7 +9,7 @@
 
 // ============================================================
 // rp_fs_mailbox.cpp
-// NEO MMU - read-only filesystem mailbox command bridge
+// NEO MMU - filesystem mailbox command bridge
 //
 // Filesystem command semantics only. mailbox.cpp owns the single central
 // mailbox command table and dispatch.
@@ -23,9 +23,9 @@
 //          FLAGS bits 0..7 = mounted/ready device bitmask
 //
 //   FS_OPEN:
-//     in : ARG0 = pointer to NUL-terminated filename in 6502 RAM
+//     in : ARG0 = pointer to NUL-terminated 8.3 filename in 6502 RAM
 //          ARG1 = maximum filename bytes to scan, including NUL
-//          ARG2 low byte  = open flags; only 0 is accepted for read-only
+//          ARG2 low byte  = open flags: 0=read existing, 1=write create/truncate
 //          ARG2 high byte = device id / FatFs drive number
 //     out: RES0 = RP file handle 0..RP_FS_MAX_HANDLES-1
 //
@@ -36,11 +36,17 @@
 //     out: RES0 = bytes copied to destination
 //          FLAGS bit 0 = EOF after this read
 //
+//   FS_WRITE:
+//     in : ARG0 = source pointer in 6502 RAM
+//          ARG1 = requested byte count; capped to 256 bytes per command
+//          ARG2 = RP file handle
+//     out: RES0 = bytes written
+//
 //   FS_CLOSE:
 //     in : ARG2 = RP file handle
 //     out: RES0 = 0
 //
-// No write/seek/sync commands are implemented in this milestone.
+// Seek/sync/directory/long-filename commands are not implemented in this milestone.
 // ============================================================
 
 static constexpr uint16_t RP_FS_MAILBOX_MAX_PATH = 96;
@@ -50,10 +56,12 @@ static uint32_t gFSCommandCount = 0;
 static uint32_t gFSStatusCount = 0;
 static uint32_t gFSOpenCount = 0;
 static uint32_t gFSReadCount = 0;
+static uint32_t gFSWriteCount = 0;
 static uint32_t gFSCloseCount = 0;
 static uint32_t gFSErrorCount = 0;
 
 static uint8_t gFSReadBuffer[RP_FS_MAILBOX_CHUNK_SIZE];
+static uint8_t gFSWriteBuffer[RP_FS_MAILBOX_CHUNK_SIZE];
 
 static void rp_fs_mb_set_done(uint16_t result, uint8_t flags = 0) {
   rp_mailbox_set_done(result, flags);
@@ -120,7 +128,7 @@ mailbox_state_t rp_fs_mailbox_handle_status() {
 /// <summary>
 /// rp_fs_mb_handle_open processes FS_OPEN. ARG0 is a pointer to a
 /// NUL-terminated filename in 6502 RAM, ARG1 bounds the filename scan, ARG2 low
-/// byte contains read-only flags, and ARG2 high byte selects the device/FatFs
+/// byte contains open flags, and ARG2 high byte selects the device/FatFs
 /// drive. RES0 receives the RP-side file handle on success.
 /// </summary>
 mailbox_state_t rp_fs_mailbox_handle_open() {
@@ -130,7 +138,7 @@ mailbox_state_t rp_fs_mailbox_handle_open() {
   uint8_t const flags = (uint8_t)(open_arg & 0xFF);
   uint8_t const device = (uint8_t)(open_arg >> 8);
 
-  if (flags != 0) {
+  if (flags != RP_FS_OPEN_READ && flags != RP_FS_OPEN_WRITE_TRUNC) {
     rp_fs_mb_set_error(RP_ERR_EPERM);
     return mbDONE;
   }
@@ -146,7 +154,10 @@ mailbox_state_t rp_fs_mailbox_handle_open() {
     return mbDONE;
   }
 
-  int const handle = rp_fs_open_readonly_83(device, filename);
+  int const handle = (flags == RP_FS_OPEN_WRITE_TRUNC)
+    ? rp_fs_open_write_truncate_83(device, filename)
+    : rp_fs_open_readonly_83(device, filename);
+
   if (handle < 0) {
     if (!rp_fs_ready(device))
       rp_fs_mb_set_error(RP_ERR_EIO);
@@ -209,6 +220,49 @@ mailbox_state_t rp_fs_mailbox_handle_read() {
 }
 
 /// <summary>
+/// rp_fs_mb_handle_write processes FS_WRITE. ARG0 is the 6502 source address,
+/// ARG1 is the requested byte count, and ARG2 is the RP file handle. The request
+/// is capped to RP_FS_MAILBOX_CHUNK_SIZE bytes, RES0 receives the number of bytes
+/// written to the file.
+/// </summary>
+mailbox_state_t rp_fs_mailbox_handle_write() {
+  uint16_t const src = rp_read16(RP_ARG0L);
+  uint16_t len = rp_read16(RP_ARG1L);
+  uint8_t const handle = (uint8_t)(rp_read16(RP_ARG2L) & 0xFF);
+
+  if (src == 0) {
+    rp_fs_mb_set_error(RP_ERR_EINVAL);
+    return mbDONE;
+  }
+
+  if (!rp_fs_is_open(handle)) {
+    rp_fs_mb_set_error(RP_ERR_EINVAL);
+    return mbDONE;
+  }
+
+  if (len == 0) {
+    rp_fs_mb_set_done(0);
+    return mbDONE;
+  }
+
+  if (len > RP_FS_MAILBOX_CHUNK_SIZE)
+    len = RP_FS_MAILBOX_CHUNK_SIZE;
+
+  snoop_read6502Memory(src, len, gFSWriteBuffer);
+
+  int const count = rp_fs_write(handle, gFSWriteBuffer, len);
+  if (count < 0) {
+    rp_fs_mb_set_error(RP_ERR_EIO);
+    return mbDONE;
+  }
+
+  rp_fs_mb_set_done((uint16_t)count);
+  gFSWriteCount++;
+
+  return mbDONE;
+}
+
+/// <summary>
 /// rp_fs_mb_handle_close processes FS_CLOSE. ARG2 contains the RP file handle.
 /// Only currently-open handles are accepted; stale handles after USB removal are
 /// rejected because usb_fatfs_unmount() closes all RP filesystem handles.
@@ -255,6 +309,8 @@ void rp_fs_mailbox_print_diag() {
   Serial1.print(gFSOpenCount);
   Serial1.print(F(" read="));
   Serial1.print(gFSReadCount);
+  Serial1.print(F(" write="));
+  Serial1.print(gFSWriteCount);
   Serial1.print(F(" close="));
   Serial1.print(gFSCloseCount);
   Serial1.print(F(" errs="));

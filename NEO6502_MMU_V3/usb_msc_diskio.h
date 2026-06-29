@@ -18,9 +18,10 @@
 #define USB_MSC_DISKIO_MAX_PDRV USB_STORAGE_MAX_DEVICES
 #endif
 
-// Read-only milestone. Enable writes only after read/mount/open/read is stable.
+// Filesystem write support is enabled by default. Set this to 1 only for
+// an intentionally read-only diagnostic build.
 #ifndef USB_MSC_DISKIO_READONLY
-#define USB_MSC_DISKIO_READONLY 1
+#define USB_MSC_DISKIO_READONLY 0
 #endif
 
 // Local project FatFs. Include ff.h first because diskio.h depends on BYTE/UINT/LBA_t.

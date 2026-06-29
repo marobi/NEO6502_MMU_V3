@@ -39,16 +39,27 @@ struct USBStorageSlot {
   uint8_t lun;
   uint32_t block_count;
   uint32_t block_size;
+  uint32_t mount_pending_since_ms;
 };
 
 static bool gUSBStorageInitialized = false;
 static USBStorageSlot gUSBStorageSlots[USB_STORAGE_MAX_DEVICES];
 
+static constexpr uint32_t USB_STORAGE_BOOT_MOUNT_GRACE_MS = 2000;
+static constexpr uint32_t USB_STORAGE_PENDING_MOUNT_MIN_AGE_MS = 500;
+static constexpr uint32_t USB_STORAGE_MOUNT_STAGGER_MS = 1000;
+
+static uint32_t gStorageMountEnableMs = 0;
+static uint32_t gNextFatFsMountAllowedMs = 0;
+
 static volatile bool gReadDone = false;
 static volatile bool gReadOK = false;
+static volatile bool gWriteDone = false;
+static volatile bool gWriteOK = false;
 
 #if defined(USE_TINYUSB_HOST)
 static bool usb_storage_msc_read_complete(uint8_t dev_addr, const tuh_msc_complete_data_t* cb_data);
+static bool usb_storage_msc_write_complete(uint8_t dev_addr, const tuh_msc_complete_data_t* cb_data);
 #endif
 
 static bool usb_storage_valid_device(uint8_t device) {
@@ -93,6 +104,7 @@ static void usb_storage_clear_slot(uint8_t device) {
   gUSBStorageSlots[device].lun = 0;
   gUSBStorageSlots[device].block_count = 0;
   gUSBStorageSlots[device].block_size = 0;
+  gUSBStorageSlots[device].mount_pending_since_ms = 0;
 }
 
 void initUSBStorage() {
@@ -104,6 +116,10 @@ void initUSBStorage() {
 #else
   Serial1.println("*E: USB host storage: USE_TINYUSB_HOST is not enabled");
 #endif
+
+  uint32_t const now = millis();
+  gStorageMountEnableMs = now + USB_STORAGE_BOOT_MOUNT_GRACE_MS;
+  gNextFatFsMountAllowedMs = gStorageMountEnableMs;
 
   gUSBStorageInitialized = true;
 }
@@ -120,9 +136,20 @@ void taskUSBStorage() {
 
   gUSBHost.task();
 
+  uint32_t const now = millis();
+
+  if ((int32_t)(now - gStorageMountEnableMs) < 0)
+    return;
+
+  if ((int32_t)(now - gNextFatFsMountAllowedMs) < 0)
+    return;
+
   for (uint8_t device = 0; device < USB_STORAGE_MAX_DEVICES; device++) {
     USBStorageSlot* const slot = usb_storage_slot(device);
     if (slot == nullptr || !slot->mount_pending)
+      continue;
+
+    if ((int32_t)(now - slot->mount_pending_since_ms) < (int32_t)USB_STORAGE_PENDING_MOUNT_MIN_AGE_MS)
       continue;
 
     slot->mount_pending = false;
@@ -134,6 +161,9 @@ void taskUSBStorage() {
                        (unsigned)device);
       }
     }
+
+    gNextFatFsMountAllowedMs = millis() + USB_STORAGE_MOUNT_STAGGER_MS;
+    break;
   }
 #endif
 }
@@ -304,12 +334,83 @@ bool usb_storage_write_blocks(uint32_t lba, const uint8_t* buffer, uint16_t coun
 }
 
 bool usb_storage_write_blocks(uint8_t device, uint32_t lba, const uint8_t* buffer, uint16_t count, uint32_t timeout_ms) {
+#if defined(USE_TINYUSB_HOST)
+  if (!gUSBStorageInitialized)
+    initUSBStorage();
+
+  USBStorageSlot* const slot = usb_storage_slot(device);
+  if (slot == nullptr) {
+    Serial1.printf("*E: USB storage: invalid device %u\n", (unsigned)device);
+    return false;
+  }
+
+  if (buffer == nullptr || count == 0)
+    return false;
+
+  if (!slot->present) {
+    Serial1.printf("*E: USB storage: device %u not mounted\n", (unsigned)device);
+    return false;
+  }
+
+  if (slot->block_size != 512) {
+    Serial1.printf("*E: USB storage: device %u unsupported block size %lu\n",
+                   (unsigned)device,
+                   (unsigned long)slot->block_size);
+    return false;
+  }
+
+  if (lba >= slot->block_count || (uint32_t)count > (slot->block_count - lba)) {
+    Serial1.printf("*E: USB storage: device %u LBA range %lu+%u out of range\n",
+                   (unsigned)device,
+                   (unsigned long)lba,
+                   count);
+    return false;
+  }
+
+  if (!tuh_msc_ready(slot->dev_addr)) {
+    Serial1.printf("*E: USB storage: device %u MSC busy/not ready\n", (unsigned)device);
+    return false;
+  }
+
+  gWriteDone = false;
+  gWriteOK = false;
+
+  if (!tuh_msc_write10(slot->dev_addr,
+                       slot->lun,
+                       buffer,
+                       lba,
+                       count,
+                       usb_storage_msc_write_complete,
+                       (uintptr_t)lba)) {
+    Serial1.printf("*E: USB storage: device %u failed to queue WRITE10\n", (unsigned)device);
+    return false;
+  }
+
+  uint32_t const start_ms = millis();
+  while (!gWriteDone) {
+    gUSBHost.task();
+    if ((uint32_t)(millis() - start_ms) >= timeout_ms) {
+      Serial1.printf("*E: USB storage: device %u WRITE10 timeout\n", (unsigned)device);
+      return false;
+    }
+    delay(1);
+  }
+
+  if (!gWriteOK) {
+    Serial1.printf("*E: USB storage: device %u WRITE10 failed\n", (unsigned)device);
+    return false;
+  }
+
+  return true;
+#else
   (void)device;
   (void)lba;
   (void)buffer;
   (void)count;
   (void)timeout_ms;
+  Serial1.println("*E: USB storage: USE_TINYUSB_HOST is not enabled");
   return false;
+#endif
 }
 
 bool usb_storage_sync() {
@@ -375,6 +476,16 @@ static bool usb_storage_msc_read_complete(uint8_t dev_addr, const tuh_msc_comple
   return true;
 }
 
+static bool usb_storage_msc_write_complete(uint8_t dev_addr, const tuh_msc_complete_data_t* cb_data) {
+  (void)dev_addr;
+
+  gWriteOK = (cb_data != nullptr) &&
+             (cb_data->csw != nullptr) &&
+             (cb_data->csw->status == 0);
+  gWriteDone = true;
+  return true;
+}
+
 void tuh_msc_mount_cb(uint8_t dev_addr) {
   uint8_t const lun = 0;
 
@@ -398,7 +509,12 @@ void tuh_msc_mount_cb(uint8_t dev_addr) {
   slot->block_size = tuh_msc_get_block_size(dev_addr, lun);
   slot->present = true;
   slot->mount_pending = true;
+  slot->mount_pending_since_ms = millis();
 
+  Serial1.printf("*I: USB MSC mount pending: device=%u dev=%u lun=%u\n",
+                 (unsigned)device,
+                 dev_addr,
+                 lun);
 }
 
 void tuh_msc_umount_cb(uint8_t dev_addr) {

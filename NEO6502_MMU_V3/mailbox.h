@@ -83,6 +83,7 @@ enum mailbox_state_t {
 #define RP_FS_CMD_OPEN      0x02
 #define RP_FS_CMD_READ      0x03
 #define RP_FS_CMD_CLOSE     0x04
+#define RP_FS_CMD_WRITE     0x05
 
 // ------------------------------------------------------------
 // RP mailbox error codes aligned with the existing RP mailbox ABI.
@@ -102,6 +103,9 @@ enum mailbox_state_t {
 // ------------------------------------------------------------
 #define RP_FS_STATUS_READY  0x0001
 #define RP_FS_FLAG_EOF      0x01
+
+#define RP_FS_OPEN_READ            0x00
+#define RP_FS_OPEN_WRITE_TRUNC     0x01
 
 
 // ------------------------------------------------------------
