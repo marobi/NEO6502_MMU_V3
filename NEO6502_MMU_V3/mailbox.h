@@ -7,28 +7,50 @@
 // ------------------------------------------------------------
 #define RP_DOORBELL     0xD010                      // sync with memory.ini
 
+#define RP_DOORBELL_NONE     0x00
+#define RP_DOORBELL_TRIGGER  0x01
+
 // ------------------------------------------------------------
 // Fixed request/result block in 6502 RAM
+// ABI v2: command identity is RP_GROUP + RP_CMD at the start of the block.
+// RP_DOORBELL is trigger-only and does not carry the command byte anymore.
 // ------------------------------------------------------------
 #define RP_REQ_BASE     0xE000
 
-#define RP_ARG0L        (RP_REQ_BASE + 0x00)
-#define RP_ARG0H        (RP_REQ_BASE + 0x01)
-#define RP_ARG1L        (RP_REQ_BASE + 0x02)
-#define RP_ARG1H        (RP_REQ_BASE + 0x03)
-#define RP_ARG2L        (RP_REQ_BASE + 0x04)
-#define RP_ARG2H        (RP_REQ_BASE + 0x05)
-#define RP_RES0L        (RP_REQ_BASE + 0x06)
-#define RP_RES0H        (RP_REQ_BASE + 0x07)
-#define RP_ERR          (RP_REQ_BASE + 0x08)
-#define RP_FLAGS        (RP_REQ_BASE + 0x09)
-#define RP_STATE        (RP_REQ_BASE + 0x0A)
+#define RP_GROUP        (RP_REQ_BASE + 0x00)
+#define RP_CMD          (RP_REQ_BASE + 0x01)
+#define RP_STATUS       (RP_REQ_BASE + 0x02)
+#define RP_ERR          (RP_REQ_BASE + 0x03)
+#define RP_FLAGS        (RP_REQ_BASE + 0x04)
+#define RP_STATE        (RP_REQ_BASE + 0x05)
+#define RP_ARG0L        (RP_REQ_BASE + 0x06)
+#define RP_ARG0H        (RP_REQ_BASE + 0x07)
+#define RP_ARG1L        (RP_REQ_BASE + 0x08)
+#define RP_ARG1H        (RP_REQ_BASE + 0x09)
+#define RP_ARG2L        (RP_REQ_BASE + 0x0A)
+#define RP_ARG2H        (RP_REQ_BASE + 0x0B)
+#define RP_RES0L        (RP_REQ_BASE + 0x0C)
+#define RP_RES0H        (RP_REQ_BASE + 0x0D)
+#define RP_RES1L        (RP_REQ_BASE + 0x0E)
+#define RP_RES1H        (RP_REQ_BASE + 0x0F)
 
-#define RP_STATUS       (RP_REQ_BASE + 0x0B)
-#define RP_IRQ_SOURCE   (RP_REQ_BASE + 0x0C)          // source of IRQ
-#define RP_CONSOLE_PID  (RP_REQ_BASE + 0x0D)          // console PID
-#define RP_CONSOLE_RDY  (RP_REQ_BASE + 0x0E)          // console ready: 0 when no input available
-#define RP_IRQ_STATE    (RP_REQ_BASE + 0x0F)          // IRQ state: 0=none, 1=pending
+// These bytes remain outside the request/result block.
+#define RP_IRQ_SOURCE   0xE010                      // source of IRQ
+#define RP_CONSOLE_PID  0xE011                      // console PID
+#define RP_CONSOLE_RDY  0xE012                      // console ready: 0 when no input available
+#define RP_IRQ_STATE    0xE013                      // IRQ state: 0=none, 1=pending
+
+
+// ------------------------------------------------------------
+// Mailbox FSM states used by the central dispatcher and command modules
+// ------------------------------------------------------------
+enum mailbox_state_t {
+  mbINIT = 0,
+  mbIDLE,
+  mbWRITE,
+  mbREAD,
+  mbDONE
+};
 
 // ------------------------------------------------------------
 // Mailbox status values
@@ -39,18 +61,28 @@
 #define RP_ERROR        3
 
 // ------------------------------------------------------------
-// Mailbox command values
+// Mailbox ABI/version values
 // ------------------------------------------------------------
-#define RP_CMD_NONE         0x00
-#define RP_CMD_CON_WRITE    0x10
-#define RP_CMD_CON_READ     0x11
+#define RP_MAILBOX_ABI_V2_GROUPED  2
+#define RP_MAILBOX_ABI_CURRENT     RP_MAILBOX_ABI_V2_GROUPED
 
-// Read-only filesystem mailbox commands. RP-side only for now; the 6502
-// bindings are intentionally kept separate for the next milestone.
-#define RP_CMD_FS_STATUS    0x20
-#define RP_CMD_FS_OPEN      0x21
-#define RP_CMD_FS_READ      0x22
-#define RP_CMD_FS_CLOSE     0x23
+// ------------------------------------------------------------
+// Mailbox command groups and per-group command values
+// ------------------------------------------------------------
+#define RP_GROUP_NONE       0x00
+#define RP_GROUP_CONSOLE    0x01
+#define RP_GROUP_FS         0x02
+#define RP_GROUP_SYSTEM     0x03
+
+#define RP_CON_CMD_NONE     0x00
+#define RP_CON_CMD_WRITE    0x01
+#define RP_CON_CMD_READ     0x02
+
+#define RP_FS_CMD_NONE      0x00
+#define RP_FS_CMD_STATUS    0x01
+#define RP_FS_CMD_OPEN      0x02
+#define RP_FS_CMD_READ      0x03
+#define RP_FS_CMD_CLOSE     0x04
 
 // ------------------------------------------------------------
 // RP mailbox error codes aligned with the existing RP mailbox ABI.
@@ -71,6 +103,13 @@
 #define RP_FS_STATUS_READY  0x0001
 #define RP_FS_FLAG_EOF      0x01
 
+
+// ------------------------------------------------------------
+// Shared mailbox result helpers
+// ------------------------------------------------------------
+void rp_mailbox_clear_result_fields();
+void rp_mailbox_set_done(uint16_t result, uint8_t flags = 0);
+void rp_mailbox_set_error(uint8_t err, uint16_t partial = 0);
 
 // ------------------------------------------------------------
 // Shared mailbox memory helpers

@@ -16,6 +16,7 @@ Lesser General Public License for more details.
 // see help
 // 
 #include <Arduino.h>
+#include <string.h>
 #include <SimpleCLI.h>
 #include "cmd.h"
 
@@ -472,6 +473,9 @@ static void cmdFSTestCallback(cmd* c) {
 }
 // DEBUG END: temporary RP filesystem local read-test monitor command
 
+
+
+
 /// <summary>
 /// help overview of commands
 /// </summary>
@@ -551,6 +555,7 @@ void initMonitor() {
   gCmd = gCli.addCmd("keymap", cmdKeymapCallback);
   gCmd.addPositionalArgument("locale", "");
 
+  
   gCmd = gCli.addCmd("usbdisks", cmdUSBDisksCallback);
 
   gCmd = gCli.addBoundlessCommand(">", cmdMemCallback);

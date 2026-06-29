@@ -94,3 +94,98 @@ V28e keeps concise USB lifecycle confirmation while avoiding verbose boot debug:
 ```
 
 Verbose block geometry, FatFs mount steps, HID activation details, and fstest reminders remain removed. Use `usbdisks` and `fstest [device]` for explicit diagnostics.
+
+## V29a mailbox ABI note
+
+V29a converts the RP-side mailbox to ABI v2 only. The request/result block still starts at `$E000`, but the first fields are now `RP_GROUP` and `RP_CMD`. `RP_DOORBELL` is trigger-only and no longer carries the command byte.
+
+ABI v2 request/result block:
+
+```text
+$E000 RP_GROUP
+$E001 RP_CMD
+$E002 RP_STATUS
+$E003 RP_ERR
+$E004 RP_FLAGS
+$E005 RP_STATE
+$E006 RP_ARG0L
+$E007 RP_ARG0H
+$E008 RP_ARG1L
+$E009 RP_ARG1H
+$E00A RP_ARG2L
+$E00B RP_ARG2H
+$E00C RP_RES0L
+$E00D RP_RES0H
+$E00E RP_RES1L
+$E00F RP_RES1H
+```
+
+The current RP dispatcher is driven by one central command table in `mailbox.cpp`. ABI v1 command-byte dispatch was removed. The NEOX 6502 side must be updated next before 6502 mailbox terminal I/O works again.
+
+## V29c central mailbox command table
+
+Mailbox ABI v2 remains unchanged from V29a, but dispatch ownership is now strict:
+
+- `mailbox.cpp` owns the single central command table.
+- Each command-table entry contains `group`, `cmd`, `name`, and handler pointer.
+- `mailbox.cpp` owns mailbox transport, ABI field helpers, status/result completion, console command handling, and command lookup/dispatch.
+- `rp_fs_mailbox.cpp` owns filesystem command semantics only. It exports FS handler functions, but it does not own command IDs, lookup logic, group tables, or per-module command tables.
+- Filesystem handlers use shared mailbox result helpers instead of directly clearing the doorbell/status fields.
+
+This removes the V29b split-dispatch model where `mailbox.cpp` had a group table and `rp_fs_mailbox.cpp` had a separate filesystem command table.
+
+
+## V29d mailbox source split
+
+Mailbox ABI remains v2-only:
+
+```text
+$E000 RP_GROUP
+$E001 RP_CMD
+$E002 RP_STATUS
+$E003 RP_ERR
+$E004 RP_FLAGS
+$E005 RP_STATE
+$E006 RP_ARG0L
+$E007 RP_ARG0H
+$E008 RP_ARG1L
+$E009 RP_ARG1H
+$E00A RP_ARG2L
+$E00B RP_ARG2H
+$E00C RP_RES0L
+$E00D RP_RES0H
+$E00E RP_RES1L
+$E00F RP_RES1H
+```
+
+Dispatch metadata is still centralized in `mailbox.cpp` only.
+
+Responsibility split:
+
+```text
+mailbox.cpp:
+  ABI v2 transport
+  central command table
+  command lookup/dispatch
+  status/result helpers
+  mailbox FSM
+
+rp_console_io.cpp:
+  console command semantics
+  console read/write transfer state
+  VDU/CPU queue movement for console mailbox commands
+
+rp_fs_mailbox.cpp:
+  filesystem command semantics
+```
+
+
+## V29e mailbox cleanup
+
+- Removed unnecessary FS/console wrapper command functions from `mailbox.cpp`.
+- `mailbox.cpp` now points the single central command table directly at real command semantic handlers.
+- `mailbox_state_t` is shared through `mailbox.h` so command modules can return mailbox FSM outcomes directly.
+
+## V29t mailbox diagnostic cleanup
+
+Removed temporary monitor command `mbtest` and its helper functions after ABI v2 was validated through NEOX user task 4. The central mailbox command table and normal ABI v2 dispatch remain unchanged.

@@ -62,7 +62,7 @@ static void printFile(const char* vFile) {
   if (f.available()) {
 //    Serial1.printf("File %s exists\n", vFile);
     while (f.available()) {
-      Serial1.write(f.read());
+      vduPutc(f.read());
     }
     f.close();
   }
@@ -137,15 +137,11 @@ void setup() {
 
 //  dumpSystemConfig();
 
-
   bootSystemWithMenu();         // load/boot system with menu to select configuration.
 
   Serial1.printf("\n*D: default context: CTX%1X\n", memoryConfig.boot_context);
 
   //  fillMemory(0x00);             // clear memory 64k of current context
-
-  initUSBStorage();
-  initUSBHIDInput();
 
   initMailbox();
 
@@ -157,9 +153,13 @@ void setup() {
 
   set6502State(sRESET);         // reset CPU
 
+  initUSBStorage();
+  initUSBHIDInput();
+
   initMonitor();                // init monitor after boot
 
   initIndicator();              // setup board led indicator
+
 }
 
 /// <summary>

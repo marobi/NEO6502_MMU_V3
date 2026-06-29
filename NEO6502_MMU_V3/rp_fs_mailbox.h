@@ -1,38 +1,38 @@
 #pragma once
 
 #include <Arduino.h>
+#include <stdint.h>
+
+#include "mailbox.h"
 
 // ============================================================
 // rp_fs_mailbox.h
 // NEO MMU - read-only filesystem mailbox command bridge
 //
 // RP-side only. The 6502 syscall/kernel bindings are a separate milestone.
-// The command decode remains in mailbox.cpp as explicit switch cases.
+// mailbox.cpp owns the single central command table and dispatch.
+// This module owns only the filesystem command semantics.
 // ============================================================
 
 /// <summary>
-/// Handles the RP_CMD_FS_STATUS mailbox command and writes the filesystem
-/// readiness result to the shared mailbox request/result block.
+/// Handles FS_STATUS for the central mailbox command table.
 /// </summary>
-void rp_fs_mailbox_handle_status();
+mailbox_state_t rp_fs_mailbox_handle_status();
 
 /// <summary>
-/// Handles the RP_CMD_FS_OPEN mailbox command. The command opens one RP-side
-/// read-only filesystem handle from a bounded filename string in 6502 RAM.
+/// Handles FS_OPEN for the central mailbox command table.
 /// </summary>
-void rp_fs_mailbox_handle_open();
+mailbox_state_t rp_fs_mailbox_handle_open();
 
 /// <summary>
-/// Handles the RP_CMD_FS_READ mailbox command. The command copies bytes from an
-/// open RP-side file handle into 6502 RAM and returns the copied byte count.
+/// Handles FS_READ for the central mailbox command table.
 /// </summary>
-void rp_fs_mailbox_handle_read();
+mailbox_state_t rp_fs_mailbox_handle_read();
 
 /// <summary>
-/// Handles the RP_CMD_FS_CLOSE mailbox command. The command closes one open
-/// RP-side filesystem handle.
+/// Handles FS_CLOSE for the central mailbox command table.
 /// </summary>
-void rp_fs_mailbox_handle_close();
+mailbox_state_t rp_fs_mailbox_handle_close();
 
 /// <summary>
 /// Closes all RP-side filesystem handles owned by the mailbox layer.

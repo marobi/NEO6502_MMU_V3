@@ -10,7 +10,7 @@
 #include "neobus.h"
 
 // KERNEL CONFIGURATION
-#define  MAX_PROCS 4    // system wide
+#define  MAX_PROCS 5    // system wide
 #define  OPEN_MAX  8    // system wide
 
 #define  MAX_FDS   6    // per process
@@ -91,6 +91,7 @@ struct __attribute__((packed)) scheduler_info_t {
   uint8_t open_refcnt[OPEN_MAX];
   uint8_t open_flags[OPEN_MAX];
   uint8_t open_dev[OPEN_MAX];
+  uint8_t open_file_handle[OPEN_MAX];
 
   // wait queues
   uint8_t wait_reason[MAX_PROCS];

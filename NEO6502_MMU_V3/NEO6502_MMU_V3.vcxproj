@@ -99,6 +99,7 @@
     <ClCompile Include="ram.cpp" />
     <ClCompile Include="rom.cpp" />
     <ClCompile Include="rp_fs.cpp" />
+    <ClCompile Include="rp_console_io.cpp" />
     <ClCompile Include="rp_fs_mailbox.cpp" />
     <ClCompile Include="usb_storage.cpp" />
     <ClCompile Include="usb_fatfs.cpp" />
@@ -138,6 +139,7 @@
     <ClInclude Include="ram.h" />
     <ClInclude Include="rom.h" />
     <ClInclude Include="rp_fs.h" />
+    <ClInclude Include="rp_console_io.h" />
     <ClInclude Include="rp_fs_mailbox.h" />
     <ClInclude Include="usb_storage.h" />
     <ClInclude Include="usb_fatfs.h" />

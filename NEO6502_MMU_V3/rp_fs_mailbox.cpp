@@ -11,7 +11,10 @@
 // rp_fs_mailbox.cpp
 // NEO MMU - read-only filesystem mailbox command bridge
 //
-// Command protocol, using the existing mailbox request/result block:
+// Filesystem command semantics only. mailbox.cpp owns the single central
+// mailbox command table and dispatch.
+//
+// Command protocol, using mailbox ABI v2 request/result fields:
 //
 //   FS_STATUS:
 //     in : none
@@ -52,50 +55,13 @@ static uint32_t gFSErrorCount = 0;
 
 static uint8_t gFSReadBuffer[RP_FS_MAILBOX_CHUNK_SIZE];
 
-/// <summary>
-/// rp_fs_mb_clear_result_fields clears the result fields in the mailbox
-/// request/result block. It sets RES0 to 0, ERR to RP_ERR_OK, FLAGS to 0,
-/// and STATE to 0. This is called before processing each filesystem command
-/// so stale results from a previous command cannot leak into the next result.
-/// </summary>
-static void rp_fs_mb_clear_result_fields() {
-  rp_write16(RP_RES0L, 0);
-  snoop_write6502MemoryLoc(RP_ERR, RP_ERR_OK);
-  snoop_write6502MemoryLoc(RP_FLAGS, 0);
-  snoop_write6502MemoryLoc(RP_STATE, 0);
-}
-
-/// <summary>
-/// rp_fs_mb_set_done writes a successful filesystem mailbox result. RES0 holds
-/// the command-specific result value, ERR is cleared, FLAGS is set to the
-/// supplied command flags, STATUS becomes RP_DONE, and the doorbell is cleared
-/// so the command is acknowledged exactly once.
-/// </summary>
-/// <param name="result">Command-specific 16-bit result written to RES0.</param>
-/// <param name="flags">Command-specific result flags written to RP_FLAGS.</param>
 static void rp_fs_mb_set_done(uint16_t result, uint8_t flags = 0) {
-  rp_write16(RP_RES0L, result);
-  snoop_write6502MemoryLoc(RP_ERR, RP_ERR_OK);
-  snoop_write6502MemoryLoc(RP_FLAGS, flags);
-  snoop_write6502MemoryLoc(RP_STATUS, RP_DONE);
-  snoop_write6502MemoryLoc(RP_DOORBELL, RP_CMD_NONE);
+  rp_mailbox_set_done(result, flags);
 }
 
-/// <summary>
-/// rp_fs_mb_set_error writes a failed filesystem mailbox result. RES0 may hold
-/// a partial count, ERR receives the RP mailbox error code, FLAGS is cleared,
-/// STATUS becomes RP_ERROR, and the doorbell is cleared.
-/// </summary>
-/// <param name="err">RP mailbox error code to store in RP_ERR.</param>
-/// <param name="partial">Optional partial result, usually zero.</param>
 static void rp_fs_mb_set_error(uint8_t err, uint16_t partial = 0) {
-  rp_write16(RP_RES0L, partial);
-  snoop_write6502MemoryLoc(RP_ERR, err);
-  snoop_write6502MemoryLoc(RP_FLAGS, 0);
-  snoop_write6502MemoryLoc(RP_STATUS, RP_ERROR);
-  snoop_write6502MemoryLoc(RP_DOORBELL, RP_CMD_NONE);
-
   gFSErrorCount++;
+  rp_mailbox_set_error(err, partial);
 }
 
 /// <summary>
@@ -140,13 +106,15 @@ static bool rp_fs_mb_read_filename(uint16_t src, uint16_t scan_len, char* dst, s
 /// contain the mounted-device count, and FLAGS contains the mounted-device
 /// bitmask.
 /// </summary>
-static void rp_fs_mb_handle_status() {
+mailbox_state_t rp_fs_mailbox_handle_status() {
   uint8_t const mask = usb_fatfs_mounted_mask();
   uint8_t const count = usb_fatfs_mounted_count();
   uint16_t const status = (mask != 0 ? RP_FS_STATUS_READY : 0) | ((uint16_t)count << 8);
   rp_fs_mb_set_done(status, mask);
 
   gFSStatusCount++;
+
+  return mbDONE;
 }
 
 /// <summary>
@@ -155,7 +123,7 @@ static void rp_fs_mb_handle_status() {
 /// byte contains read-only flags, and ARG2 high byte selects the device/FatFs
 /// drive. RES0 receives the RP-side file handle on success.
 /// </summary>
-static void rp_fs_mb_handle_open() {
+mailbox_state_t rp_fs_mailbox_handle_open() {
   uint16_t const src = rp_read16(RP_ARG0L);
   uint16_t const scan_len = rp_read16(RP_ARG1L);
   uint16_t const open_arg = rp_read16(RP_ARG2L);
@@ -164,18 +132,18 @@ static void rp_fs_mb_handle_open() {
 
   if (flags != 0) {
     rp_fs_mb_set_error(RP_ERR_EPERM);
-    return;
+    return mbDONE;
   }
 
   if (rp_fs_free_handle_count() == 0) {
     rp_fs_mb_set_error(RP_ERR_ENOMEM);
-    return;
+    return mbDONE;
   }
 
   char filename[RP_FS_MAILBOX_MAX_PATH];
   if (!rp_fs_mb_read_filename(src, scan_len, filename, sizeof(filename))) {
     rp_fs_mb_set_error(RP_ERR_EINVAL);
-    return;
+    return mbDONE;
   }
 
   int const handle = rp_fs_open_readonly_83(device, filename);
@@ -184,11 +152,13 @@ static void rp_fs_mb_handle_open() {
       rp_fs_mb_set_error(RP_ERR_EIO);
     else
       rp_fs_mb_set_error(RP_ERR_ENOENT);
-    return;
+    return mbDONE;
   }
 
   rp_fs_mb_set_done((uint16_t)handle);
   gFSOpenCount++;
+
+  return mbDONE;
 }
 
 /// <summary>
@@ -197,25 +167,25 @@ static void rp_fs_mb_handle_open() {
 /// is capped to RP_FS_MAILBOX_CHUNK_SIZE bytes, RES0 receives the number of bytes
 /// copied, and RP_FS_FLAG_EOF is set in FLAGS when the handle is at EOF.
 /// </summary>
-static void rp_fs_mb_handle_read() {
+mailbox_state_t rp_fs_mailbox_handle_read() {
   uint16_t const dst = rp_read16(RP_ARG0L);
   uint16_t len = rp_read16(RP_ARG1L);
   uint8_t const handle = (uint8_t)(rp_read16(RP_ARG2L) & 0xFF);
 
   if (dst == 0) {
     rp_fs_mb_set_error(RP_ERR_EINVAL);
-    return;
+    return mbDONE;
   }
 
   if (!rp_fs_is_open(handle)) {
     rp_fs_mb_set_error(RP_ERR_EINVAL);
-    return;
+    return mbDONE;
   }
 
   if (len == 0) {
     uint8_t const eof = (rp_fs_position(handle) >= rp_fs_size(handle)) ? RP_FS_FLAG_EOF : 0;
     rp_fs_mb_set_done(0, eof);
-    return;
+    return mbDONE;
   }
 
   if (len > RP_FS_MAILBOX_CHUNK_SIZE)
@@ -224,7 +194,7 @@ static void rp_fs_mb_handle_read() {
   int const count = rp_fs_read(handle, gFSReadBuffer, len);
   if (count < 0) {
     rp_fs_mb_set_error(RP_ERR_EIO);
-    return;
+    return mbDONE;
   }
 
   if (count > 0)
@@ -234,6 +204,8 @@ static void rp_fs_mb_handle_read() {
   rp_fs_mb_set_done((uint16_t)count, eof);
 
   gFSReadCount++;
+
+  return mbDONE;
 }
 
 /// <summary>
@@ -241,61 +213,23 @@ static void rp_fs_mb_handle_read() {
 /// Only currently-open handles are accepted; stale handles after USB removal are
 /// rejected because usb_fatfs_unmount() closes all RP filesystem handles.
 /// </summary>
-static void rp_fs_mb_handle_close() {
+mailbox_state_t rp_fs_mailbox_handle_close() {
   uint8_t const handle = (uint8_t)(rp_read16(RP_ARG2L) & 0xFF);
 
   if (!rp_fs_is_open(handle)) {
     rp_fs_mb_set_error(RP_ERR_EINVAL);
-    return;
+    return mbDONE;
   }
 
   if (!rp_fs_close(handle)) {
     rp_fs_mb_set_error(RP_ERR_EIO);
-    return;
+    return mbDONE;
   }
 
   rp_fs_mb_set_done(0);
   gFSCloseCount++;
-}
 
-/// <summary>
-/// rp_fs_mailbox_handle_status is the public entry point for the explicit
-/// RP_CMD_FS_STATUS case in mailbox.cpp.
-/// </summary>
-void rp_fs_mailbox_handle_status() {
-  gFSCommandCount++;
-  rp_fs_mb_clear_result_fields();
-  rp_fs_mb_handle_status();
-}
-
-/// <summary>
-/// rp_fs_mailbox_handle_open is the public entry point for the explicit
-/// RP_CMD_FS_OPEN case in mailbox.cpp.
-/// </summary>
-void rp_fs_mailbox_handle_open() {
-  gFSCommandCount++;
-  rp_fs_mb_clear_result_fields();
-  rp_fs_mb_handle_open();
-}
-
-/// <summary>
-/// rp_fs_mailbox_handle_read is the public entry point for the explicit
-/// RP_CMD_FS_READ case in mailbox.cpp.
-/// </summary>
-void rp_fs_mailbox_handle_read() {
-  gFSCommandCount++;
-  rp_fs_mb_clear_result_fields();
-  rp_fs_mb_handle_read();
-}
-
-/// <summary>
-/// rp_fs_mailbox_handle_close is the public entry point for the explicit
-/// RP_CMD_FS_CLOSE case in mailbox.cpp.
-/// </summary>
-void rp_fs_mailbox_handle_close() {
-  gFSCommandCount++;
-  rp_fs_mb_clear_result_fields();
-  rp_fs_mb_handle_close();
+  return mbDONE;
 }
 
 /// <summary>

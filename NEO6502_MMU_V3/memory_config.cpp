@@ -12,6 +12,7 @@ Lesser General Public License for more details.
 
 #include "memory_config.h"
 #include "mmu.h"
+#include "vdu.h"
 
 MemoryConfig memoryConfig;
 MemoryIniError lastMemoryIniError;
@@ -998,34 +999,49 @@ void dumpMMUPageMap(uint8_t context)
   Serial1.println("--------------------------------------------------");
 }
 
-void dumpMMUContext(uint8_t context)
-{
+/// <summary>
+/// dumps the MMU page map for a given context in a compact format, showing the physical page mappings for each logical page in the context. The output is printed to Serial1 and the VDU.
+/// </summary>
+/// <param name="context"></param>
+void dumpMMUContext(uint8_t context) {
   uint8_t page;
 
   if (context >= MAX_MEMORY_CONTEXTS)
     return;
 
-  Serial1.printf("CTX%1X : ", context);
+  //  Serial1.printf("CTX%1X:", context);
+  vduPrintf("CTX%1X:", context);
 
   for (page = 0; page < NUM_CONTEXT_PAGES; page++) {
     uint8_t phys = readMMUPage(context, page);
     uint8_t base = phys & 0x7F;
     bool io = (phys & 0x80) ? true : false;
 
-    if (page)
-      Serial1.print(" ");
+    if (page) {
+      //      Serial1.print(" ");
+      vduPutc(' ');
+    }
 
-    Serial1.printf("%02X", base);
+    //    Serial1.printf("%02X", base);
+    vduPrintf("%02X", base);
 
-    if (io)
-      Serial1.print("*");
-    else
-      Serial1.print(" ");
+    if (io) {
+      //     Serial1.print("*");
+      vduPutc('*');
+    }
+    else {
+      //     Serial1.print(" ");
+      vduPutc(' ');
+    }
   }
 
-  Serial1.println();
+  //  Serial1.println();
+  vduPrintStr("\n");
 }
 
+/// <summary>
+/// dumps the MMU page maps for all contexts in the active memory model in a compact format, showing the physical page mappings for each logical page in each context. The output is printed to Serial1 and the VDU.
+/// </summary>
 void dumpMMUPageMapsCompact()
 {
   MemoryModel* model;
@@ -1033,16 +1049,19 @@ void dumpMMUPageMapsCompact()
 
   model = findModel(memoryConfig.active_model);
   if (!model) {
-    Serial1.println("*E: Active model not found");
+    vduPrintStr("*E: Active model not found\n");
     return;
   }
 
-  Serial1.println("--------------------------------------------------");
-  Serial1.println("MMU PAGE MAPS");
-  Serial1.println("--------------------------------------------------");
+  //  Serial1.println("--------------------------------------------------");
+  //  Serial1.println("MMU PAGE MAPS");
+  vduPrintStr("\nMMU PAGE MAPS\n");
+  //  Serial1.println("--------------------------------------------------");
+  vduPrintStr("-------------------------------------------------------------------\n");
 
   for (ctx = 0; ctx < model->contexts; ctx++)
     dumpMMUContext(ctx);
 
-  Serial1.println("--------------------------------------------------");
+  //  Serial1.println("--------------------------------------------------");
+  vduPrintStr("-------------------------------------------------------------------\n");
 }

@@ -282,7 +282,7 @@ void introDisplay() {
   setTColor(69);  // text color light blue
   vduPrintf("NEO6502_mmu: version v%s\n\n", VERSION);
 
-#if 1
+#if 0
   gduSetReg(R6, DEFAULT_MODE);  gduSetCmd(CMD_VDU);    // gdu mode
 
   setTColor(RED); // text color red
@@ -311,7 +311,7 @@ void introDisplay() {
   gduSetReg(R7, RED); gduSetCmd(CMD_GCOLOR);
   gduSetCmdx(CMD_LINE, 4, 100, 100, WIDTH - 10, HEIGHT - 10);
 
-  vduPrintStr("Hello world ...\n");
+  vduPrintStr("Hello world ...\n\n");
 
   dumpGDURegisterSet();
 #endif

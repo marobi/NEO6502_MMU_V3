@@ -85,6 +85,9 @@
     <ClCompile Include="rp_fs.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="rp_console_io.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="rp_fs_mailbox.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -202,6 +205,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="rp_fs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="rp_console_io.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="rp_fs_mailbox.h">

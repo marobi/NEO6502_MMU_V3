@@ -16,6 +16,7 @@ Lesser General Public License for more details.
 #include "mmu.h"
 #include "p6502.h"
 #include "rom.h"
+#include "vdu.h"
 
 // ----------------------------------------
 // Visible config mapping
@@ -115,7 +116,7 @@ bool activateConfiguration(int cfgIndex) {
   set6502State(sBOOT);
 
 
-  Serial1.println(" ROM                            CTX Load Size");
+  vduPrintStr(" ROM                            CTX Load Size\n");
 
   for (uint8_t i = 0; i < configs[cfgIndex].count; i++) {
 
@@ -125,7 +126,7 @@ bool activateConfiguration(int cfgIndex) {
     char fullPath[64];
     snprintf(fullPath, sizeof(fullPath), "/system/%s", cartridges[cartIndex].file);
 
-    Serial1.printf("%32s %2d ", fullPath, ctx);
+    vduPrintf("%32s %2d ", fullPath, ctx);
     
     // read image of ROM file into memory
     data = readBinaryFile(fullPath);
@@ -161,8 +162,8 @@ void bootSystemWithMenu() {
 
   int cfgIndex = waitForUserSelection(5000);
 
-  Serial1.printf("*I: Loading configuration: %s\n",
-    configs[cfgIndex].name);
+  Serial1.printf("*I: Loading configuration: %s\n", configs[cfgIndex].name);
+  vduPrintf("Loading configuration: %s\n", configs[cfgIndex].name);
 
   if (! activateConfiguration(cfgIndex)) {
 
