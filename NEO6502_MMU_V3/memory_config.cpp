@@ -1010,7 +1010,7 @@ void dumpMMUContext(uint8_t context) {
     return;
 
   //  Serial1.printf("CTX%1X:", context);
-  vduPrintf("CTX%1X:", context);
+  vduPrintf("CTX%1X: ", context);
 
   for (page = 0; page < NUM_CONTEXT_PAGES; page++) {
     uint8_t phys = readMMUPage(context, page);
@@ -1057,11 +1057,11 @@ void dumpMMUPageMapsCompact()
   //  Serial1.println("MMU PAGE MAPS");
   vduPrintStr("\nMMU PAGE MAPS\n");
   //  Serial1.println("--------------------------------------------------");
-  vduPrintStr("-------------------------------------------------------------------\n");
+  vduPrintStr("---------------------------------------------------------------------\n");
 
   for (ctx = 0; ctx < model->contexts; ctx++)
     dumpMMUContext(ctx);
 
   //  Serial1.println("--------------------------------------------------");
-  vduPrintStr("-------------------------------------------------------------------\n");
+  vduPrintStr("---------------------------------------------------------------------\n");
 }

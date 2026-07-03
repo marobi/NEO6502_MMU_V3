@@ -84,6 +84,15 @@ enum mailbox_state_t {
 #define RP_FS_CMD_READ      0x03
 #define RP_FS_CMD_CLOSE     0x04
 #define RP_FS_CMD_WRITE     0x05
+#define RP_FS_CMD_LOAD      0x06
+#define RP_FS_CMD_SAVE      0x07
+#define RP_FS_CMD_SEEK      0x08
+#define RP_FS_CMD_TELL      0x09
+#define RP_FS_CMD_DELETE    0x0A
+#define RP_FS_CMD_RENAME    0x0B
+#define RP_FS_CMD_OPENDIR   0x0C
+#define RP_FS_CMD_READDIR   0x0D
+#define RP_FS_CMD_CLOSEDIR  0x0E
 
 // ------------------------------------------------------------
 // RP mailbox error codes aligned with the existing RP mailbox ABI.
@@ -104,8 +113,15 @@ enum mailbox_state_t {
 #define RP_FS_STATUS_READY  0x0001
 #define RP_FS_FLAG_EOF      0x01
 
-#define RP_FS_OPEN_READ            0x00
-#define RP_FS_OPEN_WRITE_TRUNC     0x01
+#define RP_FS_OPEN_READ              0x00
+#define RP_FS_OPEN_WRITE_TRUNC       0x01
+#define RP_FS_OPEN_WRITE_EXISTING    0x02
+#define RP_FS_OPEN_RW_EXISTING       0x03
+#define RP_FS_OPEN_RW_CREATE         0x04
+
+#define RP_FS_SEEK_SET               0x00
+#define RP_FS_SEEK_CUR               0x01
+#define RP_FS_SEEK_END               0x02
 
 
 // ------------------------------------------------------------
@@ -113,6 +129,7 @@ enum mailbox_state_t {
 // ------------------------------------------------------------
 void rp_mailbox_clear_result_fields();
 void rp_mailbox_set_done(uint16_t result, uint8_t flags = 0);
+void rp_mailbox_set_done32(uint32_t result, uint8_t flags = 0);
 void rp_mailbox_set_error(uint8_t err, uint16_t partial = 0);
 
 // ------------------------------------------------------------

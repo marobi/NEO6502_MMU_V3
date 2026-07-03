@@ -70,7 +70,6 @@ typedef struct {
 } vdu_mode_t;
 
 extern const vdu_mode_t* vduMode;              // treat as RO
-extern bool  scrollActive;
 
 void setCursor(const boolean);
 void resetDisplay(const uint8_t);

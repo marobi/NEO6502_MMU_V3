@@ -77,7 +77,7 @@ static bool           gInsertMode = false;
 static bool           gAsScreenMode = false;
 
 static bool           smoothScroll = false;
-bool                  scrollActive = false;
+static bool           scrollActive = false;
 static uint8_t        scrollPixel = 0;
 static int            pendingCursorRow = -1;
 

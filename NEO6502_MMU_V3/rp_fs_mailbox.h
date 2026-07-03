@@ -7,7 +7,7 @@
 
 // ============================================================
 // rp_fs_mailbox.h
-// NEO MMU - read-only filesystem mailbox command bridge
+// NEO MMU - filesystem mailbox command bridge
 //
 // RP-side only. The 6502 syscall/kernel bindings are a separate milestone.
 // mailbox.cpp owns the single central command table and dispatch.
@@ -38,6 +38,51 @@ mailbox_state_t rp_fs_mailbox_handle_write();
 /// Handles FS_CLOSE for the central mailbox command table.
 /// </summary>
 mailbox_state_t rp_fs_mailbox_handle_close();
+
+/// <summary>
+/// Handles FS_LOAD for the central mailbox command table.
+/// </summary>
+mailbox_state_t rp_fs_mailbox_handle_load();
+
+/// <summary>
+/// Handles FS_SAVE for the central mailbox command table.
+/// </summary>
+mailbox_state_t rp_fs_mailbox_handle_save();
+
+/// <summary>
+/// Handles FS_SEEK for the central mailbox command table.
+/// </summary>
+mailbox_state_t rp_fs_mailbox_handle_seek();
+
+/// <summary>
+/// Handles FS_TELL for the central mailbox command table.
+/// </summary>
+mailbox_state_t rp_fs_mailbox_handle_tell();
+
+/// <summary>
+/// Handles FS_DELETE for the central mailbox command table.
+/// </summary>
+mailbox_state_t rp_fs_mailbox_handle_delete();
+
+/// <summary>
+/// Handles FS_RENAME for the central mailbox command table.
+/// </summary>
+mailbox_state_t rp_fs_mailbox_handle_rename();
+
+/// <summary>
+/// Handles FS_OPENDIR for the central mailbox command table.
+/// </summary>
+mailbox_state_t rp_fs_mailbox_handle_opendir();
+
+/// <summary>
+/// Handles FS_READDIR for the central mailbox command table.
+/// </summary>
+mailbox_state_t rp_fs_mailbox_handle_readdir();
+
+/// <summary>
+/// Handles FS_CLOSEDIR for the central mailbox command table.
+/// </summary>
+mailbox_state_t rp_fs_mailbox_handle_closedir();
 
 /// <summary>
 /// Closes all RP-side filesystem handles owned by the mailbox layer.

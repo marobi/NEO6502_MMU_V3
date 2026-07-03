@@ -30,7 +30,6 @@ Lesser General Public License for more details.
 #include "cmd.h"
 #include "vdu.h"
 #include "gdu.h"
-#include "cmd_interface.h"
 
 #include "rom.h"
 
@@ -112,7 +111,6 @@ void setup() {
     Serial1.println("*I: LittleFS mount OK");
 
   initVDU();           // get display running
-  initCmdInterface();  // init CMD command interface
 
   introDisplay();      // show intro
 

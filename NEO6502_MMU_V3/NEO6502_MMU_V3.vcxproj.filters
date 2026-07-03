@@ -165,9 +165,6 @@
     <ClInclude Include="gdu.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="cmd_interface.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="sys_config.h">
       <Filter>Header Files</Filter>
     </ClInclude>

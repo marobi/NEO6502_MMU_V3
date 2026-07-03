@@ -104,6 +104,22 @@ void rp_mailbox_set_done(uint16_t result, uint8_t flags) {
 }
 
 /// <summary>
+/// rp_mailbox_set_done32() writes a successful 32-bit mailbox result split
+/// across RES0 low word and RES1 high word, then marks the request block DONE.
+/// </summary>
+/// <param name="result">32-bit result value written to RES0/RES1.</param>
+/// <param name="flags">Result flags written to RP_FLAGS.</param>
+void rp_mailbox_set_done32(uint32_t result, uint8_t flags) {
+  rp_write16(RP_RES0L, (uint16_t)(result & 0xFFFFUL));
+  rp_write16(RP_RES1L, (uint16_t)((result >> 16) & 0xFFFFUL));
+  snoop_write6502MemoryLoc(RP_ERR, RP_ERR_OK);
+  snoop_write6502MemoryLoc(RP_FLAGS, flags);
+
+  snoop_write6502MemoryLoc(RP_STATUS, RP_DONE);
+  rp_clear_doorbell();
+}
+
+/// <summary>
 /// rp_mailbox_set_error() writes a mailbox error result and marks the request
 /// block ERROR for the 6502 side.
 /// </summary>
@@ -164,6 +180,15 @@ static const RPMailboxCommandEntry gMailboxCommands[] = {
   { RP_GROUP_FS,      RP_FS_CMD_READ,   "fs.read",       rp_fs_mailbox_handle_read    },
   { RP_GROUP_FS,      RP_FS_CMD_CLOSE,  "fs.close",      rp_fs_mailbox_handle_close   },
   { RP_GROUP_FS,      RP_FS_CMD_WRITE,  "fs.write",      rp_fs_mailbox_handle_write   },
+  { RP_GROUP_FS,      RP_FS_CMD_LOAD,   "fs.load",       rp_fs_mailbox_handle_load    },
+  { RP_GROUP_FS,      RP_FS_CMD_SAVE,   "fs.save",       rp_fs_mailbox_handle_save    },
+  { RP_GROUP_FS,      RP_FS_CMD_SEEK,   "fs.seek",       rp_fs_mailbox_handle_seek    },
+  { RP_GROUP_FS,      RP_FS_CMD_TELL,   "fs.tell",       rp_fs_mailbox_handle_tell    },
+  { RP_GROUP_FS,      RP_FS_CMD_DELETE, "fs.delete",     rp_fs_mailbox_handle_delete  },
+  { RP_GROUP_FS,      RP_FS_CMD_RENAME, "fs.rename",     rp_fs_mailbox_handle_rename  },
+  { RP_GROUP_FS,      RP_FS_CMD_OPENDIR, "fs.opendir",    rp_fs_mailbox_handle_opendir },
+  { RP_GROUP_FS,      RP_FS_CMD_READDIR, "fs.readdir",    rp_fs_mailbox_handle_readdir },
+  { RP_GROUP_FS,      RP_FS_CMD_CLOSEDIR,"fs.closedir",   rp_fs_mailbox_handle_closedir},
 };
 
 /// <summary>

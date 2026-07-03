@@ -19,13 +19,24 @@ struct RPFSHandle {
   FIL  file;
 };
 
+struct RPFSDirHandle {
+  bool in_use;
+  uint8_t device;
+  DIR dir;
+};
+
 static constexpr uint8_t RP_FS_HANDLE_READ  = 0x01;
 static constexpr uint8_t RP_FS_HANDLE_WRITE = 0x02;
 
 static RPFSHandle gRPFSHandles[RP_FS_MAX_HANDLES];
+static RPFSDirHandle gRPFSDirHandles[RP_FS_MAX_DIR_HANDLES];
 
 static bool rp_fs_valid_handle(uint8_t handle) {
   return handle < RP_FS_MAX_HANDLES && gRPFSHandles[handle].in_use;
+}
+
+static bool rp_fs_valid_dir_handle(uint8_t handle) {
+  return handle < RP_FS_MAX_DIR_HANDLES && gRPFSDirHandles[handle].in_use;
 }
 
 bool rp_fs_is_open(uint8_t handle) {
@@ -36,6 +47,19 @@ uint8_t rp_fs_free_handle_count() {
   uint8_t count = 0;
   for (uint8_t i = 0; i < RP_FS_MAX_HANDLES; i++) {
     if (!gRPFSHandles[i].in_use)
+      count++;
+  }
+  return count;
+}
+
+bool rp_fs_dir_is_open(uint8_t handle) {
+  return rp_fs_valid_dir_handle(handle);
+}
+
+uint8_t rp_fs_free_dir_handle_count() {
+  uint8_t count = 0;
+  for (uint8_t i = 0; i < RP_FS_MAX_DIR_HANDLES; i++) {
+    if (!gRPFSDirHandles[i].in_use)
       count++;
   }
   return count;
@@ -124,6 +148,125 @@ static bool rp_fs_make_path(uint8_t device, const char* filename, char* out, siz
   return true;
 }
 
+static bool rp_fs_is_valid_83_component(const char* start, size_t len) {
+  if (start == nullptr || len == 0)
+    return false;
+
+  uint8_t base_len = 0;
+  uint8_t ext_len = 0;
+  bool in_ext = false;
+
+  for (size_t i = 0; i < len; i++) {
+    char const c = start[i];
+
+    if (c == '\\' || c == ':' || c < 33 || c >= 127)
+      return false;
+
+    if (c >= 'a' && c <= 'z')
+      return false;
+
+    if (c == '.') {
+      if (in_ext || base_len == 0)
+        return false;
+      in_ext = true;
+      continue;
+    }
+
+    if (!(c >= 'A' && c <= 'Z') && !(c >= '0' && c <= '9') && c != '_' && c != '-' && c != '$' && c != '~')
+      return false;
+
+    if (in_ext) {
+      ext_len++;
+      if (ext_len > 3)
+        return false;
+    }
+    else {
+      base_len++;
+      if (base_len > 8)
+        return false;
+    }
+  }
+
+  return base_len != 0 && (!in_ext || ext_len != 0);
+}
+
+static bool rp_fs_is_valid_83_path(const char* path) {
+  if (path == nullptr)
+    return false;
+
+  const char* name = path;
+  if ((path[0] >= '0' && path[0] <= '9') && path[1] == ':' && path[2] == '/')
+    name = path + 3;
+
+  if (name[0] == '\0')
+    return true;
+
+  if (name[0] == '/') {
+    name++;
+    if (name[0] == '\0')
+      return true;
+  }
+
+  const char* component = name;
+  size_t component_len = 0;
+
+  for (const char* p = name; ; p++) {
+    char const c = *p;
+    if (c == '/' || c == '\0') {
+      if (!rp_fs_is_valid_83_component(component, component_len))
+        return false;
+
+      if (c == '\0')
+        return true;
+
+      component = p + 1;
+      component_len = 0;
+      if (*component == '\0')
+        return false;
+      continue;
+    }
+
+    component_len++;
+  }
+}
+
+static bool rp_fs_make_dir_path(uint8_t device, const char* dirname, char* out, size_t out_len) {
+  if (dirname == nullptr || out == nullptr || out_len == 0)
+    return false;
+
+  if (!rp_fs_valid_device(device) || device > 9 || out_len < 4)
+    return false;
+
+  if (!rp_fs_is_valid_83_path(dirname))
+    return false;
+
+  if ((dirname[0] >= '0' && dirname[0] <= '9') && dirname[1] == ':' && dirname[2] == '/') {
+    if ((uint8_t)(dirname[0] - '0') != device)
+      return false;
+    if (strlen(dirname) >= out_len)
+      return false;
+    strcpy(out, dirname);
+    return true;
+  }
+
+  out[0] = (char)('0' + device);
+  out[1] = ':';
+  out[2] = '/';
+
+  if (dirname[0] == '\0' || (dirname[0] == '/' && dirname[1] == '\0')) {
+    out[3] = '\0';
+    return true;
+  }
+
+  const char* source = dirname[0] == '/' ? dirname + 1 : dirname;
+  size_t const name_len = strlen(source);
+  if (3 + name_len >= out_len)
+    return false;
+
+  memcpy(out + 3, source, name_len + 1);
+  return true;
+}
+
 bool rp_fs_ready() {
   return usb_fatfs_mounted_mask() != 0;
 }
@@ -132,11 +275,19 @@ bool rp_fs_ready(uint8_t device) {
   return rp_fs_valid_device(device) && usb_fatfs_mounted(device);
 }
 
-int rp_fs_open_readonly_83(const char* filename) {
-  return rp_fs_open_readonly_83(0, filename);
-}
-
-int rp_fs_open_readonly_83(uint8_t device, const char* filename) {
+/// <summary>
+/// rp_fs_open_mode_83 opens an 8.3 filesystem path on the selected USB/FatFs
+/// device using the supplied FatFs mode and records the permitted NEOX handle
+/// operations.
+/// </summary>
+/// <param name="device">RP USB storage device/FatFs drive number.</param>
+/// <param name="filename">Unqualified 8.3 name or matching FatFs-qualified path.</param>
+/// <param name="fatfs_mode">FatFs f_open mode flags.</param>
+/// <param name="handle_flags">RP_FS_HANDLE_READ and/or RP_FS_HANDLE_WRITE.</param>
+/// <param name="operation">Diagnostic operation text for Serial1 messages.</param>
+/// <param name="invalid_name_message">Diagnostic text for invalid name failures.</param>
+/// <returns>RP-side handle 0..RP_FS_MAX_HANDLES-1 on success, or -1 on failure.</returns>
+static int rp_fs_open_mode_83(uint8_t device, const char* filename, uint8_t fatfs_mode, uint8_t handle_flags, const char* operation, const char* invalid_name_message) {
   if (!rp_fs_valid_device(device)) {
     Serial1.printf("*E: RP FS: invalid device %u\n", (unsigned)device);
     return -1;
@@ -162,20 +313,28 @@ int rp_fs_open_readonly_83(uint8_t device, const char* filename) {
 
   char path[96];
   if (!rp_fs_make_path(device, filename, path, sizeof(path))) {
-    Serial1.println("*E: RP FS: invalid or too long filename");
+    Serial1.println(invalid_name_message);
     return -1;
   }
 
-  FRESULT const fr = f_open(&gRPFSHandles[slot].file, path, FA_READ);
+  FRESULT const fr = f_open(&gRPFSHandles[slot].file, path, fatfs_mode);
   if (fr != FR_OK) {
-    Serial1.printf("*W: RP FS: open %s failed fr=%u\n", path, (unsigned)fr);
+    Serial1.printf("*W: RP FS: %s %s failed fr=%u\n", operation, path, (unsigned)fr);
     return -1;
   }
 
   gRPFSHandles[slot].device = device;
-  gRPFSHandles[slot].flags = RP_FS_HANDLE_READ;
+  gRPFSHandles[slot].flags = handle_flags;
   gRPFSHandles[slot].in_use = true;
   return slot;
+}
+
+int rp_fs_open_readonly_83(const char* filename) {
+  return rp_fs_open_readonly_83(0, filename);
+}
+
+int rp_fs_open_readonly_83(uint8_t device, const char* filename) {
+  return rp_fs_open_mode_83(device, filename, FA_READ, RP_FS_HANDLE_READ, "open", "*E: RP FS: invalid or too long filename");
 }
 
 int rp_fs_open_write_truncate_83(const char* filename) {
@@ -183,45 +342,31 @@ int rp_fs_open_write_truncate_83(const char* filename) {
 }
 
 int rp_fs_open_write_truncate_83(uint8_t device, const char* filename) {
-  if (!rp_fs_valid_device(device)) {
-    Serial1.printf("*E: RP FS: invalid device %u\n", (unsigned)device);
-    return -1;
-  }
+  return rp_fs_open_mode_83(device, filename, FA_WRITE | FA_CREATE_ALWAYS, RP_FS_HANDLE_WRITE, "open write", "*E: RP FS: invalid 8.3 filename");
+}
 
-  if (!usb_fatfs_mounted(device)) {
-    if (!usb_fatfs_mount(device))
-      return -1;
-  }
+int rp_fs_open_write_existing_83(const char* filename) {
+  return rp_fs_open_write_existing_83(0, filename);
+}
 
-  int slot = -1;
-  for (uint8_t i = 0; i < RP_FS_MAX_HANDLES; i++) {
-    if (!gRPFSHandles[i].in_use) {
-      slot = i;
-      break;
-    }
-  }
+int rp_fs_open_write_existing_83(uint8_t device, const char* filename) {
+  return rp_fs_open_mode_83(device, filename, FA_READ | FA_WRITE | FA_OPEN_EXISTING, RP_FS_HANDLE_WRITE, "open write existing", "*E: RP FS: invalid 8.3 filename");
+}
 
-  if (slot < 0) {
-    Serial1.println("*E: RP FS: no free file handles");
-    return -1;
-  }
+int rp_fs_open_rw_existing_83(const char* filename) {
+  return rp_fs_open_rw_existing_83(0, filename);
+}
 
-  char path[96];
-  if (!rp_fs_make_path(device, filename, path, sizeof(path))) {
-    Serial1.println("*E: RP FS: invalid 8.3 filename");
-    return -1;
-  }
+int rp_fs_open_rw_existing_83(uint8_t device, const char* filename) {
+  return rp_fs_open_mode_83(device, filename, FA_READ | FA_WRITE | FA_OPEN_EXISTING, RP_FS_HANDLE_READ | RP_FS_HANDLE_WRITE, "open rw existing", "*E: RP FS: invalid 8.3 filename");
+}
 
-  FRESULT const fr = f_open(&gRPFSHandles[slot].file, path, FA_WRITE | FA_CREATE_ALWAYS);
-  if (fr != FR_OK) {
-    Serial1.printf("*W: RP FS: open write %s failed fr=%u\n", path, (unsigned)fr);
-    return -1;
-  }
+int rp_fs_open_rw_create_83(const char* filename) {
+  return rp_fs_open_rw_create_83(0, filename);
+}
 
-  gRPFSHandles[slot].device = device;
-  gRPFSHandles[slot].flags = RP_FS_HANDLE_WRITE;
-  gRPFSHandles[slot].in_use = true;
-  return slot;
+int rp_fs_open_rw_create_83(uint8_t device, const char* filename) {
+  return rp_fs_open_mode_83(device, filename, FA_READ | FA_WRITE | FA_OPEN_ALWAYS, RP_FS_HANDLE_READ | RP_FS_HANDLE_WRITE, "open rw create", "*E: RP FS: invalid 8.3 filename");
 }
 
 bool rp_fs_close(uint8_t handle) {
@@ -275,6 +420,246 @@ int rp_fs_write(uint8_t handle, const uint8_t* src, uint16_t len) {
   return (int)bw;
 }
 
+/// <summary>
+/// rp_fs_seek moves an open RP filesystem handle to an absolute byte position.
+/// Relative SEEK_SET/SEEK_CUR/SEEK_END arithmetic is owned by the mailbox layer.
+/// </summary>
+/// <param name="handle">Open RP-side filesystem handle.</param>
+/// <param name="position">Absolute byte position from BOF.</param>
+/// <returns>true when FatFs accepted the seek.</returns>
+bool rp_fs_seek(uint8_t handle, uint32_t position) {
+  if (!rp_fs_valid_handle(handle))
+    return false;
+
+  FRESULT const fr = f_lseek(&gRPFSHandles[handle].file, (FSIZE_t)position);
+  if (fr != FR_OK) {
+    Serial1.printf("*E: RP FS: seek handle=%u pos=%lu failed fr=%u\n", handle, (unsigned long)position, (unsigned)fr);
+    return false;
+  }
+
+  return true;
+}
+
+/// <summary>
+/// rp_fs_delete_83 deletes an 8.3 filesystem path on device 0.
+/// </summary>
+/// <param name="filename">Unqualified 8.3 name or matching FatFs-qualified path.</param>
+/// <returns>true when FatFs deleted the path.</returns>
+bool rp_fs_delete_83(const char* filename) {
+  return rp_fs_delete_83(0, filename);
+}
+
+/// <summary>
+/// rp_fs_delete_83 deletes an 8.3 filesystem path on the selected USB/FatFs
+/// device. It uses the same path validation and device qualification rules as
+/// file open.
+/// </summary>
+/// <param name="device">RP USB storage device/FatFs drive number.</param>
+/// <param name="filename">Unqualified 8.3 name or matching FatFs-qualified path.</param>
+/// <returns>true when FatFs deleted the path.</returns>
+bool rp_fs_delete_83(uint8_t device, const char* filename) {
+  if (!rp_fs_valid_device(device)) {
+    Serial1.printf("*E: RP FS: delete invalid device %u\n", (unsigned)device);
+    return false;
+  }
+
+  if (!usb_fatfs_mounted(device)) {
+    if (!usb_fatfs_mount(device))
+      return false;
+  }
+
+  char path[96];
+  if (!rp_fs_make_path(device, filename, path, sizeof(path))) {
+    Serial1.println("*E: RP FS: delete invalid 8.3 filename");
+    return false;
+  }
+
+  FRESULT const fr = f_unlink(path);
+  if (fr != FR_OK) {
+    Serial1.printf("*W: RP FS: delete %s failed fr=%u\n", path, (unsigned)fr);
+    return false;
+  }
+
+  return true;
+}
+
+/// <summary>
+/// rp_fs_rename_83 renames an 8.3 filesystem path on device 0.
+/// </summary>
+/// <param name="old_filename">Existing unqualified 8.3 source name or matching FatFs-qualified path.</param>
+/// <param name="new_filename">New unqualified 8.3 destination name or matching FatFs-qualified path.</param>
+/// <returns>true when FatFs renamed the path.</returns>
+bool rp_fs_rename_83(const char* old_filename, const char* new_filename) {
+  return rp_fs_rename_83(0, old_filename, new_filename);
+}
+
+/// <summary>
+/// rp_fs_rename_83 renames an 8.3 filesystem path on the selected USB/FatFs
+/// device. Both paths must satisfy the same validation and explicit-device
+/// qualification rules as file open.
+/// </summary>
+/// <param name="device">RP USB storage device/FatFs drive number.</param>
+/// <param name="old_filename">Existing unqualified 8.3 source name or matching FatFs-qualified path.</param>
+/// <param name="new_filename">New unqualified 8.3 destination name or matching FatFs-qualified path.</param>
+/// <returns>true when FatFs renamed the path.</returns>
+bool rp_fs_rename_83(uint8_t device, const char* old_filename, const char* new_filename) {
+  if (!rp_fs_valid_device(device)) {
+    Serial1.printf("*E: RP FS: rename invalid device %u\n", (unsigned)device);
+    return false;
+  }
+
+  if (!usb_fatfs_mounted(device)) {
+    if (!usb_fatfs_mount(device))
+      return false;
+  }
+
+  char old_path[96];
+  char new_path[96];
+  if (!rp_fs_make_path(device, old_filename, old_path, sizeof(old_path)) ||
+      !rp_fs_make_path(device, new_filename, new_path, sizeof(new_path))) {
+    Serial1.println("*E: RP FS: rename invalid 8.3 filename");
+    return false;
+  }
+
+  FRESULT const fr = f_rename(old_path, new_path);
+  if (fr != FR_OK) {
+    Serial1.printf("*W: RP FS: rename %s -> %s failed fr=%u\n", old_path, new_path, (unsigned)fr);
+    return false;
+  }
+
+  return true;
+}
+
+/// <summary>
+/// rp_fs_opendir_83 opens an 8.3 directory path on device 0.
+/// </summary>
+/// <param name="dirname">Unqualified 8.3 path, root path, or matching FatFs-qualified path.</param>
+/// <returns>RP-side directory handle 0..RP_FS_MAX_DIR_HANDLES-1 on success, or -1 on failure.</returns>
+int rp_fs_opendir_83(const char* dirname) {
+  return rp_fs_opendir_83(0, dirname);
+}
+
+/// <summary>
+/// rp_fs_opendir_83 opens an explicit 8.3 directory path on the selected
+/// USB/FatFs device. This does not use or modify a global current directory.
+/// </summary>
+/// <param name="device">RP USB storage device/FatFs drive number.</param>
+/// <param name="dirname">Unqualified 8.3 path, root path, or matching FatFs-qualified path.</param>
+/// <returns>RP-side directory handle 0..RP_FS_MAX_DIR_HANDLES-1 on success, or -1 on failure.</returns>
+int rp_fs_opendir_83(uint8_t device, const char* dirname) {
+  if (!rp_fs_valid_device(device)) {
+    Serial1.printf("*E: RP FS: opendir invalid device %u\n", (unsigned)device);
+    return -1;
+  }
+
+  if (!usb_fatfs_mounted(device)) {
+    if (!usb_fatfs_mount(device))
+      return -1;
+  }
+
+  int slot = -1;
+  for (uint8_t i = 0; i < RP_FS_MAX_DIR_HANDLES; i++) {
+    if (!gRPFSDirHandles[i].in_use) {
+      slot = i;
+      break;
+    }
+  }
+
+  if (slot < 0) {
+    Serial1.println("*E: RP FS: no free dir handles");
+    return -1;
+  }
+
+  char path[96];
+  if (!rp_fs_make_dir_path(device, dirname, path, sizeof(path))) {
+    Serial1.println("*E: RP FS: opendir invalid 8.3 path");
+    return -1;
+  }
+
+  FRESULT const fr = f_opendir(&gRPFSDirHandles[slot].dir, path);
+  if (fr != FR_OK) {
+    Serial1.printf("*W: RP FS: opendir %s failed fr=%u\n", path, (unsigned)fr);
+    return -1;
+  }
+
+  gRPFSDirHandles[slot].device = device;
+  gRPFSDirHandles[slot].in_use = true;
+  return slot;
+}
+
+/// <summary>
+/// rp_fs_readdir reads the next entry from an open RP directory handle.
+/// Dot entries are skipped. The return value distinguishes EOF from error.
+/// </summary>
+/// <param name="handle">Open RP-side directory handle.</param>
+/// <param name="name">Destination for the NUL-terminated 8.3 entry name.</param>
+/// <param name="name_len">Size of the name destination buffer.</param>
+/// <param name="attr">Destination for FatFs attribute flags.</param>
+/// <param name="size">Destination for file size; directories report their FatFs size value.</param>
+/// <returns>1 when an entry was returned, 0 at end of directory, or -1 on error.</returns>
+int rp_fs_readdir(uint8_t handle, char* name, size_t name_len, uint8_t* attr, uint32_t* size) {
+  if (!rp_fs_valid_dir_handle(handle) || name == nullptr || name_len < 13 || attr == nullptr || size == nullptr)
+    return -1;
+
+  FILINFO info{};
+  for (;;) {
+    FRESULT const fr = f_readdir(&gRPFSDirHandles[handle].dir, &info);
+    if (fr != FR_OK) {
+      Serial1.printf("*E: RP FS: readdir handle=%u failed fr=%u\n", handle, (unsigned)fr);
+      return -1;
+    }
+
+    if (info.fname[0] == '\0') {
+      name[0] = '\0';
+      *attr = 0;
+      *size = 0;
+      return 0;
+    }
+
+    if (strcmp(info.fname, ".") == 0 || strcmp(info.fname, "..") == 0)
+      continue;
+
+    const char* entry_name = info.fname;
+#if FF_USE_LFN
+    if (!rp_fs_is_valid_83_name(entry_name)) {
+      if (info.altname[0] != '\0' && rp_fs_is_valid_83_name(info.altname))
+        entry_name = info.altname;
+      else
+        continue;
+    }
+#else
+    if (!rp_fs_is_valid_83_name(entry_name))
+      continue;
+#endif
+
+    size_t const len = strlen(entry_name);
+    if (len >= name_len) {
+      Serial1.printf("*E: RP FS: readdir 8.3 name too long: %s\n", entry_name);
+      return -1;
+    }
+
+    memcpy(name, entry_name, len + 1);
+    *attr = (uint8_t)info.fattrib;
+    *size = (uint32_t)info.fsize;
+    return 1;
+  }
+}
+
+/// <summary>
+/// rp_fs_closedir closes an open RP directory handle and releases the slot.
+/// </summary>
+/// <param name="handle">Open RP-side directory handle.</param>
+/// <returns>true when FatFs accepted the close operation.</returns>
+bool rp_fs_closedir(uint8_t handle) {
+  if (!rp_fs_valid_dir_handle(handle))
+    return false;
+
+  FRESULT const fr = f_closedir(&gRPFSDirHandles[handle].dir);
+  gRPFSDirHandles[handle].in_use = false;
+  gRPFSDirHandles[handle].device = 0;
+  return fr == FR_OK;
+}
+
 uint32_t rp_fs_size(uint8_t handle) {
   if (!rp_fs_valid_handle(handle))
     return 0;
@@ -298,6 +683,14 @@ void rp_fs_close_all() {
       gRPFSHandles[i].flags = 0;
     }
   }
+
+  for (uint8_t i = 0; i < RP_FS_MAX_DIR_HANDLES; i++) {
+    if (gRPFSDirHandles[i].in_use) {
+      f_closedir(&gRPFSDirHandles[i].dir);
+      gRPFSDirHandles[i].in_use = false;
+      gRPFSDirHandles[i].device = 0;
+    }
+  }
 }
 
 void rp_fs_close_all_for_device(uint8_t device) {
@@ -310,6 +703,14 @@ void rp_fs_close_all_for_device(uint8_t device) {
       gRPFSHandles[i].in_use = false;
       gRPFSHandles[i].device = 0;
       gRPFSHandles[i].flags = 0;
+    }
+  }
+
+  for (uint8_t i = 0; i < RP_FS_MAX_DIR_HANDLES; i++) {
+    if (gRPFSDirHandles[i].in_use && gRPFSDirHandles[i].device == device) {
+      f_closedir(&gRPFSDirHandles[i].dir);
+      gRPFSDirHandles[i].in_use = false;
+      gRPFSDirHandles[i].device = 0;
     }
   }
 }

@@ -149,7 +149,6 @@
     <ClInclude Include="tusb_config.h" />
     <ClInclude Include="vdu.h" />
     <ClInclude Include="gdu.h" />
-    <ClInclude Include="cmd_interface.h" />
     <ClInclude Include="__vm\.NEO6502_MMU_V3.vsarduino.h" />
   </ItemGroup>
   <PropertyGroup>

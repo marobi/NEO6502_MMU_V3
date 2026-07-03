@@ -42,6 +42,7 @@ Lesser General Public License for more details.
 #include "debug_neox.h"
 #include "usb_storage.h"
 #include "rp_fs.h"
+#include "rp_fs_mailbox.h"
 #include "usb_keyboard_layout.h"
 
 // Create CLI Object
@@ -474,6 +475,361 @@ static void cmdFSTestCallback(cmd* c) {
 // DEBUG END: temporary RP filesystem local read-test monitor command
 
 
+/// <summary>
+/// ls_parse_u8 parses a decimal monitor argument and validates it against an
+/// inclusive upper bound.
+/// </summary>
+/// <param name="arg">Argument text.</param>
+/// <param name="max_value">Maximum accepted value.</param>
+/// <param name="value">Parsed output.</param>
+/// <returns>true when the value is valid.</returns>
+static bool ls_parse_u8(String arg, uint8_t max_value, uint8_t* value) {
+  if (value == nullptr)
+    return false;
+
+  arg.trim();
+  if (arg.length() == 0)
+    return false;
+
+  for (uint16_t i = 0; i < arg.length(); i++) {
+    if (!isDigit(arg[i]))
+      return false;
+  }
+
+  long const parsed = arg.toInt();
+  if (parsed < 0 || parsed > max_value)
+    return false;
+
+  *value = (uint8_t)parsed;
+  return true;
+}
+
+/// <summary>
+/// cmdLSCallback lists one explicit directory path using the RP V35 directory
+/// handle API directly. It is a permanent RP monitor command and does not use
+/// NEOX syscalls or mailbox READDIR.
+/// </summary>
+/// <param name="c">SimpleCLI command object.</param>
+static void cmdLSCallback(cmd* c) {
+  Command cmd(c);
+
+  uint8_t device = 0;
+  if (!ls_parse_u8(cmd.getArgument("device").getValue(), USB_STORAGE_MAX_DEVICES - 1, &device)) {
+    Serial1.println("*E: ls: device must be 0..3");
+    return;
+  }
+
+  String path = cmd.getArgument("path").getValue();
+  path.trim();
+  if (path.length() == 0)
+    path = "/";
+
+  if (!usb_storage_ready(device)) {
+    Serial1.printf("*E: ls: USB storage/FatFs device %u is not ready\n", (unsigned)device);
+    return;
+  }
+
+  Serial1.printf("*I: ls: device=%u path=%s\n", (unsigned)device, path.c_str());
+
+  int const dir_handle = rp_fs_opendir_83(device, path.c_str());
+  if (dir_handle < 0) {
+    Serial1.printf("*E: ls: opendir failed device=%u path=%s\n", (unsigned)device, path.c_str());
+    return;
+  }
+
+  uint16_t count = 0;
+  for (;;) {
+    char name[13];
+    uint8_t attr = 0;
+    uint32_t size = 0;
+
+    int const result = rp_fs_readdir((uint8_t)dir_handle, name, sizeof(name), &attr, &size);
+    if (result < 0) {
+      Serial1.printf("*E: ls: readdir failed handle=%u after %u entries\n", (unsigned)dir_handle, (unsigned)count);
+      (void)rp_fs_closedir((uint8_t)dir_handle);
+      return;
+    }
+
+    if (result == 0)
+      break;
+
+    char const type_char = ((attr & 0x10) != 0) ? 'd' : '-';
+    Serial1.printf("%c %10lu  %s\n",
+                   type_char,
+                   (unsigned long)size,
+                   name);
+    count++;
+  }
+
+  if (!rp_fs_closedir((uint8_t)dir_handle)) {
+    Serial1.printf("*E: ls: closedir failed handle=%u\n", (unsigned)dir_handle);
+    return;
+  }
+
+  Serial1.printf("*I: ls: OK entries=%u\n", (unsigned)count);
+}
+
+
+// DEBUG BEGIN: temporary RP V31 bulk filesystem monitor command
+static constexpr uint16_t FSBULK_ARG_ADDR = 0x0200;
+static constexpr uint16_t FSBULK_PATH_ADDR = 0x0210;
+static constexpr uint16_t FSBULK_SRC_ADDR = 0x0300;
+static constexpr uint16_t FSBULK_DST_ADDR = 0x0380;
+static constexpr uint16_t FSBULK_ARGS_SIZE = 8;
+static constexpr char FSBULK_FILENAME[] = "BULKTEST.TXT";
+static constexpr char FSBULK_TEXT[] = "NEOX V31 BULK TEST";
+
+/// <summary>
+/// fsbulk_parse_u8 parses a decimal monitor argument and validates it against
+/// an inclusive upper bound.
+/// </summary>
+/// <param name="arg">Argument text.</param>
+/// <param name="max_value">Maximum accepted value.</param>
+/// <param name="value">Parsed output.</param>
+/// <returns>true when the value is valid.</returns>
+static bool fsbulk_parse_u8(String arg, uint8_t max_value, uint8_t* value) {
+  if (value == nullptr)
+    return false;
+
+  arg.trim();
+  if (arg.length() == 0)
+    return false;
+
+  for (uint16_t i = 0; i < arg.length(); i++) {
+    if (!isDigit(arg[i]))
+      return false;
+  }
+
+  long const parsed = arg.toInt();
+  if (parsed < 0 || parsed > max_value)
+    return false;
+
+  *value = (uint8_t)parsed;
+  return true;
+}
+
+/// <summary>
+/// fsbulk_begin_context selects a monitor test context and returns the previous
+/// CPU state/context so it can be restored. This is used only to prepare and
+/// inspect the 6502-side test buffers for the temporary monitor test.
+/// </summary>
+/// <param name="context">MMU context to select.</param>
+/// <param name="saved_state">Previous CPU/RP bus state.</param>
+/// <param name="saved_context">Previous MMU context.</param>
+/// <returns>true when the context is valid.</returns>
+static bool fsbulk_begin_context(uint8_t context, sysstate_t* saved_state, uint8_t* saved_context) {
+  if (saved_state == nullptr || saved_context == nullptr || context >= MAX_MEMORY_CONTEXTS)
+    return false;
+
+  *saved_state = get6502State();
+  set6502State(sRPI);
+  *saved_context = getMMUContext();
+
+  if (*saved_context != context)
+    setMMUContext(context);
+
+  return true;
+}
+
+/// <summary>
+/// fsbulk_end_context restores CPU state and MMU context saved by
+/// fsbulk_begin_context.
+/// </summary>
+/// <param name="saved_state">Previous CPU/RP bus state.</param>
+/// <param name="saved_context">Previous MMU context.</param>
+static void fsbulk_end_context(sysstate_t saved_state, uint8_t saved_context) {
+  if (getMMUContext() != saved_context)
+    setMMUContext(saved_context);
+
+  set6502State(saved_state);
+}
+
+/// <summary>
+/// fsbulk_write16 writes a little-endian 16-bit value into the currently
+/// selected monitor test context.
+/// </summary>
+/// <param name="addr">6502 address.</param>
+/// <param name="value">Value to write.</param>
+static void fsbulk_write16(uint16_t addr, uint16_t value) {
+  write6502Memory(addr, (uint8_t)(value & 0xFF));
+  write6502Memory((uint16_t)(addr + 1), (uint8_t)((value >> 8) & 0xFF));
+}
+
+/// <summary>
+/// fsbulk_prepare_context builds the 6502-side path, data, destination buffer,
+/// and 8-byte bulk argument block in the chosen context.
+/// </summary>
+/// <param name="context">MMU context used for the test buffers.</param>
+/// <param name="device">USB/FatFs device number.</param>
+/// <param name="save_args">true for SAVE args, false for LOAD args.</param>
+/// <param name="byte_count">SAVE byte_count or LOAD max_bytes.</param>
+/// <returns>true when the test context was prepared.</returns>
+static bool fsbulk_prepare_context(uint8_t context, uint8_t device, bool save_args, uint16_t byte_count) {
+  sysstate_t saved_state;
+  uint8_t saved_context;
+  if (!fsbulk_begin_context(context, &saved_state, &saved_context))
+    return false;
+
+  for (uint16_t i = 0; i < sizeof(FSBULK_FILENAME); i++)
+    write6502Memory((uint16_t)(FSBULK_PATH_ADDR + i), (uint8_t)FSBULK_FILENAME[i]);
+
+  for (uint16_t i = 0; i < sizeof(FSBULK_TEXT) - 1; i++)
+    write6502Memory((uint16_t)(FSBULK_SRC_ADDR + i), (uint8_t)FSBULK_TEXT[i]);
+
+  for (uint16_t i = 0; i < 64; i++)
+    write6502Memory((uint16_t)(FSBULK_DST_ADDR + i), 0);
+
+  fsbulk_write16((uint16_t)(FSBULK_ARG_ADDR + 0), FSBULK_PATH_ADDR);
+  fsbulk_write16((uint16_t)(FSBULK_ARG_ADDR + 2), save_args ? FSBULK_SRC_ADDR : FSBULK_DST_ADDR);
+  fsbulk_write16((uint16_t)(FSBULK_ARG_ADDR + 4), byte_count);
+  write6502Memory((uint16_t)(FSBULK_ARG_ADDR + 6), device);
+  write6502Memory((uint16_t)(FSBULK_ARG_ADDR + 7), 0);
+
+  fsbulk_end_context(saved_state, saved_context);
+  return true;
+}
+
+/// <summary>
+/// fsbulk_compare_context compares the loaded destination buffer against the
+/// source test string in the selected context.
+/// </summary>
+/// <param name="context">MMU context containing the test buffers.</param>
+/// <returns>true when the loaded bytes match.</returns>
+static bool fsbulk_compare_context(uint8_t context) {
+  sysstate_t saved_state;
+  uint8_t saved_context;
+  if (!fsbulk_begin_context(context, &saved_state, &saved_context))
+    return false;
+
+  bool ok = true;
+  for (uint16_t i = 0; i < sizeof(FSBULK_TEXT) - 1; i++) {
+    uint8_t const value = read6502Memory((uint16_t)(FSBULK_DST_ADDR + i));
+    if (value != (uint8_t)FSBULK_TEXT[i]) {
+      ok = false;
+      break;
+    }
+  }
+
+  fsbulk_end_context(saved_state, saved_context);
+  return ok;
+}
+
+/// <summary>
+/// fsbulk_prepare_mailbox sets the mailbox registers for a monitor-side direct
+/// call to the V31 bulk filesystem handlers. This bypasses the doorbell but uses
+/// the same command handlers and trusted context ABI as NEOX will use later.
+/// </summary>
+/// <param name="command">RP_FS_CMD_LOAD or RP_FS_CMD_SAVE.</param>
+/// <param name="context">Trusted caller context placed in ARG2L.</param>
+static void fsbulk_prepare_mailbox(uint8_t command, uint8_t context) {
+  rp_mailbox_clear_result_fields();
+  snoop_write6502MemoryLoc(RP_GROUP, RP_GROUP_FS);
+  snoop_write6502MemoryLoc(RP_CMD, command);
+  snoop_write6502MemoryLoc(RP_STATUS, RP_BUSY);
+  rp_write16(RP_ARG0L, FSBULK_ARG_ADDR);
+  rp_write16(RP_ARG1L, FSBULK_ARGS_SIZE);
+  rp_write16(RP_ARG2L, context);
+}
+
+/// <summary>
+/// fsbulk_print_result prints the current mailbox result after a direct monitor
+/// call to a bulk filesystem handler.
+/// </summary>
+/// <param name="phase">SAVE or LOAD phase label.</param>
+/// <returns>true when RP_STATUS is RP_DONE.</returns>
+static bool fsbulk_print_result(const char* phase) {
+  uint8_t const status = snoop_read6502MemoryLoc(RP_STATUS);
+  uint8_t const err = snoop_read6502MemoryLoc(RP_ERR);
+  uint16_t const res0 = rp_read16(RP_RES0L);
+  uint8_t const flags = snoop_read6502MemoryLoc(RP_FLAGS);
+
+  if (status == RP_DONE) {
+    Serial1.printf("*I: fsbulk: %s OK bytes=%u flags=%02X\n", phase, (unsigned)res0, (unsigned)flags);
+    return true;
+  }
+
+  Serial1.printf("*E: fsbulk: %s failed status=%02X err=%02X res0=%04X flags=%02X\n",
+                 phase,
+                 (unsigned)status,
+                 (unsigned)err,
+                 (unsigned)res0,
+                 (unsigned)flags);
+  return false;
+}
+
+/// <summary>
+/// cmdFSBulkCallback runs a temporary V31 RP-side bulk SAVE/LOAD monitor test.
+/// It writes a fixed string from the selected context to BULKTEST.TXT on the
+/// chosen USB/FatFs device, loads the file back into a second buffer in the same
+/// context, and compares the result.
+/// </summary>
+/// <param name="c">SimpleCLI command object.</param>
+static void cmdFSBulkCallback(cmd* c) {
+  Command cmd(c);
+
+  uint8_t device = 0;
+  if (!fsbulk_parse_u8(cmd.getArgument("device").getValue(), USB_STORAGE_MAX_DEVICES - 1, &device)) {
+    Serial1.println("*E: fsbulk: device must be 0..3");
+    return;
+  }
+
+  uint8_t context = getMMUContext();
+  String context_arg = cmd.getArgument("context").getValue();
+  context_arg.trim();
+  if (context_arg.length() > 0) {
+    if (!fsbulk_parse_u8(context_arg, MAX_MEMORY_CONTEXTS - 1, &context)) {
+      Serial1.println("*E: fsbulk: invalid context");
+      return;
+    }
+  }
+
+  if (!usb_storage_ready(device)) {
+    Serial1.printf("*E: fsbulk: USB storage/FatFs device %u is not ready\n", (unsigned)device);
+    return;
+  }
+
+  Serial1.printf("*I: fsbulk: device=%u context=%u file=%s\n",
+                 (unsigned)device,
+                 (unsigned)context,
+                 FSBULK_FILENAME);
+
+  uint16_t const test_len = (uint16_t)(sizeof(FSBULK_TEXT) - 1);
+
+  if (!fsbulk_prepare_context(context, device, true, test_len)) {
+    Serial1.println("*E: fsbulk: failed to prepare SAVE context");
+    return;
+  }
+
+  fsbulk_prepare_mailbox(RP_FS_CMD_SAVE, context);
+  (void)rp_fs_mailbox_handle_save();
+  if (!fsbulk_print_result("SAVE")) {
+    snoop_write6502MemoryLoc(RP_STATUS, RP_IDLE);
+    return;
+  }
+
+  if (!fsbulk_prepare_context(context, device, false, 64)) {
+    Serial1.println("*E: fsbulk: failed to prepare LOAD context");
+    snoop_write6502MemoryLoc(RP_STATUS, RP_IDLE);
+    return;
+  }
+
+  fsbulk_prepare_mailbox(RP_FS_CMD_LOAD, context);
+  (void)rp_fs_mailbox_handle_load();
+  if (!fsbulk_print_result("LOAD")) {
+    snoop_write6502MemoryLoc(RP_STATUS, RP_IDLE);
+    return;
+  }
+
+  if (!fsbulk_compare_context(context)) {
+    Serial1.println("*E: fsbulk: compare failed");
+    snoop_write6502MemoryLoc(RP_STATUS, RP_IDLE);
+    return;
+  }
+
+  Serial1.println("*I: fsbulk: compare OK");
+  snoop_write6502MemoryLoc(RP_STATUS, RP_IDLE);
+}
+// DEBUG END: temporary RP V31 bulk filesystem monitor command
 
 
 /// <summary>
@@ -490,7 +846,9 @@ static void cmdHelpCallback(cmd* c) {
  help                  help\n\
  irq                   IRQ\n\
  fstest [device]       RP filesystem local read test, default device 0\n\
+ fsbulk [dev] [ctx]    temporary V31 bulk save/load test\n\
  keymap [us|de]        show/set USB keyboard layout\n\
+ ls [dev] [path]       list directory using RP filesystem\n\
  usbdisks              show USB MSC slots/FatFs drives\n\
  m/em <from> <to>      dump memory\n\
  mon/itor              enter monitor\n\
@@ -550,11 +908,20 @@ void initMonitor() {
   gCmd.addPositionalArgument("device", "0");
   // DEBUG END: temporary RP filesystem local read-test monitor command
 
+  // DEBUG BEGIN: temporary RP V31 bulk filesystem monitor command
+  gCmd = gCli.addCmd("fsbulk", cmdFSBulkCallback);
+  gCmd.addPositionalArgument("device", "0");
+  gCmd.addPositionalArgument("context", "");
+  // DEBUG END: temporary RP V31 bulk filesystem monitor command
+
   gCmd = gCli.addCmd("irq", cmdIRQCallback);
 
   gCmd = gCli.addCmd("keymap", cmdKeymapCallback);
   gCmd.addPositionalArgument("locale", "");
 
+    gCmd = gCli.addCmd("ls", cmdLSCallback);
+  gCmd.addPositionalArgument("device", "0");
+  gCmd.addPositionalArgument("path", "/");
   
   gCmd = gCli.addCmd("usbdisks", cmdUSBDisksCallback);
 
