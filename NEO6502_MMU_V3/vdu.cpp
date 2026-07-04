@@ -1,4 +1,4 @@
-﻿/*
+/*
 This software is free software; you can redistribute it and/or
 modify it under the terms of the GNU Lesser General Public
 License as published by the Free Software Foundation; either
@@ -81,6 +81,60 @@ static bool           scrollActive = false;
 static uint8_t        scrollPixel = 0;
 static int            pendingCursorRow = -1;
 
+#ifndef VDU_MOUSE_ENABLED_DEFAULT
+#define VDU_MOUSE_ENABLED_DEFAULT 1
+#endif
+
+static constexpr int16_t VDU_MOUSE_POINTER_WIDTH = 10;
+static constexpr int16_t VDU_MOUSE_POINTER_HEIGHT = 16;
+static constexpr uint8_t VDU_MOUSE_POINTER_COLOR = WHITE;
+static constexpr uint8_t VDU_MOUSE_LEFT_BUTTON = 0x01;
+
+static constexpr uint16_t VDU_MOUSE_POINTER_BITMAP[VDU_MOUSE_POINTER_HEIGHT] = {
+  0b1000000000,
+  0b1100000000,
+  0b1110000000,
+  0b1111000000,
+  0b1111100000,
+  0b1111110000,
+  0b1111111000,
+  0b1111111100,
+  0b1111111110,
+  0b1111100000,
+  0b1101110000,
+  0b1000110000,
+  0b0000111000,
+  0b0000011000,
+  0b0000011100,
+  0b0000000000,
+};
+
+typedef struct {
+  bool enabled;
+  bool active;
+  bool drawn;
+  int16_t x;
+  int16_t y;
+  uint8_t buttons;
+} vdu_mouse_def_t;
+
+static vdu_mouse_def_t gMouse = {
+  VDU_MOUSE_ENABLED_DEFAULT != 0,
+  false,
+  false,
+  WIDTH / 2,
+  HEIGHT / 2,
+  0
+};
+
+static uint8_t gMouseVduUpdateDepth = 0;
+
+static void showCursor();
+static void vduMouseHideOverlay();
+static void vduMouseDrawOverlay();
+static void vduMouseHideForVduUpdate();
+static void vduMouseShowAfterVduUpdate();
+
 /// <summary>
 /// convert column number to pixel X coordinate
 /// </summary>
@@ -155,6 +209,8 @@ void setAsScreenMode(bool mode) {
 /// </summary>
 /// <param name="vMode"></param>
 void vduSetMode(const uint8_t vMode) {
+  vduMouseHideForVduUpdate();
+
   vduMode = &vduModes[vMode % NUMBER_OF_MODES];
 
   setAsScreenMode(vduMode->screenMode);
@@ -163,6 +219,8 @@ void vduSetMode(const uint8_t vMode) {
   gCursor.shape = vduMode->cursorShape;
   gCursor.enabled = vduMode->visibleCursor;
   gCursor.blink_on = vduMode->blinkCursor;
+
+  vduMouseShowAfterVduUpdate();
 }
 
 /// <summary>
@@ -229,6 +287,237 @@ static void vduDrawCell(const uint8_t col, const uint8_t row) {
     display.setCursor(x, y + FONT_BASELINE_Y);
     display.write(c.ch);
   }
+}
+
+/// <summary>
+/// vduDrawCellPreservingCursor redraws a text cell from gScreen, but redraws the
+/// current cursor cell using the already-active cursor palette indexes when the
+/// cursor is currently rendered. This lets the cursor blink task remain the sole
+/// owner of the cursor blink palette phase while mouse overlay cleanup redraws
+/// cells underneath the pointer.
+/// </summary>
+/// <param name="col">text cell column.</param>
+/// <param name="row">text cell row.</param>
+static void vduDrawCellPreservingCursor(const uint8_t col, const uint8_t row) {
+  if (!gCursor.drawn || col != gCursor.col || row != gCursor.row) {
+    vduDrawCell(col, row);
+    return;
+  }
+
+  vdu_cell_t cell = gScreen[row][col];
+
+  uint16_t x = col * FONT_CELL_WIDTH;
+  uint16_t y = row * FONT_CELL_HEIGHT;
+
+  switch (gCursor.shape) {
+  case cBLOCK:
+    display.setTextColor(IDX_CURSOR_FG, IDX_CURSOR_BG);
+    display.fillRect(
+      x,
+      y,
+      FONT_CELL_WIDTH,
+      FONT_CELL_HEIGHT,
+      IDX_CURSOR_BG
+    );
+
+    if (cell.ch != ' ') {
+      display.setCursor(x, y + FONT_BASELINE_Y);
+      display.write(cell.ch);
+    }
+    break;
+
+  case cUNDERLINE:
+    vduDrawCell(col, row);
+    display.fillRect(
+      x,
+      y + FONT_CELL_HEIGHT - 2,
+      FONT_CELL_WIDTH,
+      2,
+      IDX_CURSOR_BG
+    );
+    break;
+  }
+}
+
+/// <summary>
+/// vduMouseClampCoordinate clamps a mouse coordinate to the visible VDU area.
+/// </summary>
+/// <param name="value">candidate coordinate.</param>
+/// <param name="maximum">maximum inclusive coordinate.</param>
+/// <returns>clamped coordinate.</returns>
+static int16_t vduMouseClampCoordinate(const int32_t value, const int16_t maximum) {
+  if (value < 0)
+    return 0;
+
+  if (value > maximum)
+    return maximum;
+
+  return (int16_t)value;
+}
+
+/// <summary>
+/// vduMouseDrawPixel draws one mouse overlay pixel when it is inside the visible area.
+/// </summary>
+/// <param name="x">pixel X coordinate.</param>
+/// <param name="y">pixel Y coordinate.</param>
+/// <param name="color">palette color index.</param>
+static void vduMouseDrawPixel(const int16_t x, const int16_t y, const uint8_t color) {
+  if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT)
+    return;
+
+  display.drawPixel(x, y, color);
+}
+
+/// <summary>
+/// vduMouseRedrawUnderlyingText redraws the text cells underneath the mouse overlay.
+/// </summary>
+static void vduMouseRedrawUnderlyingText() {
+  if (!vduMode->textMode)
+    return;
+
+  int16_t x0 = gMouse.x;
+  int16_t y0 = gMouse.y;
+  int16_t x1 = gMouse.x + VDU_MOUSE_POINTER_WIDTH - 1;
+  int16_t y1 = gMouse.y + VDU_MOUSE_POINTER_HEIGHT - 1;
+
+  if (x0 < 0)
+    x0 = 0;
+  if (y0 < 0)
+    y0 = 0;
+  if (x1 >= WIDTH)
+    x1 = WIDTH - 1;
+  if (y1 >= HEIGHT)
+    y1 = HEIGHT - 1;
+
+  uint8_t col0 = x0 / FONT_CELL_WIDTH;
+  uint8_t row0 = y0 / FONT_CELL_HEIGHT;
+  uint8_t col1 = x1 / FONT_CELL_WIDTH;
+  uint8_t row1 = y1 / FONT_CELL_HEIGHT;
+
+  if (col1 >= COLS)
+    col1 = COLS - 1;
+  if (row1 >= ROWS)
+    row1 = ROWS - 1;
+
+  for (uint8_t row = row0; row <= row1; row++) {
+    for (uint8_t col = col0; col <= col1; col++) {
+      vduDrawCellPreservingCursor(col, row);
+    }
+  }
+}
+
+/// <summary>
+/// vduMouseHideOverlay removes the software mouse overlay by redrawing the underlying text cells.
+/// </summary>
+static void vduMouseHideOverlay() {
+  if (!gMouse.drawn)
+    return;
+
+  vduMouseRedrawUnderlyingText();
+  gMouse.drawn = false;
+}
+
+/// <summary>
+/// vduMouseDrawOverlay draws the RP-local mouse pointer last. The overlay only draws in text modes
+/// because text cells are the available authoritative underlay. The overlay is suppressed
+/// while smooth scrolling is active because the partially shifted framebuffer no longer
+/// matches the stable gScreen cell grid until the scroll completes.
+/// </summary>
+static void vduMouseDrawOverlay() {
+  if (!gMouse.enabled || !gMouse.active || gMouse.drawn || !vduMode->textMode || scrollActive)
+    return;
+
+  for (int16_t row = 0; row < VDU_MOUSE_POINTER_HEIGHT; row++) {
+    uint16_t const bits = VDU_MOUSE_POINTER_BITMAP[row];
+
+    for (int16_t col = 0; col < VDU_MOUSE_POINTER_WIDTH; col++) {
+      if ((bits & (uint16_t)(1u << (VDU_MOUSE_POINTER_WIDTH - 1 - col))) == 0)
+        continue;
+
+      vduMouseDrawPixel(gMouse.x + col, gMouse.y + row, VDU_MOUSE_POINTER_COLOR);
+    }
+  }
+
+  gMouse.drawn = true;
+}
+
+/// <summary>
+/// vduMouseHideForVduUpdate hides the mouse overlay before normal VDU drawing.
+/// Nested calls are allowed.
+/// </summary>
+static void vduMouseHideForVduUpdate() {
+  if (gMouseVduUpdateDepth++ == 0)
+    vduMouseHideOverlay();
+}
+
+/// <summary>
+/// vduMouseShowAfterVduUpdate restores the mouse overlay after normal VDU drawing.
+/// Nested calls are allowed.
+/// </summary>
+static void vduMouseShowAfterVduUpdate() {
+  if (gMouseVduUpdateDepth == 0)
+    return;
+
+  gMouseVduUpdateDepth--;
+
+  if (gMouseVduUpdateDepth == 0)
+    vduMouseDrawOverlay();
+}
+
+/// <summary>
+/// Enable or disable the RP-side VDU mouse overlay. This is VDU-local only and
+/// does not expose mouse state to the 6502.
+/// </summary>
+/// <param name="enabled">true to show the overlay, false to hide it.</param>
+void vduMouseEnable(const bool enabled) {
+  vduMouseHideForVduUpdate();
+  gMouse.enabled = enabled;
+  vduMouseShowAfterVduUpdate();
+}
+
+/// <summary>
+/// Return whether the RP-side VDU mouse overlay is enabled.
+/// </summary>
+/// <returns>true when enabled.</returns>
+bool vduMouseIsEnabled() {
+  return gMouse.enabled;
+}
+
+/// <summary>
+/// Update the RP-side VDU mouse overlay from a relative USB HID mouse report.
+/// V2 remains RP-local: it does not report mouse state to the 6502. A left-button
+/// press edge in text mode moves the existing VDU text cursor to the mouse cell.
+/// </summary>
+/// <param name="dx">relative X movement from the HID report.</param>
+/// <param name="dy">relative Y movement from the HID report.</param>
+/// <param name="buttons">current HID button bitmask.</param>
+void vduMouseUpdate(const int8_t dx, const int8_t dy, const uint8_t buttons) {
+  bool const movement = (dx != 0) || (dy != 0);
+  bool const buttonsChanged = (buttons != gMouse.buttons);
+  bool const leftClick = ((buttons & VDU_MOUSE_LEFT_BUTTON) != 0) &&
+                         ((gMouse.buttons & VDU_MOUSE_LEFT_BUTTON) == 0);
+
+  if (!movement && !buttonsChanged)
+    return;
+
+  vduMouseHideForVduUpdate();
+
+  gMouse.active = true;
+
+  if (movement) {
+    gMouse.x = vduMouseClampCoordinate((int32_t)gMouse.x + dx, WIDTH - 1);
+    gMouse.y = vduMouseClampCoordinate((int32_t)gMouse.y + dy, HEIGHT - 1);
+  }
+
+  gMouse.buttons = buttons;
+
+  if (leftClick && gMouse.enabled && vduMode->textMode) {
+    uint16_t const col = (uint16_t)(gMouse.x / FONT_CELL_WIDTH);
+    uint16_t const row = (uint16_t)(gMouse.y / FONT_CELL_HEIGHT);
+    moveCursor(col, row);
+  }
+
+  vduMouseShowAfterVduUpdate();
 }
 
 /// <summary>
@@ -331,6 +620,8 @@ void alterCursor(const cursor_shape_t vShape) {
 /// </summary>
 /// <param name="vVisible"></param>
 void setCursor(const boolean vShow) {
+  vduMouseHideForVduUpdate();
+
   if (vduMode->textMode) {
     gCursor.enabled = vduMode->visibleCursor;
 
@@ -339,6 +630,8 @@ void setCursor(const boolean vShow) {
     else
       hideCursor();
   }
+
+  vduMouseShowAfterVduUpdate();
 }
 
 /// <summary>
@@ -347,6 +640,8 @@ void setCursor(const boolean vShow) {
 /// <param name="x"></param>
 /// <param name="y"></param>
 void moveCursor(const uint16_t x, const uint16_t y) {
+  vduMouseHideForVduUpdate();
+
   bool wasVisible = gCursor.drawn;
 
   if (wasVisible)
@@ -357,6 +652,8 @@ void moveCursor(const uint16_t x, const uint16_t y) {
 
   if (wasVisible)
     showCursor();
+
+  vduMouseShowAfterVduUpdate();
 }
 
 /// <summary>
@@ -396,6 +693,8 @@ static void vduRedrawLine(uint8_t row) {
 /// 
 /// </summary>
 static void scrollStep() {
+  vduMouseHideForVduUpdate();
+
   uint8_t* fb = display.getBuffer();
 
   // move framebuffer up one scanline
@@ -433,6 +732,8 @@ static void scrollStep() {
     gCursor.drawn = false;
     showCursor();
   }
+
+  vduMouseShowAfterVduUpdate();
 }
 
 /// <summary>
@@ -440,6 +741,8 @@ static void scrollStep() {
 /// </summary>
 /// <param name="vLines"></param>
 static void cmdScrollUp() {
+  vduMouseHideForVduUpdate();
+
   if (gCursor.drawn) {
     hideCursor();
   }
@@ -448,6 +751,7 @@ static void cmdScrollUp() {
   if (smoothScroll) {
     scrollPixel = 0;
     scrollActive = true;
+    vduMouseShowAfterVduUpdate();
     return;
   }
 
@@ -491,6 +795,8 @@ static void cmdScrollUp() {
 
   gCursor.drawn = false;
   showCursor();
+
+  vduMouseShowAfterVduUpdate();
 }
 
 /// <summary>
@@ -760,6 +1066,8 @@ static void cmdInstantScroll() {
 
 void cmdClearScreen()
 {
+  vduMouseHideForVduUpdate();
+
   // hide cursor during redraw
   hideCursor();
 
@@ -784,6 +1092,8 @@ void cmdClearScreen()
 
   // show cursor again if enabled
   setCursor(true);
+
+  vduMouseShowAfterVduUpdate();
 }
 
 //-----------------------------------------------------------------------------------------
@@ -833,9 +1143,12 @@ void vduPutc(const uint8_t c) {
   while (scrollActive)
     taskVDU();
 
+  vduMouseHideForVduUpdate();
+
   if (!vduMode->textMode) {
     display.setColor(currentColor, currentBGColor);
     display.write(c);
+    vduMouseShowAfterVduUpdate();
     return;
   }
 
@@ -895,6 +1208,8 @@ void vduPutc(const uint8_t c) {
   }
 
   setCursor(true);
+
+  vduMouseShowAfterVduUpdate();
 }
 
 /// <summary>

@@ -6,6 +6,7 @@
 #include "Adafruit_TinyUSB.h"
 #include "monitor.h"
 #include "mailbox.h"
+#include "vdu.h"
 
 // ============================================================
 // usb_hid_input.cpp
@@ -14,9 +15,9 @@
 // The USB host controller and TinyUSB host task are owned by usb_storage.cpp.
 // This module records HID keyboard/mouse interfaces, enables HID reports after
 // a short staged delay, translates simple boot-keyboard reports to ASCII, and
-// logs mouse movement/button reports for hub stability testing. HID activation
-// deliberately does not depend on USB MSC/FatFs readiness, so keyboard/mouse
-// still work when no USB storage stick is inserted.
+// forwards mouse movement to the RP-local VDU overlay. HID activation deliberately
+// does not depend on USB MSC/FatFs readiness, so keyboard/mouse still work when
+// no USB storage stick is inserted.
 //
 // Boot stability rules for this module:
 //   - no Serial output from TinyUSB HID callbacks;
@@ -32,8 +33,6 @@ static constexpr uint32_t USB_HID_ARM_DELAY_MS = 1500;
 static constexpr uint32_t USB_HID_REARM_DELAY_MS = 20;
 static constexpr uint32_t USB_KEY_REPEAT_DELAY_MS = 500;
 static constexpr uint32_t USB_KEY_REPEAT_INTERVAL_MS = 50;
-static constexpr uint32_t USB_MOUSE_DEBUG_INTERVAL_MS = 100;
-
 
 // USB HID Keyboard/Keypad usage IDs for function keys.
 // These are handled as RP-side routing commands before ASCII translation.
@@ -105,13 +104,6 @@ static uint8_t g_mouseInstance = 0;
 static bool g_mouseSelected = false;
 static bool g_mouseActiveAnnounced = false;
 static uint32_t g_lastMouseArmAttemptMs = 0;
-static uint32_t g_lastMouseDebugPrintMs = 0;
-static bool g_mouseDebugPending = false;
-static int32_t g_mouseAccumX = 0;
-static int32_t g_mouseAccumY = 0;
-static int32_t g_mouseAccumWheel = 0;
-static int32_t g_mouseAccumPan = 0;
-static uint8_t g_mouseLastButtonsPrinted = 0;
 
 static bool g_hidArmDelayStarted = false;
 static uint32_t g_hidArmDelayStartMs = 0;
@@ -323,14 +315,7 @@ static bool usb_hid_select_mouse() {
     g_mouseSelected = true;
     memset(&g_lastMouseReport, 0, sizeof(g_lastMouseReport));
     memset(&g_pendingMouseReport, 0, sizeof(g_pendingMouseReport));
-    g_mouseAccumX = 0;
-    g_mouseAccumY = 0;
-    g_mouseAccumWheel = 0;
-    g_mouseAccumPan = 0;
-    g_mouseDebugPending = false;
-    g_lastMouseDebugPrintMs = millis();
 
-    Serial1.println("*I: USB mouse ready");
     return true;
   }
 
@@ -440,42 +425,16 @@ static void usb_keyboard_process_report(const hid_keyboard_report_t& report) {
 }
 
 /// <summary>
-/// usb_mouse_process_report prints concise mouse diagnostics. Mouse input is
-/// not routed to NEOX yet.
+/// usb_mouse_process_report forwards relative mouse movement to the RP-local
+/// VDU mouse overlay. Mouse input is not routed to the 6502/NEOX mailbox path.
+/// Mouse Serial1 diagnostics are intentionally disabled for VDU overlay testing.
 /// </summary>
 static void usb_mouse_process_report(const USBMouseBootReport& report) {
   bool const movement = (report.x != 0) || (report.y != 0) || (report.wheel != 0) || (report.pan != 0);
   bool const buttons_changed = (report.buttons != g_lastMouseReport.buttons);
 
-  if (movement) {
-    g_mouseAccumX += report.x;
-    g_mouseAccumY += report.y;
-    g_mouseAccumWheel += report.wheel;
-    g_mouseAccumPan += report.pan;
-  }
-
-  if (movement || buttons_changed)
-    g_mouseDebugPending = true;
-
-  uint32_t const now = millis();
-  bool const debug_due = buttons_changed ||
-                         ((uint32_t)(now - g_lastMouseDebugPrintMs) >= USB_MOUSE_DEBUG_INTERVAL_MS);
-
-  if (g_mouseDebugPending && debug_due) {
-    Serial1.printf("*I: USB mouse: buttons=%02X dx=%ld dy=%ld wheel=%ld pan=%ld\n",
-                   report.buttons,
-                   (long)g_mouseAccumX,
-                   (long)g_mouseAccumY,
-                   (long)g_mouseAccumWheel,
-                   (long)g_mouseAccumPan);
-
-    g_mouseAccumX = 0;
-    g_mouseAccumY = 0;
-    g_mouseAccumWheel = 0;
-    g_mouseAccumPan = 0;
-    g_mouseLastButtonsPrinted = report.buttons;
-    g_mouseDebugPending = false;
-    g_lastMouseDebugPrintMs = now;
+  if (movement || buttons_changed) {
+    vduMouseUpdate(report.x, report.y, report.buttons);
   }
 
   g_lastMouseReport = report;
@@ -566,7 +525,6 @@ void taskUSBHIDInput() {
 
   if (g_mouseRemovedNoticePending) {
     g_mouseRemovedNoticePending = false;
-    Serial1.println("*I: USB mouse removed");
   }
 
   if (!g_hidArmDelayStarted) {
@@ -642,11 +600,6 @@ extern "C" void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance) {
     g_mouseRemovedNoticePending = true;
     g_mouseDevAddr = 0;
     g_mouseInstance = 0;
-    g_mouseAccumX = 0;
-    g_mouseAccumY = 0;
-    g_mouseAccumWheel = 0;
-    g_mouseAccumPan = 0;
-    g_mouseDebugPending = false;
     memset(&g_lastMouseReport, 0, sizeof(g_lastMouseReport));
     memset(&g_pendingMouseReport, 0, sizeof(g_pendingMouseReport));
   }
