@@ -1009,7 +1009,7 @@ bool monitorConsoleInput(uint8_t c, bool allowReturnToICM) {
 
     if (getAsScreenMode()) {
       vduGetCurrentScreenline(lBuffer);
-      //        Serial1.printf("*D: normalInput: [%s]\n\n", lBuffer);
+//      Serial1.printf("*D: normalInput: [%s]\n\n", lBuffer);
 
       vduRestoreCursor();
 

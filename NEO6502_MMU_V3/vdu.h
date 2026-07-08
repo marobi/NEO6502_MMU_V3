@@ -12,10 +12,12 @@ Lesser General Public License for more details.
 */
 #pragma once
 
-#define DEFAULT_COLOR   15      // WHITE
-#define DEFAULT_BG_COLOR 4      // DARK BLUE
-#define DEFAULT_MODE     0      // VDU display mode (0-9)
-#define NUMBER_OF_MODES 10      // number of VDU modes
+//#define DEFAULT_COLOR   15      // WHITE
+//#define DEFAULT_BG_COLOR 4      // DARK BLUE
+#define DEFAULT_COLOR     0
+#define DEFAULT_BG_COLOR  250
+#define DEFAULT_MODE      0      // VDU display mode (0-9)
+#define NUMBER_OF_MODES  10      // number of VDU modes
 
 #define CURSOR_BLINK_INTERVAL_MS 400    // MS
 #define SCROLL_INTERVAL_MS       8
@@ -100,5 +102,27 @@ void vduPrintf(char const* fmt, ...);
 uint8_t vduReadc(const uint16_t, const uint16_t);
 void vduGetScreenline(const uint8_t, uint8_t*);
 void vduGetCurrentScreenline(uint8_t* buffer);
+
+/// <summary>
+/// Enable or disable the RP-side VDU mouse overlay. This is VDU-local only.
+/// </summary>
+/// <param name="enabled">true to show the overlay, false to hide it.</param>
+void vduMouseEnable(bool enabled);
+
+/// <summary>
+/// Update the RP-side VDU mouse overlay from a relative USB HID mouse report.
+/// This does not report mouse state to the 6502. In text mode, a left-button
+/// press edge moves the existing VDU cursor to the mouse cell.
+/// </summary>
+/// <param name="dx">relative X movement from the HID report.</param>
+/// <param name="dy">relative Y movement from the HID report.</param>
+/// <param name="buttons">current HID button bitmask.</param>
+void vduMouseUpdate(int8_t dx, int8_t dy, uint8_t buttons);
+
+/// <summary>
+/// Return whether the RP-side VDU mouse overlay is enabled.
+/// </summary>
+/// <returns>true when enabled.</returns>
+bool vduMouseIsEnabled();
 
 void initVDU();

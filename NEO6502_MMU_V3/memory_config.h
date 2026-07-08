@@ -20,7 +20,7 @@ Lesser General Public License for more details.
 #define MAX_MEMORY_MODELS      4
 #define MAX_MEMORY_LAYOUTS     8
 #define MAX_MEMORY_REGIONS     16
-#define MAX_MEMORY_CONTEXTS    8
+#define MAX_MEMORY_CONTEXTS    16
 
 enum MemoryRegionType {
   MEMORY_REGION_NORMAL = 0,

@@ -124,6 +124,7 @@
     <ClInclude Include="font_VT100_8x20.h" />
     <ClInclude Include="indicator.h" />
     <ClInclude Include="input.h" />
+    <ClInclude Include="MacMonaco_80x24_8x20.h" />
     <ClInclude Include="mailbox.h" />
     <ClInclude Include="memory_config.h" />
     <ClInclude Include="scheduler.h" />

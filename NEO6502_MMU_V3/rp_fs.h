@@ -46,6 +46,10 @@ bool rp_fs_delete_83(const char* filename);
 bool rp_fs_delete_83(uint8_t device, const char* filename);
 bool rp_fs_rename_83(const char* old_filename, const char* new_filename);
 bool rp_fs_rename_83(uint8_t device, const char* old_filename, const char* new_filename);
+bool rp_fs_mkdir_83(const char* dirname);
+bool rp_fs_mkdir_83(uint8_t device, const char* dirname);
+bool rp_fs_rmdir_83(const char* dirname);
+bool rp_fs_rmdir_83(uint8_t device, const char* dirname);
 
 int rp_fs_opendir_83(const char* dirname);
 int rp_fs_opendir_83(uint8_t device, const char* dirname);

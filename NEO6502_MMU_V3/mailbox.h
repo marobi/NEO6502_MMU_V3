@@ -93,6 +93,8 @@ enum mailbox_state_t {
 #define RP_FS_CMD_OPENDIR   0x0C
 #define RP_FS_CMD_READDIR   0x0D
 #define RP_FS_CMD_CLOSEDIR  0x0E
+#define RP_FS_CMD_MKDIR     0x0F
+#define RP_FS_CMD_RMDIR     0x10
 
 // ------------------------------------------------------------
 // RP mailbox error codes aligned with the existing RP mailbox ABI.

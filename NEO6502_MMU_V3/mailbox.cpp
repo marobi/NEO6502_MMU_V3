@@ -189,6 +189,8 @@ static const RPMailboxCommandEntry gMailboxCommands[] = {
   { RP_GROUP_FS,      RP_FS_CMD_OPENDIR, "fs.opendir",    rp_fs_mailbox_handle_opendir },
   { RP_GROUP_FS,      RP_FS_CMD_READDIR, "fs.readdir",    rp_fs_mailbox_handle_readdir },
   { RP_GROUP_FS,      RP_FS_CMD_CLOSEDIR,"fs.closedir",   rp_fs_mailbox_handle_closedir},
+  { RP_GROUP_FS,      RP_FS_CMD_MKDIR,  "fs.mkdir",      rp_fs_mailbox_handle_mkdir   },
+  { RP_GROUP_FS,      RP_FS_CMD_RMDIR,  "fs.rmdir",      rp_fs_mailbox_handle_rmdir   },
 };
 
 /// <summary>

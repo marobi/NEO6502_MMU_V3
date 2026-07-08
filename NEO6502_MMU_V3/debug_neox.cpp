@@ -11,6 +11,7 @@
 
 // KERNEL CONFIGURATION
 #define  MAX_PROCS 8    // system wide
+#define  MAX_CONTEXTS 10 // system wide, must match include/context.inc
 #define  OPEN_MAX  16   // system wide
 
 #define  MAX_FDS   6    // per process
@@ -31,6 +32,12 @@
 #define  FD_FLAG_WRITE 0x02
 
 #define STDIN      0
+
+#define CTX_INVALID        0x00
+#define CTX_RESERVED       0x01
+#define CTX_PRELOADED_FREE 0x02
+#define CTX_EMPTY_FREE     0x03
+#define CTX_IN_USE         0x04
 
 /// <summary>
 /// must be compatible with kernel definition
@@ -62,6 +69,10 @@ struct __attribute__((packed)) scheduler_info_t {
 
   uint8_t proc_state[MAX_PROCS];
   uint8_t proc_context[MAX_PROCS];
+
+  uint8_t context_state[MAX_CONTEXTS];
+  uint8_t context_owner_pid[MAX_CONTEXTS];
+
   uint8_t proc_sp[MAX_PROCS];
   uint8_t proc_entryL[MAX_PROCS];
   uint8_t proc_entryH[MAX_PROCS];
@@ -223,14 +234,26 @@ static char txt_errno[15][7] = {
 /// <summary>
 /// txt for process states, must be compatible with kernel definition
 /// </summary>
-static char txt_proc_state[7][4] = {
+static char txt_proc_state[8][4] = {
   "EMP",
   "NEW",
   "RDY",
   "RUN",
   "BLK",
   "STP",
-  "ZOM"
+  "ZOM",
+  "SET"
+};
+
+/// <summary>
+/// txt for MMU context states, must be compatible with include/context.inc.
+/// </summary>
+static char txt_context_state[5][5] = {
+  "INV",
+  "RSV",
+  "PRF",
+  "EMF",
+  "USE"
 };
 
 /// <summary>
@@ -476,7 +499,7 @@ static void dumpTask(const uint8_t pid) {
     " %3d %3d %3s   %1s   %02X %03d %02X  %02X%02X | %3s  ",
     SharedInfo->proc_parent_pid[pid],
     pid,
-    SharedInfo->proc_state[pid] < 7 ? txt_proc_state[SharedInfo->proc_state[pid]] : "?",
+    SharedInfo->proc_state[pid] < 8 ? txt_proc_state[SharedInfo->proc_state[pid]] : "?",
     SharedInfo->proc_signal_pending[pid] < 4 ? txt_signal_pending[SharedInfo->proc_signal_pending[pid]] : "?",
     SharedInfo->proc_sp[pid],
     SharedInfo->proc_context[pid],
@@ -528,6 +551,22 @@ static void dumpTasks() {
   Serial1.println("PPID PID State Sig SP Ctx Flg Mem  | Wait Obj | FD:");
   for (uint8_t p = 0; p < MAX_PROCS; p++) {
     dumpTask(p);
+  }
+}
+
+/// <summary>
+/// dump MMU context-slot ownership info, must be compatible with kernel/shared_state.asm and include/context.inc.
+/// </summary>
+static void dumpContexts() {
+  Serial1.println("Context State Owner");
+  for (uint8_t c = 0; c < MAX_CONTEXTS; c++) {
+    const uint8_t state = SharedInfo->context_state[c];
+    const char* stateText = state < 5 ? txt_context_state[state] : "?";
+
+    Serial1.printf("%3d     %-4s  %02X\n",
+      c,
+      stateText,
+      SharedInfo->context_owner_pid[c]);
   }
 }
 
@@ -669,6 +708,11 @@ void dumpNEOX() {
 
     Serial1.println();
     dumpTasks();
+
+#if 1
+    Serial1.println();
+    dumpContexts();
+#endif
 
 #if 0
     Serial1.println();

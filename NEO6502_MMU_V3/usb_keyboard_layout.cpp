@@ -100,23 +100,23 @@ static bool usb_keyboard_ctrl_active(uint8_t modifier) {
 
 static const USBKeyboardLayoutTable* usb_keyboard_builtin_layout_for_locale(USBKeyboardLocale locale) {
   switch (locale) {
-    case USB_KEYBOARD_LOCALE_DE: return &g_deLayout;
-    case USB_KEYBOARD_LOCALE_US:
-    default:                    return &g_usLayout;
+  case USB_KEYBOARD_LOCALE_DE: return &g_deLayout;
+  case USB_KEYBOARD_LOCALE_US:
+  default:                    return &g_usLayout;
   }
 }
 
 void usb_keyboard_set_locale(USBKeyboardLocale locale) {
   switch (locale) {
-    case USB_KEYBOARD_LOCALE_US:
-    case USB_KEYBOARD_LOCALE_DE:
-      g_keyboardLocale = locale;
-      g_activeLayout = usb_keyboard_builtin_layout_for_locale(locale);
-      break;
-    default:
-      g_keyboardLocale = USB_KEYBOARD_LOCALE_US;
-      g_activeLayout = &g_usLayout;
-      break;
+  case USB_KEYBOARD_LOCALE_US:
+  case USB_KEYBOARD_LOCALE_DE:
+    g_keyboardLocale = locale;
+    g_activeLayout = usb_keyboard_builtin_layout_for_locale(locale);
+    break;
+  default:
+    g_keyboardLocale = USB_KEYBOARD_LOCALE_US;
+    g_activeLayout = &g_usLayout;
+    break;
   }
 }
 
@@ -162,6 +162,15 @@ uint8_t usb_keyboard_keycode_to_ascii_locale(uint8_t keycode, uint8_t modifier) 
 
   if (keycode >= USB_KEYBOARD_LAYOUT_KEY_COUNT)
     return 0;
+
+  // DK61SE-specific fallback:
+  // Plain ESC remains ESC.
+  // Fn+ESC is handled by the keyboard itself and arrives as HID 0x35 -> `.
+  // Fn+Shift+ESC is not distinguishable from Fn+ESC on this keyboard.
+  // Therefore Shift+ESC is reserved as the reliable way to type ~,
+  // needed for 8.3 aliases such as LONGFI~1.TXT.
+  if (keycode == 0x29 && usb_keyboard_shift_active(modifier))
+    return 0x7E;
 
   if (usb_keyboard_ctrl_active(modifier))
     return layout->ctrl[keycode];

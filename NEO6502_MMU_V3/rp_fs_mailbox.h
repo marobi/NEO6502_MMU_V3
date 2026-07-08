@@ -85,6 +85,16 @@ mailbox_state_t rp_fs_mailbox_handle_readdir();
 mailbox_state_t rp_fs_mailbox_handle_closedir();
 
 /// <summary>
+/// Handles FS_MKDIR for the central mailbox command table.
+/// </summary>
+mailbox_state_t rp_fs_mailbox_handle_mkdir();
+
+/// <summary>
+/// Handles FS_RMDIR for the central mailbox command table.
+/// </summary>
+mailbox_state_t rp_fs_mailbox_handle_rmdir();
+
+/// <summary>
 /// Closes all RP-side filesystem handles owned by the mailbox layer.
 /// </summary>
 void rp_fs_mailbox_reset();

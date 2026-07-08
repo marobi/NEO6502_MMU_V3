@@ -115,36 +115,50 @@ static bool rp_fs_is_valid_83_name(const char* filename) {
   return base_len != 0 && (!in_ext || ext_len != 0);
 }
 
+static bool rp_fs_is_valid_83_path(const char* path);
+
 static bool rp_fs_make_path(uint8_t device, const char* filename, char* out, size_t out_len) {
   if (filename == nullptr || filename[0] == '\0' || out == nullptr || out_len == 0)
     return false;
 
-  if (!rp_fs_is_valid_83_name(filename))
+  if (!rp_fs_valid_device(device) || device > 9 || out_len < 4)
     return false;
 
-  // Accept already-qualified FatFs paths such as "0:/TEST.TXT" only when
-  // the path drive matches the explicit RP FS device. This keeps handle device
-  // ownership consistent with the mounted FatFs drive.
+  if (!rp_fs_is_valid_83_path(filename))
+    return false;
+
+  const char* logical = filename;
   if ((filename[0] >= '0' && filename[0] <= '9') && filename[1] == ':' && filename[2] == '/') {
     if ((uint8_t)(filename[0] - '0') != device)
       return false;
+    logical = filename + 3;
+  }
+
+  // File operations require a file path, not a drive or directory root.
+  if (logical[0] == '\0' || (logical[0] == '/' && logical[1] == '\0'))
+    return false;
+
+  // Accept already-qualified FatFs paths such as "0:/DIR/TEST.TXT" only when
+  // the path drive matches the explicit RP FS device. This keeps handle device
+  // ownership consistent with the mounted FatFs drive.
+  if ((filename[0] >= '0' && filename[0] <= '9') && filename[1] == ':' && filename[2] == '/') {
     if (strlen(filename) >= out_len)
       return false;
     strcpy(out, filename);
     return true;
   }
 
-  if (!rp_fs_valid_device(device) || device > 9 || out_len < 4)
-    return false;
+  if (logical[0] == '/')
+    logical++;
 
-  size_t const name_len = strlen(filename);
-  if (3 + name_len >= out_len)
+  size_t const name_len = strlen(logical);
+  if (name_len == 0 || 3 + name_len >= out_len)
     return false;
 
   out[0] = (char)('0' + device);
   out[1] = ':';
   out[2] = '/';
-  memcpy(out + 3, filename, name_len + 1);
+  memcpy(out + 3, logical, name_len + 1);
   return true;
 }
 
@@ -524,6 +538,103 @@ bool rp_fs_rename_83(uint8_t device, const char* old_filename, const char* new_f
   FRESULT const fr = f_rename(old_path, new_path);
   if (fr != FR_OK) {
     Serial1.printf("*W: RP FS: rename %s -> %s failed fr=%u\n", old_path, new_path, (unsigned)fr);
+    return false;
+  }
+
+  return true;
+}
+
+/// <summary>
+/// rp_fs_is_root_dir_path checks whether a fully-qualified FatFs directory path
+/// identifies a drive root. V37 mkdir/rmdir deliberately rejects roots.
+/// </summary>
+/// <param name="path">FatFs path produced by rp_fs_make_dir_path.</param>
+/// <returns>true when the path is a root such as "0:/".</returns>
+static bool rp_fs_is_root_dir_path(const char* path) {
+  if (path == nullptr)
+    return false;
+
+  return path[0] >= '0' && path[0] <= '9' && path[1] == ':' && path[2] == '/' && path[3] == '\0';
+}
+
+/// <summary>
+/// rp_fs_mkdir_83 creates an 8.3 directory path on device 0.
+/// </summary>
+/// <param name="dirname">Unqualified 8.3 path or matching FatFs-qualified path.</param>
+/// <returns>true when FatFs created the directory.</returns>
+bool rp_fs_mkdir_83(const char* dirname) {
+  return rp_fs_mkdir_83(0, dirname);
+}
+
+/// <summary>
+/// rp_fs_mkdir_83 creates an 8.3 directory path on the selected USB/FatFs
+/// device. Parent directories must already exist. Directory roots are rejected.
+/// </summary>
+/// <param name="device">RP USB storage device/FatFs drive number.</param>
+/// <param name="dirname">Unqualified 8.3 path or matching FatFs-qualified path.</param>
+/// <returns>true when FatFs created the directory.</returns>
+bool rp_fs_mkdir_83(uint8_t device, const char* dirname) {
+  if (!rp_fs_valid_device(device)) {
+    Serial1.printf("*E: RP FS: mkdir invalid device %u\n", (unsigned)device);
+    return false;
+  }
+
+  if (!usb_fatfs_mounted(device)) {
+    if (!usb_fatfs_mount(device))
+      return false;
+  }
+
+  char path[96];
+  if (!rp_fs_make_dir_path(device, dirname, path, sizeof(path)) || rp_fs_is_root_dir_path(path)) {
+    Serial1.println("*E: RP FS: mkdir invalid 8.3 directory path");
+    return false;
+  }
+
+  FRESULT const fr = f_mkdir(path);
+  if (fr != FR_OK) {
+    Serial1.printf("*W: RP FS: mkdir %s failed fr=%u\n", path, (unsigned)fr);
+    return false;
+  }
+
+  return true;
+}
+
+/// <summary>
+/// rp_fs_rmdir_83 removes an empty 8.3 directory path on device 0.
+/// </summary>
+/// <param name="dirname">Unqualified 8.3 path or matching FatFs-qualified path.</param>
+/// <returns>true when FatFs removed the directory.</returns>
+bool rp_fs_rmdir_83(const char* dirname) {
+  return rp_fs_rmdir_83(0, dirname);
+}
+
+/// <summary>
+/// rp_fs_rmdir_83 removes an empty 8.3 directory path on the selected USB/FatFs
+/// device. FatFs rejects non-empty directories. Directory roots are rejected.
+/// </summary>
+/// <param name="device">RP USB storage device/FatFs drive number.</param>
+/// <param name="dirname">Unqualified 8.3 path or matching FatFs-qualified path.</param>
+/// <returns>true when FatFs removed the directory.</returns>
+bool rp_fs_rmdir_83(uint8_t device, const char* dirname) {
+  if (!rp_fs_valid_device(device)) {
+    Serial1.printf("*E: RP FS: rmdir invalid device %u\n", (unsigned)device);
+    return false;
+  }
+
+  if (!usb_fatfs_mounted(device)) {
+    if (!usb_fatfs_mount(device))
+      return false;
+  }
+
+  char path[96];
+  if (!rp_fs_make_dir_path(device, dirname, path, sizeof(path)) || rp_fs_is_root_dir_path(path)) {
+    Serial1.println("*E: RP FS: rmdir invalid 8.3 directory path");
+    return false;
+  }
+
+  FRESULT const fr = f_unlink(path);
+  if (fr != FR_OK) {
+    Serial1.printf("*W: RP FS: rmdir %s failed fr=%u\n", path, (unsigned)fr);
     return false;
   }
 

@@ -108,6 +108,20 @@
 //          ARG2 high byte = 0
 //     out: RES0 = 0
 //
+//   FS_MKDIR:
+//     in : ARG0 = pointer to NUL-terminated explicit 8.3 directory path
+//          ARG1 = maximum path bytes to scan, including NUL
+//          ARG2 low byte  = device id / FatFs drive number
+//          ARG2 high byte = 0
+//     out: RES0 = 0
+//
+//   FS_RMDIR:
+//     in : ARG0 = pointer to NUL-terminated explicit 8.3 directory path
+//          ARG1 = maximum path bytes to scan, including NUL
+//          ARG2 low byte  = device id / FatFs drive number
+//          ARG2 high byte = 0
+//     out: RES0 = 0
+//
 // Directory commands use explicit paths only. The RP side does not maintain
 // a global current directory; NEOX resolves relative paths before calling RP.
 // Long-filename commands are not implemented in this milestone.
@@ -133,6 +147,8 @@ static uint32_t gFSRenameCount = 0;
 static uint32_t gFSOpendirCount = 0;
 static uint32_t gFSReaddirCount = 0;
 static uint32_t gFSClosedirCount = 0;
+static uint32_t gFSMkdirCount = 0;
+static uint32_t gFSRmdirCount = 0;
 static uint32_t gFSErrorCount = 0;
 
 static uint8_t gFSReadBuffer[RP_FS_MAILBOX_CHUNK_SIZE];
@@ -807,6 +823,79 @@ mailbox_state_t rp_fs_mailbox_handle_closedir() {
   return mbDONE;
 }
 
+
+/// <summary>
+/// rp_fs_mailbox_handle_mkdir processes FS_MKDIR. ARG0 points to a
+/// NUL-terminated explicit 8.3 directory path in 6502 RAM, ARG1 bounds the path
+/// scan, ARG2L is the device/FatFs drive number, and ARG2H is reserved. RES0 is
+/// zero on success.
+/// </summary>
+mailbox_state_t rp_fs_mailbox_handle_mkdir() {
+  uint16_t const src = rp_read16(RP_ARG0L);
+  uint16_t const scan_len = rp_read16(RP_ARG1L);
+  uint16_t const device_arg = rp_read16(RP_ARG2L);
+  uint8_t const device = (uint8_t)(device_arg & 0xFF);
+
+  if ((device_arg & 0xFF00) != 0) {
+    rp_fs_mb_set_error(RP_ERR_EINVAL);
+    return mbDONE;
+  }
+
+  char dirname[RP_FS_MAILBOX_MAX_PATH];
+  if (!rp_fs_mb_read_filename(src, scan_len, dirname, sizeof(dirname))) {
+    rp_fs_mb_set_error(RP_ERR_EINVAL);
+    return mbDONE;
+  }
+
+  if (!rp_fs_mkdir_83(device, dirname)) {
+    if (!rp_fs_ready(device))
+      rp_fs_mb_set_error(RP_ERR_EIO);
+    else
+      rp_fs_mb_set_error(RP_ERR_EINVAL);
+    return mbDONE;
+  }
+
+  rp_fs_mb_set_done(0);
+  gFSMkdirCount++;
+  return mbDONE;
+}
+
+/// <summary>
+/// rp_fs_mailbox_handle_rmdir processes FS_RMDIR. ARG0 points to a
+/// NUL-terminated explicit 8.3 directory path in 6502 RAM, ARG1 bounds the path
+/// scan, ARG2L is the device/FatFs drive number, and ARG2H is reserved. RES0 is
+/// zero on success.
+/// </summary>
+mailbox_state_t rp_fs_mailbox_handle_rmdir() {
+  uint16_t const src = rp_read16(RP_ARG0L);
+  uint16_t const scan_len = rp_read16(RP_ARG1L);
+  uint16_t const device_arg = rp_read16(RP_ARG2L);
+  uint8_t const device = (uint8_t)(device_arg & 0xFF);
+
+  if ((device_arg & 0xFF00) != 0) {
+    rp_fs_mb_set_error(RP_ERR_EINVAL);
+    return mbDONE;
+  }
+
+  char dirname[RP_FS_MAILBOX_MAX_PATH];
+  if (!rp_fs_mb_read_filename(src, scan_len, dirname, sizeof(dirname))) {
+    rp_fs_mb_set_error(RP_ERR_EINVAL);
+    return mbDONE;
+  }
+
+  if (!rp_fs_rmdir_83(device, dirname)) {
+    if (!rp_fs_ready(device))
+      rp_fs_mb_set_error(RP_ERR_EIO);
+    else
+      rp_fs_mb_set_error(RP_ERR_EINVAL);
+    return mbDONE;
+  }
+
+  rp_fs_mb_set_done(0);
+  gFSRmdirCount++;
+  return mbDONE;
+}
+
 /// <summary>
 /// rp_fs_mb_handle_close processes FS_CLOSE. ARG2 contains the RP file handle.
 /// Only currently-open handles are accepted; stale handles after USB removal are
@@ -1056,6 +1145,10 @@ void rp_fs_mailbox_print_diag() {
   Serial1.print(gFSReaddirCount);
   Serial1.print(F(" closedir="));
   Serial1.print(gFSClosedirCount);
+  Serial1.print(F(" mkdir="));
+  Serial1.print(gFSMkdirCount);
+  Serial1.print(F(" rmdir="));
+  Serial1.print(gFSRmdirCount);
   Serial1.print(F(" errs="));
   Serial1.println(gFSErrorCount);
 }

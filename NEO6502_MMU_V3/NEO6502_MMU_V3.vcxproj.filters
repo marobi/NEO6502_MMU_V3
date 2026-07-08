@@ -228,5 +228,8 @@
     <ClInclude Include="tusb_config.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="MacMonaco_80x24_8x20.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
