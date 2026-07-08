@@ -361,3 +361,6 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/NEO6502_MMU_V3/NEO6502_MMU_V3.vcxproj
+/.gitignore
+/NEO6502_MMU_V3/NEO6502_MMU_V3.vcxproj
