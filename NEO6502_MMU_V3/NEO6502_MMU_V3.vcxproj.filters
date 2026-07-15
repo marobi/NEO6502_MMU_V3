@@ -85,6 +85,9 @@
     <ClCompile Include="rp_fs.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="rp_fs_path.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="rp_console_io.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -195,13 +198,13 @@
     <ClInclude Include="debug_neox.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="font_VT100_8x20.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="simple_io.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="rp_fs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="rp_fs_path.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="rp_console_io.h">
@@ -229,6 +232,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="MacMonaco_80x24_8x20.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="VT100_80x24_8x20.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

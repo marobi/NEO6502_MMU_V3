@@ -76,15 +76,15 @@ static void rp_clear_doorbell() {
 }
 
 /// <summary>
-/// rp_mailbox_clear_result_fields() clears result, error, flags, and mailbox
-/// substate fields before a command handler writes its completion state.
+/// rp_mailbox_clear_result_fields() clears result, error, and result flags
+/// before a command handler writes its completion state. RP_STATE is retained
+/// because RP_FS_CMD_EXEC uses it as the generic filesystem operation input.
 /// </summary>
 void rp_mailbox_clear_result_fields() {
   rp_write16(RP_RES0L, 0);
   rp_write16(RP_RES1L, 0);
   snoop_write6502MemoryLoc(RP_ERR, RP_ERR_OK);
   snoop_write6502MemoryLoc(RP_FLAGS, 0);
-  snoop_write6502MemoryLoc(RP_STATE, 0);
 }
 
 /// <summary>
@@ -175,22 +175,7 @@ struct RPMailboxCommandEntry {
 static const RPMailboxCommandEntry gMailboxCommands[] = {
   { RP_GROUP_CONSOLE, RP_CON_CMD_WRITE, "console.write", rp_console_io_handle_write       },
   { RP_GROUP_CONSOLE, RP_CON_CMD_READ,  "console.read",  rp_console_io_handle_read        },
-  { RP_GROUP_FS,      RP_FS_CMD_STATUS, "fs.status",     rp_fs_mailbox_handle_status  },
-  { RP_GROUP_FS,      RP_FS_CMD_OPEN,   "fs.open",       rp_fs_mailbox_handle_open    },
-  { RP_GROUP_FS,      RP_FS_CMD_READ,   "fs.read",       rp_fs_mailbox_handle_read    },
-  { RP_GROUP_FS,      RP_FS_CMD_CLOSE,  "fs.close",      rp_fs_mailbox_handle_close   },
-  { RP_GROUP_FS,      RP_FS_CMD_WRITE,  "fs.write",      rp_fs_mailbox_handle_write   },
-  { RP_GROUP_FS,      RP_FS_CMD_LOAD,   "fs.load",       rp_fs_mailbox_handle_load    },
-  { RP_GROUP_FS,      RP_FS_CMD_SAVE,   "fs.save",       rp_fs_mailbox_handle_save    },
-  { RP_GROUP_FS,      RP_FS_CMD_SEEK,   "fs.seek",       rp_fs_mailbox_handle_seek    },
-  { RP_GROUP_FS,      RP_FS_CMD_TELL,   "fs.tell",       rp_fs_mailbox_handle_tell    },
-  { RP_GROUP_FS,      RP_FS_CMD_DELETE, "fs.delete",     rp_fs_mailbox_handle_delete  },
-  { RP_GROUP_FS,      RP_FS_CMD_RENAME, "fs.rename",     rp_fs_mailbox_handle_rename  },
-  { RP_GROUP_FS,      RP_FS_CMD_OPENDIR, "fs.opendir",    rp_fs_mailbox_handle_opendir },
-  { RP_GROUP_FS,      RP_FS_CMD_READDIR, "fs.readdir",    rp_fs_mailbox_handle_readdir },
-  { RP_GROUP_FS,      RP_FS_CMD_CLOSEDIR,"fs.closedir",   rp_fs_mailbox_handle_closedir},
-  { RP_GROUP_FS,      RP_FS_CMD_MKDIR,  "fs.mkdir",      rp_fs_mailbox_handle_mkdir   },
-  { RP_GROUP_FS,      RP_FS_CMD_RMDIR,  "fs.rmdir",      rp_fs_mailbox_handle_rmdir   },
+  { RP_GROUP_FS,      RP_FS_CMD_EXEC,   "fs.exec",       rp_fs_mailbox_handle_exec        },
 };
 
 /// <summary>
@@ -279,10 +264,11 @@ void taskMailbox() {
 
     gPollCount++;
 
-    if (!triggerMMUIO() && (lCount++ % 2500))
+    if (!triggerMMUIO() && (lCount++ < 2500))
       break;
 
     ackMMUIO();
+    lCount = 0;
 
     if (snoop_read6502MemoryLoc(RP_DOORBELL) != RP_DOORBELL_NONE ||
         snoop_read6502MemoryLoc(RP_STATUS) == RP_BUSY) {

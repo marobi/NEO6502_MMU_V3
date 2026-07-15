@@ -79,22 +79,30 @@ enum mailbox_state_t {
 #define RP_CON_CMD_READ     0x02
 
 #define RP_FS_CMD_NONE      0x00
-#define RP_FS_CMD_STATUS    0x01
-#define RP_FS_CMD_OPEN      0x02
-#define RP_FS_CMD_READ      0x03
-#define RP_FS_CMD_CLOSE     0x04
-#define RP_FS_CMD_WRITE     0x05
-#define RP_FS_CMD_LOAD      0x06
-#define RP_FS_CMD_SAVE      0x07
-#define RP_FS_CMD_SEEK      0x08
-#define RP_FS_CMD_TELL      0x09
-#define RP_FS_CMD_DELETE    0x0A
-#define RP_FS_CMD_RENAME    0x0B
-#define RP_FS_CMD_OPENDIR   0x0C
-#define RP_FS_CMD_READDIR   0x0D
-#define RP_FS_CMD_CLOSEDIR  0x0E
-#define RP_FS_CMD_MKDIR     0x0F
-#define RP_FS_CMD_RMDIR     0x10
+#define RP_FS_CMD_EXEC      0x11
+
+// Generic filesystem operations carried in RP_STATE. Values 0x01-0x10 retain
+// their established numeric assignments but are no longer direct commands.
+#define RP_FS_OP_STATUS        0x01
+#define RP_FS_OP_OPEN          0x02
+#define RP_FS_OP_READ          0x03
+#define RP_FS_OP_CLOSE         0x04
+#define RP_FS_OP_WRITE         0x05
+#define RP_FS_OP_LOAD          0x06
+#define RP_FS_OP_SAVE          0x07
+#define RP_FS_OP_SEEK          0x08
+#define RP_FS_OP_TELL          0x09
+#define RP_FS_OP_DELETE        0x0A
+#define RP_FS_OP_RENAME        0x0B
+#define RP_FS_OP_OPENDIR       0x0C
+#define RP_FS_OP_READDIR       0x0D
+#define RP_FS_OP_CLOSEDIR      0x0E
+#define RP_FS_OP_MKDIR         0x0F
+#define RP_FS_OP_RMDIR         0x10
+#define RP_FS_OP_CWD_INIT_ROOT 0x12
+#define RP_FS_OP_CWD_CLONE     0x13
+#define RP_FS_OP_CHDIR         0x14
+#define RP_FS_OP_GETCWD        0x15
 
 // ------------------------------------------------------------
 // RP mailbox error codes aligned with the existing RP mailbox ABI.

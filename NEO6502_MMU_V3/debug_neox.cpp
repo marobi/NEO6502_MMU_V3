@@ -16,6 +16,9 @@
 
 #define  MAX_FDS   6    // per process
 
+#define  NEOX_CWD_MAX 32
+#define  SPAWN_ARG_MAX 24
+
 #define  MAX_TIMER 8    // system wide
 
 #define  MAX_PIPES 8    // system wide
@@ -24,6 +27,9 @@
 #define  SHARED_STATE 0xC800
 
 #define  PIPE_BUF_SIZE  64  // FIXED: must match kernel definition
+
+#define PIPE_STATE_READ_OPEN   0x01
+#define PIPE_STATE_WRITE_OPEN  0x02
 
 // =============================================
 #define  FD_NONE   0xFF
@@ -51,14 +57,12 @@ struct __attribute__((packed)) scheduler_info_t {
   //-----------------------------------------------
   uint8_t file_io_gate;
   uint8_t file_io_gate_owner;
-  uint8_t file_io_gate_phase;
   uint8_t file_io_gate_wait_head;
   uint8_t file_io_gate_wait_tail;
   uint8_t file_io_gate_next[MAX_PROCS];
 
   uint8_t proc_gate;
   uint8_t proc_gate_owner;
-  uint8_t proc_gate_phase;
   uint8_t proc_gate_wait_head;
   uint8_t proc_gate_wait_tail;
   uint8_t proc_gate_next[MAX_PROCS];
@@ -81,10 +85,6 @@ struct __attribute__((packed)) scheduler_info_t {
   uint8_t proc_signal_pending[MAX_PROCS];
 
   uint8_t sched_lock;
-  uint8_t sched_lock_owner;
-  uint8_t sched_lock_phase;
-  uint8_t sched_lock_depth;
-  uint8_t sched_lock_underflow;
 
   uint8_t console_owner_pid;
 
@@ -111,6 +111,14 @@ struct __attribute__((packed)) scheduler_info_t {
   // exit codes
   uint8_t proc_exit_code[MAX_PROCS];
 
+
+  // resident launch metadata
+  uint8_t proc_launch_id[MAX_PROCS];
+  uint8_t proc_launch_argc[MAX_PROCS];
+  uint8_t proc_launch_arg0_len[MAX_PROCS];
+  uint8_t proc_launch_arg1_len[MAX_PROCS];
+  uint8_t proc_launch_arg0[MAX_PROCS * SPAWN_ARG_MAX];
+  uint8_t proc_launch_arg1[MAX_PROCS * SPAWN_ARG_MAX];
   //------------------------------------------------
   uint8_t system_ticks_lo;
   uint8_t system_ticks_hi;
@@ -136,65 +144,12 @@ struct __attribute__((packed)) scheduler_info_t {
   uint8_t pipe_head[MAX_PIPES];
   uint8_t pipe_tail[MAX_PIPES];
   uint8_t pipe_count[MAX_PIPES];
-  uint8_t pipe_readers[MAX_PIPES];
-  uint8_t pipe_writers[MAX_PIPES];
   uint8_t pipe_buf[MAX_PIPES * PIPE_BUF_SIZE];
 
   // Per-open-object pipe endpoint metadata.
   // Indexed by open object number.
   uint8_t open_pipe[OPEN_MAX];
   uint8_t open_pipe_mode[OPEN_MAX];
-
-  //================================================
-  //
-  // debug stuff, not necessarily in kernel 
-  // 
-  uint8_t sched_debug_marker;
-  uint8_t sched_debug_pid;
-  uint8_t sched_debug_old_pid;
-  uint8_t sched_debug_old_state;
-
-  uint8_t sched_debug_state_pid;
-  uint8_t sched_debug_state_old;
-  uint8_t sched_debug_state_new;
-
-  uint8_t dbg_sched_path;
-  uint8_t dbg_sched_current_pid;
-  uint8_t dbg_sched_selected_pid;
-
-  uint8_t dbg_sched_saved_pid;
-  uint8_t dbg_sched_saved_sp;
-  uint8_t dbg_sched_saved_mode;
-
-  uint8_t dbg_sched_loaded_pid;
-  uint8_t dbg_sched_loaded_sp;
-
-  uint8_t dbg_sched_resume_mode;
-  uint8_t dbg_sched_resume_pid;
-  uint8_t dbg_sched_resume_context;
-
-  uint8_t dbg_proc_state_pid;
-  uint8_t dbg_proc_state_old;
-  uint8_t dbg_proc_state_new;
-
-  uint8_t rp_lock_owner;
-
-  uint8_t dbg_gate_wait_reason;
-  uint8_t dbg_gate_wait_object;
-
-  uint8_t dbg_timer_pid;
-  uint8_t dbg_timer_slot;
-  uint8_t dbg_timer_until_lo;
-  uint8_t dbg_timer_until_hi;
-  uint8_t dbg_timer_now_lo;
-  uint8_t dbg_timer_now_hi;
-
-  uint8_t dbg_irq_preempt_count;
-  uint8_t dbg_irq_current_pid;
-  uint8_t dbg_irq_selected_pid;
-  uint8_t dbg_irq_saved_sp;
-  uint8_t dbg_irq_loaded_sp;
-  uint8_t dbg_irq_skip_reason;
 
 };
 
@@ -268,6 +223,7 @@ static const char* txt_wait_reason[] = {
   "PRC",   // 5 WAIT_PROC
   "LCK",   // 6 WAIT_LOCK
   "PIW",   // 7 WAIT_PIPE_WRITE
+  "RP",    // 8 WAIT_RP
 };
 
 #define WAIT_NONE       0x00
@@ -277,6 +233,8 @@ static const char* txt_wait_reason[] = {
 #define WAIT_TIMER      0x04
 #define WAIT_PROC       0x05
 #define WAIT_LOCK       0x06
+#define WAIT_PIPE_WRITE 0x07
+#define WAIT_RP         0x08
 
 #define LOCK_ID_FILE_IO 0x00
 #define LOCK_ID_PROC    0x01
@@ -300,14 +258,6 @@ static char txt_dev_type[2][4] = {
 };
 
 /// <summary>
-/// txt for process resume modes, must be compatible with kernel definition
-/// </summary>
-static char txt_proc_resume_mode[2][4] = {
-  "RTI",  // 0 = PROC_RESUME_RTI / PROC_FRAME_RTI
-  "?"     // 1 = invalid in RTI-only scheduler
-};
-
-/// <summary>
 /// txt for pending signals, must be compatible with kernel definition
 /// </summary>
 static char txt_signal_pending[4][2] = {
@@ -320,81 +270,12 @@ static char txt_signal_pending[4][2] = {
 /// <summary>
 /// txt for pipe states, must be compatible with kernel definition
 /// </summary>
-static char txt_pipe_state[2][5] = {
+static char txt_pipe_state[4][5] = {
   "FREE",
-  "USED"
+  "READ",
+  "WRIT",
+  "BOTH"
 };
-
-/*
--- = no skip / IRQ entered scheduler
-M  = skipped because monitor_active != 0
-S  = skipped because sched_lock != 0
-R  = skipped because rp_lock != 0
-F  = skipped because file_io_gate != 0
-P  = skipped because proc_gate != 0
-E  = enter switch
-*/
-static char txt_irq_skip_reason[7][2] = {
-  "-",
-  "M",
-  "S",
-  "R",
-  "F",
-  "P",
-  "E"
-};
-
-/// <summary>
-/// Dump scheduler debug info. Must match kernel/shared_state.asm and include/debug.inc.
-/// </summary>
-static const char* dbgPathName(uint8_t path) {
-  switch (path) {
-  case 0x00: return "-";
-  case 0x01: return "IRQ";
-  case 0x02: return "YLD";
-  default:   return "?";
-  }
-}
-
-/// <summary>
-/// debug mode name, must be compatible with kernel definition and usage in scheduler code.
-/// </summary>
-/// <param name="mode"></param>
-/// <returns></returns>
-static const char* dbgModeName(uint8_t mode) {
-  switch (mode) {
-  case 0x00: return "-";
-  case 0x01: return "IRQ";   // RTI frame created by IRQ/preemption path
-  case 0x02: return "YLD";   // RTI frame created by cooperative yield path
-  case 0x03: return "BOOT";  // first-run bootstrap path, if used by kernel debug
-  default:   return "?";
-  }
-}
-
-/// <summary>
-/// scheduler marker text, must be compatible with kernel definition.
-/// These markers are used to identify where in the scheduler code we are, 
-/// for better understanding of scheduler behavior and easier debugging.
-/// </summary>
-/// <param name="marker"></param>
-/// <returns></returns>
-static const char* dbgMarkerText(const uint8_t marker) {
-  switch (marker) {
-  case 0x00: return "-";
-  case 0x01: return "IRQ";
-  case 0x02: return "SAVE";
-  case 0x03: return "PICK";
-  case 0x04: return "YLD";
-  case 0x61: return "SEL";
-  case 0x62: return "LOAD";
-  case 0x63: return "RTI";
-  case 0x64: return "BOOT";
-  case 0xEE: return "STALE";
-  case 0xE1: return "GREC";
-  case 0xE2: return "GREL";
-  default:   return "?";
-  }
-}
 
 /// <summary>
 /// wait object text, must be compatible with kernel definition
@@ -421,20 +302,43 @@ static const char* waitObjectText(const uint8_t reason, const uint8_t object) {
   return nullptr;
 }
 
+
+/// <summary>
+/// Returns the gate-hold diagnostic text for a process PID.
+/// </summary>
+/// <param name="pid">Process identifier.</param>
+/// <returns>Three-character gate-hold text.</returns>
+static const char* heldGateText(const uint8_t pid) {
+  const bool holdsFileIO =
+    SharedInfo->file_io_gate != 0 && SharedInfo->file_io_gate_owner == pid;
+  const bool holdsProc =
+    SharedInfo->proc_gate != 0 && SharedInfo->proc_gate_owner == pid;
+
+  if (holdsFileIO && holdsProc)
+    return "BTH";
+  if (holdsFileIO)
+    return "FIO";
+  if (holdsProc)
+    return "PRC";
+
+  return "---";
+}
+
 /// <summary>
 /// dump pipe info, must be compatible with kernel definition
 /// </summary>
 static void dumpPipes() {
   Serial1.println("Pipe State Head Tail Count Readers Writers");
   for (uint8_t i = 0; i < MAX_PIPES; i++) {
+    const uint8_t state = SharedInfo->pipe_state[i];
     Serial1.printf("%d    %4s  %02d   %02d   %02d    %02d      %02d\n",
       i,
-      SharedInfo->pipe_state[i] < 2 ? txt_pipe_state[SharedInfo->pipe_state[i]] : "?",
+      state < 4 ? txt_pipe_state[state] : "?",
       SharedInfo->pipe_head[i],
       SharedInfo->pipe_tail[i],
       SharedInfo->pipe_count[i],
-      SharedInfo->pipe_readers[i],
-      SharedInfo->pipe_writers[i]);
+      (state & PIPE_STATE_READ_OPEN) != 0 ? 1 : 0,
+      (state & PIPE_STATE_WRITE_OPEN) != 0 ? 1 : 0);
   }
 }
 
@@ -491,12 +395,14 @@ static void dumpTask(const uint8_t pid) {
   const uint8_t waitObject = SharedInfo->wait_object[pid];
 
   const char* waitReasonText =
-    waitReason < 7 ? txt_wait_reason[waitReason] : "?";
+    waitReason < (sizeof(txt_wait_reason) / sizeof(txt_wait_reason[0]))
+      ? txt_wait_reason[waitReason]
+      : "?";
 
   const char* waitObjectName = waitObjectText(waitReason, waitObject);
 
   Serial1.printf(
-    " %3d %3d %3s   %1s   %02X %03d %02X  %02X%02X | %3s  ",
+    " %3d %3d %3s   %1s   %02X %03d %02X  %02X%02X | %-4s ",
     SharedInfo->proc_parent_pid[pid],
     pid,
     SharedInfo->proc_state[pid] < 8 ? txt_proc_state[SharedInfo->proc_state[pid]] : "?",
@@ -510,11 +416,13 @@ static void dumpTask(const uint8_t pid) {
   );
 
   if (waitObjectName != nullptr) {
-    Serial1.printf("%3s | ", waitObjectName);
+    Serial1.printf("%-3s ", waitObjectName);
   }
   else {
-    Serial1.printf("%02X  | ", waitObject);
+    Serial1.printf("%02X  ", waitObject);
   }
+
+  Serial1.printf("%-4s| ", heldGateText(pid));
 
   for (uint8_t fd = 0; fd < MAX_FDS; fd++) {
     const uint8_t index = pid * MAX_FDS + fd;
@@ -548,7 +456,7 @@ static void dumpTask(const uint8_t pid) {
 /// dump task info for all PIDs, must be compatible with kernel definition
 /// </summary>
 static void dumpTasks() {
-  Serial1.println("PPID PID State Sig SP Ctx Flg Mem  | Wait Obj | FD:");
+  Serial1.println("PPID PID State Sig SP Ctx Flg Mem  | Wait Obj Hold | FD:");
   for (uint8_t p = 0; p < MAX_PROCS; p++) {
     dumpTask(p);
   }
@@ -571,72 +479,6 @@ static void dumpContexts() {
 }
 
 /// <summary>
-/// Dump scheduler debug info, compatible with kernel shared debug layout.
-/// </summary>
-static void dumpSchedDebug() {
-  Serial1.println();
-  Serial1.println("Scheduler debug:");
-  Serial1.println("Path   Marker Current Selected");
-  Serial1.printf(
-    "%-6s %02X/%-4s %02d      %02d\n",
-    dbgPathName(SharedInfo->dbg_sched_path),
-    SharedInfo->sched_debug_marker,
-    dbgMarkerText(SharedInfo->sched_debug_marker),
-    SharedInfo->dbg_sched_current_pid,
-    SharedInfo->dbg_sched_selected_pid
-  );
-
-  Serial1.println();
-  Serial1.println("Save   PID SP Src");
-  Serial1.printf(
-    "       %02d  %02X %-4s\n",
-    SharedInfo->dbg_sched_saved_pid,
-    SharedInfo->dbg_sched_saved_sp,
-    dbgModeName(SharedInfo->dbg_sched_saved_mode)
-  );
-
-  Serial1.println("Load   PID SP");
-  Serial1.printf(
-    "       %02d  %02X\n",
-    SharedInfo->dbg_sched_loaded_pid,
-    SharedInfo->dbg_sched_loaded_sp
-  );
-
-  Serial1.println("Resume PID Ctx Src");
-  Serial1.printf(
-    "       %02d  %03d %-4s\n",
-    SharedInfo->dbg_sched_resume_pid,
-    SharedInfo->dbg_sched_resume_context,
-    dbgModeName(SharedInfo->dbg_sched_resume_mode)
-  );
-
-  // IRQ preemption debug info, useful for understanding IRQ behavior and debugging IRQ-related issues.
-  Serial1.println("\nIRQ preemt:\nCount Current Selected SavedSP LoadSP Skip");
-  Serial1.printf(
-    "%05d  %02d      %02d       %02X      %02X  %-1s/%02X\n",
-    SharedInfo->dbg_irq_preempt_count,
-    SharedInfo->dbg_irq_current_pid,
-    SharedInfo->dbg_irq_selected_pid,
-    SharedInfo->dbg_irq_saved_sp,
-    SharedInfo->dbg_irq_loaded_sp,
-    SharedInfo->dbg_irq_skip_reason < 7 ? txt_irq_skip_reason[SharedInfo->dbg_irq_skip_reason] : "?",
-    SharedInfo->dbg_irq_skip_reason
-  );
-
-  Serial1.println();
-  Serial1.println("State change:");
-  Serial1.println("PID Old     New");
-  Serial1.printf(
-    "%02d  %-3s/%02X  %-3s/%02X\n",
-    SharedInfo->dbg_proc_state_pid,
-    SharedInfo->dbg_proc_state_old < 6 ? txt_proc_state[SharedInfo->dbg_proc_state_old] : "???",
-    SharedInfo->dbg_proc_state_old,
-    SharedInfo->dbg_proc_state_new < 6 ? txt_proc_state[SharedInfo->dbg_proc_state_new] : "???",
-    SharedInfo->dbg_proc_state_new
-  );
-}
-
-/// <summary>
 /// dump 6502 interface info, must be compatible with kernel definition
 /// </summary>
 static void dumpInterface() {
@@ -650,37 +492,30 @@ static void dumpInterface() {
 
 /*
 Locks/Gates:
-Name     Val Owner Phase Head Tail
-SCHED    00  FF    00    00   00
-FILE_IO  00  FF    00    FF   FF
-PROC     00  FF    00    FF   FF
-RP       00  FF
+Name     Val
+SCHED    00
+
+Name     Val Owner Head Tail
+FILE_IO  00  FF    FF   FF
+PROC     00  FF    FF   FF
+RP       00
 */
 void dumpLockGates() {
   Serial1.println("Locks/Gates:");
-  Serial1.println("Name     Val Owner Phase Depth Under");
-  Serial1.printf("SCHED    %02X  %02X    %02X    %02X    %02X\n",
-    SharedInfo->sched_lock,
-    SharedInfo->sched_lock_owner,
-    SharedInfo->sched_lock_phase,
-    SharedInfo->sched_lock_depth,
-    SharedInfo->sched_lock_underflow);
-  Serial1.println("\nName     Val Owner Phase Head  Tail");
-  Serial1.printf("FILE_IO  %02X  %02X    %02X    %02X    %02X\n",
+  Serial1.println("Name     Val");
+  Serial1.printf("SCHED    %02X\n", SharedInfo->sched_lock);
+  Serial1.println("\nName     Val Owner Head  Tail");
+  Serial1.printf("FILE_IO  %02X  %02X    %02X   %02X\n",
     SharedInfo->file_io_gate,
     SharedInfo->file_io_gate_owner,
-    SharedInfo->file_io_gate_phase,
     SharedInfo->file_io_gate_wait_head,
     SharedInfo->file_io_gate_wait_tail);
-  Serial1.printf("PROC     %02X  %02X    %02X    %02X    %02X\n",
+  Serial1.printf("PROC     %02X  %02X    %02X   %02X\n",
     SharedInfo->proc_gate,
     SharedInfo->proc_gate_owner,
-    SharedInfo->proc_gate_phase,
     SharedInfo->proc_gate_wait_head,
     SharedInfo->proc_gate_wait_tail);
-  Serial1.printf("RP       %02X  %02X\n",
-    SharedInfo->rp_lock,
-    SharedInfo->rp_lock_owner);
+  Serial1.printf("RP       %02X\n", SharedInfo->rp_lock);
 }
 
 /// <summary>
@@ -690,7 +525,7 @@ void dumpNEOX() {
   snoop_read6502Memory(SHARED_STATE, sizeof(scheduler_info_t), SharedSpace);    // read struct
 
   switch (SharedInfo->kernel_version) {
-  case 0x0203:
+  case 0x0209:
     Serial1.println("---------------------------------------\nSystem:");
     Serial1.printf("Sys ticks         = %d\n", (SharedInfo->system_ticks_hi << 8) | SharedInfo->system_ticks_lo);
     Serial1.printf("Active PID        = %d\n", SharedInfo->active_pid);
@@ -701,10 +536,6 @@ void dumpNEOX() {
     Serial1.println();
     dumpLockGates();
 
-#if 0
-    Serial1.println();
-    dumpSchedDebug();
-#endif
 
     Serial1.println();
     dumpTasks();

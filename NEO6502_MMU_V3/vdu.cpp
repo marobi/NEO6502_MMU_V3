@@ -10,7 +10,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 Lesser General Public License for more details.
 */
 #include <Adafruit_dvhstx.h>
-#include "font_VT100_8x20.h"
+#include "VT100_80x24_8x20.h"
 //#include "MacMonaco_80x24_8x20.h"
 //#include "MacMono_80x24_8x20.h"
 #include "config.h"
@@ -89,7 +89,7 @@ static int            pendingCursorRow = -1;
 
 static constexpr int16_t VDU_MOUSE_POINTER_WIDTH = 10;
 static constexpr int16_t VDU_MOUSE_POINTER_HEIGHT = 16;
-static constexpr uint8_t VDU_MOUSE_POINTER_COLOR = BLACK;
+static constexpr uint8_t VDU_MOUSE_POINTER_COLOR = WHITE;
 static constexpr uint8_t VDU_MOUSE_LEFT_BUTTON = 0x01;
 
 static constexpr uint16_t VDU_MOUSE_POINTER_BITMAP[VDU_MOUSE_POINTER_HEIGHT] = {
@@ -551,7 +551,7 @@ static void showCursor() {
       x,
       y,
       FONT_CELL_WIDTH,
-      FONT_CELL_HEIGHT,
+      FONT_CELL_HEIGHT - 2,       // uglh
       IDX_CURSOR_BG
     );
 

@@ -44,6 +44,7 @@ void schedSwitchcontext(const uint8_t vContext) {
 }
 
 static bool gIntrPending = false;
+static bool gFsCompletionPending = false;
 
 /// <summary>
 /// 
@@ -65,6 +66,14 @@ bool genIRQ6502(irq_source_t vSrc) {
   else {
     return false;
   }
+}
+
+/// <summary>
+/// Queues one filesystem-completion interrupt for the 6502. The scheduler
+/// retries delivery until the single RP IRQ slot becomes available.
+/// </summary>
+void requestFSCompletionIRQ() {
+  gFsCompletionPending = true;
 }
 
 static bool irqTimerEnabled = false;
@@ -122,6 +131,16 @@ void taskIRQTimer() {
     return;
   }
 
+  // Filesystem completion has priority over the periodic timer. A timer or
+  // monitor interrupt that already owns the single IRQ slot merely delays this
+  // request; it cannot lose the completion notification.
+  if (gFsCompletionPending) {
+    if (genIRQ6502(RP_SRC_FS_DONE))
+      gFsCompletionPending = false;
+
+    return;
+  }
+
   if (irqTimerEnabled) {
     if (millis() >= (irqLastTS + irqTimerInterval)) {
       irqLastTS = millis();
@@ -168,6 +187,7 @@ void taskScheduler() {
 ///
 /// </summary>
 void initScheduler() {
+  gFsCompletionPending = false;
   snoop_write6502MemoryLoc(RP_IRQ_SOURCE, RP_SRC_NONE);
   snoop_write6502MemoryLoc(RP_IRQ_STATE, RP_IRQ_NONE);
 }

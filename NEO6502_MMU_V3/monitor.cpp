@@ -575,7 +575,6 @@ static constexpr uint16_t FSBULK_ARG_ADDR = 0x0200;
 static constexpr uint16_t FSBULK_PATH_ADDR = 0x0210;
 static constexpr uint16_t FSBULK_SRC_ADDR = 0x0300;
 static constexpr uint16_t FSBULK_DST_ADDR = 0x0380;
-static constexpr uint16_t FSBULK_ARGS_SIZE = 8;
 static constexpr char FSBULK_FILENAME[] = "BULKTEST.TXT";
 static constexpr char FSBULK_TEXT[] = "NEOX V31 BULK TEST";
 
@@ -715,20 +714,22 @@ static bool fsbulk_compare_context(uint8_t context) {
 }
 
 /// <summary>
-/// fsbulk_prepare_mailbox sets the mailbox registers for a monitor-side direct
-/// call to the V31 bulk filesystem handlers. This bypasses the doorbell but uses
-/// the same command handlers and trusted context ABI as NEOX will use later.
+/// Prepares a monitor-side direct call to the same generic filesystem handler
+/// used by NEOX. PID 0 suppresses completion IRQ generation because the monitor
+/// invokes the handler synchronously.
 /// </summary>
-/// <param name="command">RP_FS_CMD_LOAD or RP_FS_CMD_SAVE.</param>
-/// <param name="context">Trusted caller context placed in ARG2L.</param>
-static void fsbulk_prepare_mailbox(uint8_t command, uint8_t context) {
+/// <param name="operation">RP_FS_OP_LOAD or RP_FS_OP_SAVE.</param>
+/// <param name="context">Trusted caller context placed in ARG1H.</param>
+static void fsbulk_prepare_mailbox(uint8_t operation, uint8_t context) {
   rp_mailbox_clear_result_fields();
   snoop_write6502MemoryLoc(RP_GROUP, RP_GROUP_FS);
-  snoop_write6502MemoryLoc(RP_CMD, command);
+  snoop_write6502MemoryLoc(RP_CMD, RP_FS_CMD_EXEC);
+  snoop_write6502MemoryLoc(RP_STATE, operation);
   snoop_write6502MemoryLoc(RP_STATUS, RP_BUSY);
   rp_write16(RP_ARG0L, FSBULK_ARG_ADDR);
-  rp_write16(RP_ARG1L, FSBULK_ARGS_SIZE);
-  rp_write16(RP_ARG2L, context);
+  snoop_write6502MemoryLoc(RP_ARG1L, 0);
+  snoop_write6502MemoryLoc(RP_ARG1H, context);
+  rp_write16(RP_ARG2L, 0);
 }
 
 /// <summary>
@@ -800,8 +801,8 @@ static void cmdFSBulkCallback(cmd* c) {
     return;
   }
 
-  fsbulk_prepare_mailbox(RP_FS_CMD_SAVE, context);
-  (void)rp_fs_mailbox_handle_save();
+  fsbulk_prepare_mailbox(RP_FS_OP_SAVE, context);
+  (void)rp_fs_mailbox_handle_exec();
   if (!fsbulk_print_result("SAVE")) {
     snoop_write6502MemoryLoc(RP_STATUS, RP_IDLE);
     return;
@@ -813,8 +814,8 @@ static void cmdFSBulkCallback(cmd* c) {
     return;
   }
 
-  fsbulk_prepare_mailbox(RP_FS_CMD_LOAD, context);
-  (void)rp_fs_mailbox_handle_load();
+  fsbulk_prepare_mailbox(RP_FS_OP_LOAD, context);
+  (void)rp_fs_mailbox_handle_exec();
   if (!fsbulk_print_result("LOAD")) {
     snoop_write6502MemoryLoc(RP_STATUS, RP_IDLE);
     return;

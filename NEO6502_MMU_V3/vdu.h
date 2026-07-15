@@ -12,10 +12,10 @@ Lesser General Public License for more details.
 */
 #pragma once
 
-//#define DEFAULT_COLOR   15      // WHITE
-//#define DEFAULT_BG_COLOR 4      // DARK BLUE
-#define DEFAULT_COLOR     0
-#define DEFAULT_BG_COLOR  250
+#define DEFAULT_COLOR   15      // WHITE
+#define DEFAULT_BG_COLOR 4      // DARK BLUE
+//#define DEFAULT_COLOR     0
+//#define DEFAULT_BG_COLOR  250
 #define DEFAULT_MODE      0      // VDU display mode (0-9)
 #define NUMBER_OF_MODES  10      // number of VDU modes
 

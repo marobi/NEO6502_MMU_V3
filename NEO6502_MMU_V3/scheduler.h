@@ -18,7 +18,8 @@ Lesser General Public License for more details.
 enum irq_source_t {
   RP_SRC_NONE = 0,
   RP_SRC_TIMER,
-  RP_SRC_MONITOR
+  RP_SRC_MONITOR,
+  RP_SRC_FS_DONE
 };
 
 /// <summary>
@@ -32,6 +33,11 @@ enum irq_state_t {
 extern bool gInMonitor;
 
 bool genIRQ6502(irq_source_t vSrc);
+
+/// <summary>
+/// Queues one filesystem-completion interrupt for delivery to the 6502.
+/// </summary>
+void requestFSCompletionIRQ();
 
 void stopIRQTimer();
 
