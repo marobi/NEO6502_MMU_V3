@@ -5,7 +5,7 @@
 // ------------------------------------------------------------
 // Doorbell in MMU I/O page
 // ------------------------------------------------------------
-#define RP_DOORBELL     0xD010                      // sync with memory.ini
+#define RP_DOORBELL     0xE010                      // sync with memory.ini
 
 #define RP_DOORBELL_NONE     0x00
 #define RP_DOORBELL_TRIGGER  0x01
@@ -15,7 +15,7 @@
 // ABI v2: command identity is RP_GROUP + RP_CMD at the start of the block.
 // RP_DOORBELL is trigger-only and does not carry the command byte anymore.
 // ------------------------------------------------------------
-#define RP_REQ_BASE     0xE000
+#define RP_REQ_BASE     0xB000
 
 #define RP_GROUP        (RP_REQ_BASE + 0x00)
 #define RP_CMD          (RP_REQ_BASE + 0x01)
@@ -35,10 +35,10 @@
 #define RP_RES1H        (RP_REQ_BASE + 0x0F)
 
 // These bytes remain outside the request/result block.
-#define RP_IRQ_SOURCE   0xE010                      // source of IRQ
-#define RP_CONSOLE_PID  0xE011                      // console PID
-#define RP_CONSOLE_RDY  0xE012                      // console ready: 0 when no input available
-#define RP_IRQ_STATE    0xE013                      // IRQ state: 0=none, 1=pending
+#define RP_IRQ_SOURCE   0xB010                      // source of IRQ
+#define RP_CONSOLE_PID  0xB011                      // console PID
+#define RP_CONSOLE_RDY  0xB012                      // console ready: 0 when no input available
+#define RP_IRQ_STATE    0xB013                      // IRQ state: 0=none, 1=pending
 
 
 // ------------------------------------------------------------

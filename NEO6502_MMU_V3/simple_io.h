@@ -2,8 +2,8 @@
 
 #pragma once
 
-#define RP_GETCHAR     0xD000
-#define RP_PUTCHAR     0xD001
+#define RP_GETCHAR     0xE000
+#define RP_PUTCHAR     0xE001
 
 void taskSimpleIO();
 

@@ -24,7 +24,7 @@
 #define  MAX_PIPES 8    // system wide
 
 // =============================================
-#define  SHARED_STATE 0xC800
+#define  SHARED_STATE 0xB020
 
 #define  PIPE_BUF_SIZE  64  // FIXED: must match kernel definition
 
@@ -525,7 +525,7 @@ void dumpNEOX() {
   snoop_read6502Memory(SHARED_STATE, sizeof(scheduler_info_t), SharedSpace);    // read struct
 
   switch (SharedInfo->kernel_version) {
-  case 0x0209:
+  case 0x020A:
     Serial1.println("---------------------------------------\nSystem:");
     Serial1.printf("Sys ticks         = %d\n", (SharedInfo->system_ticks_hi << 8) | SharedInfo->system_ticks_lo);
     Serial1.printf("Active PID        = %d\n", SharedInfo->active_pid);

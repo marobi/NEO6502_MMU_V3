@@ -164,7 +164,7 @@ static void rp_fs_mb_set_error(uint8_t err, uint16_t partial = 0) {
 }
 
 
-static constexpr uint16_t RP_FS_PRIVATE_LIMIT = 0x6000;
+static constexpr uint16_t RP_FS_PRIVATE_LIMIT = 0x8000;
 
 static uint16_t rp_fs_mb_u16(const uint8_t* p) {
   return (uint16_t)p[0] | ((uint16_t)p[1] << 8);

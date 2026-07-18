@@ -13,10 +13,10 @@
 #error "fatfs_local/ffconf.h must define FF_VOLUMES >= 4"
 #endif
 
-#if __has_include("../../../../../AppData/Local/arduino15/packages/rp2040/hardware/rp2040/5.6.1/libraries/FatFS/src/ffunicode.cpp")
-  #include "../../../../../AppData/Local/arduino15/packages/rp2040/hardware/rp2040/5.6.1/libraries/FatFS/src/ffunicode.cpp"
+#if __has_include("../../../../../AppData/Local/arduino15/packages/rp2040/hardware/rp2040/5.7.0/libraries/FatFS/src/ffunicode.cpp")
+  #include "../../../../../AppData/Local/arduino15/packages/rp2040/hardware/rp2040/5.7.0/libraries/FatFS/src/ffunicode.cpp"
 #elif __has_include(<ffunicode.cpp>)
   #include <ffunicode.cpp>
 #else
-  #error "Cannot locate Arduino-Pico 5.6.1 FatFS implementation ffunicode.cpp. Keep libraries/FatFS/src on the include path or update fatfs_local/ffunicode.cpp."
+  #error "Cannot locate Arduino-Pico 5.7.0 FatFS implementation ffunicode.cpp. Keep libraries/FatFS/src on the include path or update fatfs_local/ffunicode.cpp."
 #endif

@@ -12,7 +12,7 @@ Lesser General Public License for more details.
 */
 #pragma once
 
-#define CMD_SLOT_BASE    0xD000   // sync with memory.ini
+#define CMD_SLOT_BASE    0xE000   // sync with memory.ini
 //#define CMD_SLOT_OUTCHAR 0        // write to 6502      (obsolete)
 //#define CMD_SLOT_INCHAR  1        // read from 6502     (obsolete)
 #define CMD_SLOT_CMD     2        // cmd from 6502

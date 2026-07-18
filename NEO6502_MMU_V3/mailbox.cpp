@@ -3,12 +3,12 @@
 // NEO6502 MMU - RP2350 Arduino mailbox handler
 //
 // Mailbox ABI v2:
-//   - Request/result block starts at RP_REQ_BASE ($E000)
+//   - Request/result block starts at RP_REQ_BASE ($B000)
 //   - RP_GROUP and RP_CMD are the command identity at block offsets 0/1
-//   - RP_DOORBELL is the interrupt-generating MMU I/O register at $D010
+//   - RP_DOORBELL is the interrupt-generating MMU I/O register at $E010
 //   - RP_DOORBELL is trigger-only; its value is not a command byte
 //   - RP-side command dispatch is single central command-table driven
-//   - BIOS already uses $D000-$D004
+//   - BIOS simple I/O and command registers use $E000-$E004
 //
 // ============================================================
 
@@ -264,8 +264,8 @@ void taskMailbox() {
 
     gPollCount++;
 
-    if (!triggerMMUIO() && (lCount++ < 2500))
-      break;
+    if (!triggerMMUIO() && (lCount++ < 250))
+      return;
 
     ackMMUIO();
     lCount = 0;
