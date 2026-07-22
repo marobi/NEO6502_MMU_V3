@@ -52,26 +52,6 @@ void dumpMemory(const uint16_t vStartAddress, const uint16_t vEndAddress) {
 }
 
 /// <summary>
-/// load a binary at memory addresss with size
-/// </summary>
-/// <param name="vAddress"></param>
-/// <param name="vSize"></param>
-/// <param name="vBinary"></param>
-/// <returns></returns>
-bool loadBinary(const uint16_t vAddress, const uint16_t vSize, const uint8_t* vBinary) {
-  if ((vAddress + vSize) < vAddress) {
-    Serial1.printf("*E: loadBinary: binary @0x%04X with size 0x%04X does not fit\n", vAddress, vSize);
-    return false;
-  }
-
-  for (uint16_t m = 0; m < vSize; m++) {
-    write6502Memory(vAddress + m, vBinary[m]);
-  }
-
-  return true;
-}
-
-/// <summary>
 /// fill memory with a value. 
 /// You better not have your CPU running :-)
 /// BTW current context

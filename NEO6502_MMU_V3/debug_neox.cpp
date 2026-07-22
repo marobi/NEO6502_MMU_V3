@@ -2,6 +2,7 @@
 // 
 // 
 #include <Arduino.h>
+#include <stddef.h>
 
 #include "mmu.h"
 #include "mailbox.h"
@@ -17,7 +18,7 @@
 #define  MAX_FDS   6    // per process
 
 #define  NEOX_CWD_MAX 32
-#define  SPAWN_ARG_MAX 24
+#define  SPAWN_LINE_MAX 64
 
 #define  MAX_TIMER 8    // system wide
 
@@ -112,13 +113,11 @@ struct __attribute__((packed)) scheduler_info_t {
   uint8_t proc_exit_code[MAX_PROCS];
 
 
-  // resident launch metadata
+  // Resident launch metadata. The kernel transports one opaque argument
+  // line per process; tokenization is strictly a user-space concern.
   uint8_t proc_launch_id[MAX_PROCS];
-  uint8_t proc_launch_argc[MAX_PROCS];
-  uint8_t proc_launch_arg0_len[MAX_PROCS];
-  uint8_t proc_launch_arg1_len[MAX_PROCS];
-  uint8_t proc_launch_arg0[MAX_PROCS * SPAWN_ARG_MAX];
-  uint8_t proc_launch_arg1[MAX_PROCS * SPAWN_ARG_MAX];
+  uint8_t proc_launch_line_len[MAX_PROCS];
+  uint8_t proc_launch_line[MAX_PROCS * SPAWN_LINE_MAX];
   //------------------------------------------------
   uint8_t system_ticks_lo;
   uint8_t system_ticks_hi;
@@ -152,6 +151,19 @@ struct __attribute__((packed)) scheduler_info_t {
   uint8_t open_pipe_mode[OPEN_MAX];
 
 };
+
+// Compile-time guards for the validated NEOX shared-state layout.
+// SHARED_STATE is $B020, so system_ticks_lo must reside at $B36F.
+static_assert(offsetof(scheduler_info_t, proc_launch_id) == 0x013F,
+              "NEOX shared layout: proc_launch_id offset mismatch");
+static_assert(offsetof(scheduler_info_t, proc_launch_line_len) == 0x0147,
+              "NEOX shared layout: proc_launch_line_len offset mismatch");
+static_assert(offsetof(scheduler_info_t, proc_launch_line) == 0x014F,
+              "NEOX shared layout: proc_launch_line offset mismatch");
+static_assert(offsetof(scheduler_info_t, system_ticks_lo) == 0x034F,
+              "NEOX shared layout: system_ticks offset mismatch");
+static_assert(sizeof(scheduler_info_t) == 0x05BE,
+              "NEOX shared layout: scheduler_info_t size mismatch");
 
 static uint8_t SharedSpace[sizeof(scheduler_info_t)];
 static const scheduler_info_t* SharedInfo = (scheduler_info_t*)SharedSpace;
@@ -242,11 +254,12 @@ static const char* txt_wait_reason[] = {
 /// <summary>
 /// txt for open file types, must be compatible with kernel definition
 /// </summary>
-static char txt_open_type[4][4] = {
+static char txt_open_type[5][4] = {
   "-",
   "DEV",
   "FIL",
-  "PIP"
+  "PIP",
+  "DIR"
 };
 
 /// <summary>
@@ -525,7 +538,7 @@ void dumpNEOX() {
   snoop_read6502Memory(SHARED_STATE, sizeof(scheduler_info_t), SharedSpace);    // read struct
 
   switch (SharedInfo->kernel_version) {
-  case 0x020A:
+  case 0x020B:
     Serial1.println("---------------------------------------\nSystem:");
     Serial1.printf("Sys ticks         = %d\n", (SharedInfo->system_ticks_hi << 8) | SharedInfo->system_ticks_lo);
     Serial1.printf("Active PID        = %d\n", SharedInfo->active_pid);

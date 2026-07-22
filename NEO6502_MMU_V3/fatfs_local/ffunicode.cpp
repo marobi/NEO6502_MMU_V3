@@ -13,8 +13,8 @@
 #error "fatfs_local/ffconf.h must define FF_VOLUMES >= 4"
 #endif
 
-#if __has_include("../../../../../AppData/Local/arduino15/packages/rp2040/hardware/rp2040/5.7.0/libraries/FatFS/src/ffunicode.cpp")
-  #include "../../../../../AppData/Local/arduino15/packages/rp2040/hardware/rp2040/5.7.0/libraries/FatFS/src/ffunicode.cpp"
+#if __has_include("../../../../../AppData/Local/arduino15/packages/rp2040/hardware/rp2040/6.0.0/libraries/FatFS/src/ffunicode.cpp")
+  #include "../../../../../AppData/Local/arduino15/packages/rp2040/hardware/rp2040/6.0.0/libraries/FatFS/src/ffunicode.cpp"
 #elif __has_include(<ffunicode.cpp>)
   #include <ffunicode.cpp>
 #else

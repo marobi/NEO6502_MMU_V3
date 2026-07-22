@@ -1,11 +1,13 @@
 #include <Arduino.h>
 #include <string.h>
 #include "usb_hid_input.h"
+#include "config.h"
 #include "usb_keyboard_layout.h"
 #include "tusb_config.h"
 #include "Adafruit_TinyUSB.h"
 #include "monitor.h"
 #include "mailbox.h"
+#include "scheduler.h"
 #include "vdu.h"
 
 // ============================================================
@@ -239,6 +241,45 @@ static bool usb_keyboard_is_route_key(uint8_t keycode) {
   return keycode >= USB_HID_KEY_F1 && keycode <= USB_HID_KEY_F12;
 }
 
+
+/// <summary>
+/// usb_keyboard_is_console_break checks the configurable raw HID break
+/// sequence before locale translation. The default is C with either Ctrl key.
+/// </summary>
+/// <param name="keycode">Raw HID keyboard usage ID.</param>
+/// <param name="modifier">Raw HID boot-report modifier byte.</param>
+/// <returns>True when the configured break sequence is active.</returns>
+static bool usb_keyboard_is_console_break(uint8_t keycode, uint8_t modifier) {
+  if (keycode != NEOX_CONSOLE_BREAK_KEYCODE)
+    return false;
+
+  uint8_t const any_mask = NEOX_CONSOLE_BREAK_MODIFIER_ANY_MASK;
+  if (any_mask != 0 && (modifier & any_mask) == 0)
+    return false;
+
+  uint8_t const all_mask = NEOX_CONSOLE_BREAK_MODIFIER_ALL_MASK;
+  if (all_mask != 0 && (modifier & all_mask) != all_mask)
+    return false;
+
+  return true;
+}
+
+/// <summary>
+/// usb_keyboard_handle_console_break consumes one break key-down transition,
+/// disables repeat, and queues an out-of-band 6502 IRQ.
+/// </summary>
+/// <param name="keycode">Raw HID keyboard usage ID.</param>
+/// <param name="modifier">Raw HID boot-report modifier byte.</param>
+/// <returns>True when the key transition was consumed as console break.</returns>
+static bool usb_keyboard_handle_console_break(uint8_t keycode, uint8_t modifier) {
+  if (!usb_keyboard_is_console_break(keycode, modifier))
+    return false;
+
+  usb_keyboard_repeat_clear();
+  requestConsoleBreakIRQ();
+  return true;
+}
+
 /// <summary>
 /// usb_keyboard_handle_route_key_down consumes function-key routing commands.
 /// F1..F9 select console contexts 1..9, F10 returns to context 0, and F11/F12
@@ -408,6 +449,11 @@ static void usb_keyboard_process_report(const hid_keyboard_report_t& report) {
       continue;
 
     if (usb_keyboard_key_is_down(g_lastKeyboardReport, keycode))
+      continue;
+
+    // Break is out-of-band process control. Consume it before function-key
+    // routing and before locale/ASCII translation so no $03 reaches stdin.
+    if (usb_keyboard_handle_console_break(keycode, report.modifier))
       continue;
 
     if (usb_keyboard_handle_route_key_down(keycode))

@@ -11,8 +11,8 @@ $ProjectName = Split-Path $ProjectDir -Leaf
 
 $VMBuildRoot = "$env:LOCALAPPDATA\Temp\VMBuilds\$ProjectName"
 $ArduinoRoot = "$env:LOCALAPPDATA\arduino15\packages\rp2040"
-$OpenOCD     = "$ArduinoRoot\tools\pqt-openocd\4.1.0-1aec55e\bin\openocd.exe"
-$OpenOCDScripts = "$ArduinoRoot\tools\pqt-openocd\4.1.0-1aec55e\share\openocd\scripts"
+$OpenOCD     = "$ArduinoRoot\tools\pqt-openocd\5.0.0-9576866\bin\openocd.exe"
+$OpenOCDScripts = "$ArduinoRoot\tools\pqt-openocd\5.0.0-9576866\share\openocd\scripts"
 
 # ------------------------------------------------
 # Locate latest Visual Micro build folder

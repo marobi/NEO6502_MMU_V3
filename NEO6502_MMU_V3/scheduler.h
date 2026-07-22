@@ -19,7 +19,8 @@ enum irq_source_t {
   RP_SRC_NONE = 0,
   RP_SRC_TIMER,
   RP_SRC_MONITOR,
-  RP_SRC_FS_DONE
+  RP_SRC_FS_DONE,
+  RP_SRC_CONSOLE_BREAK
 };
 
 /// <summary>
@@ -38,6 +39,11 @@ bool genIRQ6502(irq_source_t vSrc);
 /// Queues one filesystem-completion interrupt for delivery to the 6502.
 /// </summary>
 void requestFSCompletionIRQ();
+
+/// <summary>
+/// Queues one console-break interrupt for delivery to the 6502.
+/// </summary>
+void requestConsoleBreakIRQ();
 
 void stopIRQTimer();
 

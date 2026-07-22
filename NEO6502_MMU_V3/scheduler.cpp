@@ -45,6 +45,7 @@ void schedSwitchcontext(const uint8_t vContext) {
 
 static bool gIntrPending = false;
 static bool gFsCompletionPending = false;
+static bool gConsoleBreakPending = false;
 
 /// <summary>
 /// 
@@ -74,6 +75,14 @@ bool genIRQ6502(irq_source_t vSrc) {
 /// </summary>
 void requestFSCompletionIRQ() {
   gFsCompletionPending = true;
+}
+
+/// <summary>
+/// Queues one out-of-band console-break interrupt. Repeated break
+/// requests coalesce while the single RP IRQ slot is occupied.
+/// </summary>
+void requestConsoleBreakIRQ() {
+  gConsoleBreakPending = true;
 }
 
 static bool irqTimerEnabled = false;
@@ -131,9 +140,18 @@ void taskIRQTimer() {
     return;
   }
 
-  // Filesystem completion has priority over the periodic timer. A timer or
-  // monitor interrupt that already owns the single IRQ slot merely delays this
-  // request; it cannot lose the completion notification.
+  // Console break has priority over asynchronous filesystem completion and
+  // the periodic timer. Requests coalesce until the single IRQ slot is free.
+  if (gConsoleBreakPending) {
+    if (genIRQ6502(RP_SRC_CONSOLE_BREAK))
+      gConsoleBreakPending = false;
+
+    return;
+  }
+
+  // Filesystem completion has priority over the periodic timer. A timer,
+  // monitor, or console-break interrupt that already owns the single IRQ slot
+  // merely delays this request; it cannot lose the completion notification.
   if (gFsCompletionPending) {
     if (genIRQ6502(RP_SRC_FS_DONE))
       gFsCompletionPending = false;
@@ -188,6 +206,7 @@ void taskScheduler() {
 /// </summary>
 void initScheduler() {
   gFsCompletionPending = false;
+  gConsoleBreakPending = false;
   snoop_write6502MemoryLoc(RP_IRQ_SOURCE, RP_SRC_NONE);
   snoop_write6502MemoryLoc(RP_IRQ_STATE, RP_IRQ_NONE);
 }

@@ -40,6 +40,12 @@
 #define RP_CONSOLE_RDY  0xB012                      // console ready: 0 when no input available
 #define RP_IRQ_STATE    0xB013                      // IRQ state: 0=none, 1=pending
 
+#define RP_IRQ_SRC_NONE           0x00
+#define RP_IRQ_SRC_TIMER          0x01
+#define RP_IRQ_SRC_MONITOR        0x02
+#define RP_IRQ_SRC_FS_DONE        0x03
+#define RP_IRQ_SRC_CONSOLE_BREAK  0x04
+
 
 // ------------------------------------------------------------
 // Mailbox FSM states used by the central dispatcher and command modules

@@ -12,7 +12,7 @@ Lesser General Public License for more details.
 */
 #pragma once
 
-#define VERSION "3.15.678"
+#define VERSION "3.17.687"
 
 #define USE_VALIDATION 0
 
@@ -20,7 +20,29 @@ Lesser General Public License for more details.
 //   USB_KEYBOARD_LOCALE_US
 //   USB_KEYBOARD_LOCALE_DE
 // Runtime monitor command: keymap [us|de]
+
 #define USB_KEYBOARD_DEFAULT_LOCALE USB_KEYBOARD_LOCALE_US
+
+// NEOX foreground-process break sequence, matched against raw HID reports
+// before locale/ASCII translation.
+//
+// Defaults:
+//   keycode $06 = HID Keyboard C
+//   modifier-any mask $11 = left Ctrl ($01) or right Ctrl ($10)
+//
+// MODIFIER_ANY_MASK:
+//   At least one configured bit must be present when nonzero.
+//
+// MODIFIER_ALL_MASK:
+//   Every configured bit must be present when nonzero.
+//
+// Examples:
+//   Ctrl-C (either Ctrl): key=$06, any=$11, all=$00
+//   Ctrl-Shift-C:         key=$06, any=$11, all=$22
+//   F12 without modifier: key=$45, any=$00, all=$00
+#define NEOX_CONSOLE_BREAK_KEYCODE            0x06
+#define NEOX_CONSOLE_BREAK_MODIFIER_ANY_MASK  0x11
+#define NEOX_CONSOLE_BREAK_MODIFIER_ALL_MASK  0x00
 
 // -------------------------------------------------------------------------------------
 

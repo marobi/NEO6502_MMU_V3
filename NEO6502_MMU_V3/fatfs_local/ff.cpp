@@ -18,8 +18,8 @@
 // Prefer the known Arduino-Pico 5.7.0 package location relative to Rien's
 // Visual Studio project layout. Keep a fallback through the build include path
 // for machines where the FatFS src directory is still on the include path.
-#if __has_include("../../../../../AppData/Local/arduino15/packages/rp2040/hardware/rp2040/5.7.0/libraries/FatFS/src/ff.cpp")
-  #include "../../../../../AppData/Local/arduino15/packages/rp2040/hardware/rp2040/5.7.0/libraries/FatFS/src/ff.cpp"
+#if __has_include("../../../../../AppData/Local/arduino15/packages/rp2040/hardware/rp2040/6.0.0/libraries/FatFS/src/ff.cpp")
+  #include "../../../../../AppData/Local/arduino15/packages/rp2040/hardware/rp2040/6.0.0/libraries/FatFS/src/ff.cpp"
 #elif __has_include(<ff.cpp>)
   #include <ff.cpp>
 #else

@@ -105,7 +105,6 @@ static int waitForUserSelection(unsigned long timeoutMs) {
 /// <param name="cfgIndex"></param>
 /// <returns></returns>
 bool activateConfiguration(int cfgIndex) {
-  uint8_t* data;
 
   if (cfgIndex < 0 || cfgIndex >= MAX_CONFIG)
     return false;
@@ -128,19 +127,10 @@ bool activateConfiguration(int cfgIndex) {
 
     vduPrintf("%32s %2d ", fullPath, ctx);
     
-    // read image of ROM file into memory
-    data = readBinaryFile(fullPath);
-    if (data) {
-      // Activate context before loading
-      setMMUContext(ctx);
+    // Activate context before streaming the cartridge directly into memory.
+    setMMUContext(ctx);
 
-      // load ROM
-      if (!loadROMCartridge(data)) {
-        Serial1.println("*E: Cartridge load failed.");
-        return false;
-      }
-    }
-    else {
+    if (!loadROMCartridgeFile(fullPath)) {
       Serial1.println("*E: Cartridge load failed.");
       return false;
     }

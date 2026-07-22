@@ -569,6 +569,18 @@ static void cmdLSCallback(cmd* c) {
   Serial1.printf("*I: ls: OK entries=%u\n", (unsigned)count);
 }
 
+/// <summary>
+/// 
+/// </summary>
+/// <param name="c"></param>
+static void cmdBootCallback(cmd* c) {
+  Command cmd(c);
+
+  Serial1.println("*I: Booting NEOX ...");
+  set6502State(sRUNNING);
+  set6502Clockfrequency(8 * MHZ);
+  startIRQTimer(10);
+}
 
 // DEBUG BEGIN: temporary RP V31 bulk filesystem monitor command
 static constexpr uint16_t FSBULK_ARG_ADDR = 0x0200;
@@ -840,6 +852,7 @@ static void cmdFSBulkCallback(cmd* c) {
 static void cmdHelpCallback(cmd* c) {
   Serial1.print(F("\nMICmon help:\n\
  > <address> <data>    modify memory address(es)\n\
+ b/oot                 boot NEOX\n\
  clock <freq MHz>      set 6502 clock frequency\n\
  ctx                   show mmu context\n\
  d/is <from> <lines>   disasm memory\n\
@@ -889,6 +902,8 @@ static void errorCallback(cmd_error* e) {
 /// </summary>
 void initMonitor() {
   Serial1.printf("\nMIC-ICM (%s) %s\n%x> ", BIOS_CPU, MON_VERSION, getMMUContext());
+
+  gCmd = gCli.addCmd("b/oot", cmdBootCallback);
 
   // Create the commands with callback function
   gCmd = gCli.addCmd("clock", cmdClockCallback);
@@ -971,16 +986,64 @@ void initMonitor() {
 
 ////////////////////////////////////////////////////////////////////////////
 
+static constexpr size_t ICM_INPUT_BUFFER_SIZE = 40;
+
 static uint8_t gInputIndex = 0;
-static char    gInputBuffer[40] = "\0";
+static char gInputBuffer[ICM_INPUT_BUFFER_SIZE] = { 0 };
+static bool gInputOverflow = false;
+
+/// <summary>
+/// Resets the Serial1 monitor command-line buffer to an empty state.
+/// </summary>
+static void resetMonitorInput() {
+  gInputIndex = 0;
+  gInputBuffer[0] = '\0';
+  gInputOverflow = false;
+}
+
+/// <summary>
+/// Appends one printable ASCII byte to the monitor command-line buffer.
+/// An overlong line is discarded through its terminating newline so probe
+/// reconnect noise cannot overwrite adjacent RP memory or become a command.
+/// </summary>
+/// <param name="c">Printable ASCII byte to append.</param>
+/// <returns>true when appended; false when ignored or the line overflowed.</returns>
+static bool appendMonitorInput(const int c) {
+  if (gInputOverflow)
+    return false;
+
+  if ((c < 0x20) || (c > 0x7E))
+    return false;
+
+  if (gInputIndex >= (ICM_INPUT_BUFFER_SIZE - 1)) {
+    gInputIndex = 0;
+    gInputBuffer[0] = '\0';
+    gInputOverflow = true;
+    return false;
+  }
+
+  gInputBuffer[gInputIndex++] = static_cast<char>(c);
+  gInputBuffer[gInputIndex] = '\0';
+  return true;
+}
+
+/// <summary>
+/// Checks whether a byte received through the Debug Probe UART is safe to
+/// forward to the active terminal. NUL, framing-error values and high-bit
+/// reconnect garbage are discarded; normal 7-bit terminal controls remain valid.
+/// </summary>
+/// <param name="c">Value returned by Serial1.read().</param>
+/// <returns>true for a valid non-NUL 7-bit terminal byte.</returns>
+static bool isValidProbeTerminalInput(const int c) {
+  return (c > 0x00) && (c <= 0x7F);
+}
 
 /// <summary>
 /// return to ICM mode, resetting the input buffer and index, and printing a new prompt for the CLI
 /// </summary>
 static void returnToICM() {
   gInterface = 0x00;                  // return to ICM
-  gInputIndex = 0;
-  gInputBuffer[0] = '\0';
+  resetMonitorInput();
   gInMonitor = false;                 // TODO: not correct
 
   Serial1.printf("%x> ", getMMUContext()); // new prompt for CLI
@@ -989,7 +1052,8 @@ static void returnToICM() {
 /// <summary>
 /// monitorConsoleInput feeds one byte into the console/terminal input path.
 /// It performs the same local echo and CPU queue handling as the existing
-/// Serial1 terminal path. When allowReturnToICM is false, Ctrl-Z is treated as
+/// Serial1 terminal path. Ctrl-C is always consumed as an out-of-band NEOX
+/// console-break request. When allowReturnToICM is false, Ctrl-Z is treated as
 /// a normal control byte and is delivered to the selected console instead of
 /// returning to the Serial1 monitor.
 /// </summary>
@@ -997,6 +1061,14 @@ static void returnToICM() {
 /// <param name="allowReturnToICM">true for Serial1 terminal mode, false for USB keyboard input.</param>
 /// <returns>true if the byte was accepted; false if CPU input queueing failed.</returns>
 bool monitorConsoleInput(uint8_t c, bool allowReturnToICM) {
+  // The RP/Serial terminal supplies already translated character bytes.
+  // Ctrl-C is therefore fixed at ASCII control byte $03 on this path.
+  // Consume it before local echo, VDU control processing, or CPU queueing.
+  if (c == ctrl('C')) {
+    requestConsoleBreakIRQ();
+    return true;
+  }
+
   if (c == ctrl('Z') && allowReturnToICM) { // ^Z returns only Serial1 terminal mode to ICM
     returnToICM();
     return true;
@@ -1065,8 +1137,10 @@ void taskICMonitor() {
     // Check if user typed something on keyboard
   if (Serial1.available()) {
     c = Serial1.read();
+
     if (gInterface != 0) {
-      normalInput(c);
+      if (isValidProbeTerminalInput(c))
+        normalInput(static_cast<uint8_t>(c));
     }
     else {
       switch (c) {
@@ -1088,17 +1162,17 @@ void taskICMonitor() {
         break;
 
       case '\n':                                 // CR
-        // Parse the user input into the CLI & execute
-        gCli.parse(gInputBuffer);
+        // Parse only complete, bounded command lines. Overlong lines are
+        // discarded because they may be reconnect noise from the Debug Probe.
+        if (!gInputOverflow)
+          gCli.parse(gInputBuffer);
         if (gInterface == 0)
           Serial1.printf("%x> ", getMMUContext());                   // new prompt
-        gInputIndex = 0;                         // new buffer
-        gInputBuffer[0] = '\0';
+        resetMonitorInput();
         break;
 
       default:                                   // enter in buffer
-        gInputBuffer[gInputIndex++] = c;
-        gInputBuffer[gInputIndex] = '\0';
+        appendMonitorInput(c);
         break;
       }
     }
